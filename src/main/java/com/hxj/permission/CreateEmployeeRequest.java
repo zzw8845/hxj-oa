@@ -1,0 +1,26 @@
+package com.hxj.permission;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+
+import java.util.List;
+
+public record CreateEmployeeRequest(
+        @Schema(description = "姓名") @NotBlank String name,
+        @Schema(description = "工号") @NotBlank String jobNo,
+        @Schema(description = "登录账号") @NotBlank String account,
+        @Schema(description = "登录密码（明文传输，建议配合 HTTPS）") @NotBlank String password,
+        @Schema(description = "所属部门") @NotBlank String department,
+        @Schema(description = "岗位") @NotBlank String post,
+        @Schema(description = "授予的角色ID列表") @NotEmpty List<Long> roleIds) {
+
+    /**
+     * 紧凑构造器：集合组件防御性拷贝为不可变列表，null 归一化为不可变空列表。
+     *
+     * <p>请求 DTO 来自外部输入，拷贝可确保后续业务流转期间入参不被改动。
+     */
+    public CreateEmployeeRequest {
+        roleIds = roleIds == null ? List.of() : List.copyOf(roleIds);
+    }
+}

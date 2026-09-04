@@ -1,0 +1,67 @@
+spring:
+  application:
+    name: oa-approval-system
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password:
+      timeout: 3s
+  datasource:
+    url: jdbc:mysql://localhost:3306/oa?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+server:
+  port: 8080
+
+flowable:
+  database-schema-update: true
+  async-executor-activate: false
+  async-history-executor-activate: false
+  app:
+    enabled: false
+  cmmn:
+    enabled: false
+  dmn:
+    enabled: false
+  idm:
+    enabled: false
+  eventregistry:
+    enabled: false
+
+app:
+  jwt:
+    secret: oa-approval-system-jwt-secret-key-please-change-in-production-2026
+    # Token 有效期 4 小时（敏感 OA 系统，不宜过长）
+    expiration-ms: 14400000
+  upload-dir: ./uploads
+  risk-threshold: 80000
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+logging:
+  level:
+    com.hxj: DEBUG
+    org.flowable: WARN
