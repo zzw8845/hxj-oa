@@ -1,57 +1,29 @@
 package com.hxj.entity;
 
-import io.swagger.v3.oas.annotations.media.Schema;
-
-/** 业务类型枚举。 */
-@Schema(description = "业务类型：PURCHASE采购类/SALES销售类/CONTRACT合同类/PAYMENT付款类/REIMBURSEMENT报销类/OTHER其他/SEAL_APPLICATION用印申请/BUSINESS_PAYMENT业务付款/DAILY_PAYMENT日常报销")
+/** 系统支持的三类业务单据（日常付款/业务付款/用印申请）。 */
 public enum BusinessType {
-    PURCHASE(0, "采购类"),
-    SALES(1, "销售类"),
-    CONTRACT(2, "合同类"),
-    PAYMENT(3, "付款类"),
-    REIMBURSEMENT(4, "报销类"),
-    OTHER(5, "其他"),
-    SEAL_APPLICATION(6, "用印申请"),
-    BUSINESS_PAYMENT(7, "业务付款"),
-    DAILY_PAYMENT(8, "日常报销");
+    /** 日常付款：日常费用类付款业务，含费用报销、差旅费、招待费、借款申请等。 */
+    DAILY_PAYMENT("BX"),
+    /** 业务付款：应付款申请、供应商货款、工资社保等业务侧付款。 */
+    BUSINESS_PAYMENT("FK"),
+    /** 用印申请：用印及证照类申请，不涉及资金收付。 */
+    SEAL_APPLICATION("YY");
 
-    private final int code;
-    private final String label;
+    private final String codePrefix;
 
-    BusinessType(int code, String label) {
-        this.code = code;
-        this.label = label;
+    BusinessType(String codePrefix) {
+        this.codePrefix = codePrefix;
     }
 
-    public int getCode() {
-        return code;
-    }
-
-    public String getLabel() {
-        return label;
-    }
-
-    public static BusinessType fromCode(int code) {
-        for (BusinessType value : values()) {
-            if (value.code == code) {
-                return value;
-            }
-        }
-        throw new IllegalArgumentException("未知业务类型 code: " + code);
-    }
-
-    /** 单据编号前缀：与 DocumentCodeGenerator 的编号规则一致。 */
     public String getCodePrefix() {
+        return codePrefix;
+    }
+
+    public DocumentType toDocumentType() {
         return switch (this) {
-            case PURCHASE -> "CG";
-            case SALES -> "XS";
-            case CONTRACT -> "HT";
-            case PAYMENT -> "ZF";
-            case REIMBURSEMENT -> "BM";
-            case OTHER -> "QT";
-            case SEAL_APPLICATION -> "YY";
-            case BUSINESS_PAYMENT -> "FK";
-            case DAILY_PAYMENT -> "BX";
+            case DAILY_PAYMENT -> DocumentType.DAILY_APPLICATION;
+            case BUSINESS_PAYMENT -> DocumentType.PAYMENT_APPLICATION;
+            case SEAL_APPLICATION -> DocumentType.SEAL_APPLICATION;
         };
     }
 }

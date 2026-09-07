@@ -18,11 +18,11 @@ import jakarta.validation.constraints.Min;
 public record DocumentPageRequest(
         @Schema(description = "关键字，模糊匹配单据编号、项目名称、申请人姓名")
         String keyword,
-        @Schema(description = "单据状态（枚举：DRAFT/PENDING/APPROVING/APPROVED/REJECTED/SUPPLEMENT_REQUIRED）")
+        @Schema(description = "单据状态（枚举）")
         DocumentStatus status,
-        @Schema(description = "业务类型（枚举，如 DAILY_PAYMENT/BUSINESS_PAYMENT/SEAL_APPLICATION）")
+        @Schema(description = "业务类型（枚举)")
         BusinessType businessType,
-        @Schema(description = "单据类型（枚举，如 NORMAL/CONTRACT/SEAL）")
+        @Schema(description = "单据类型（枚举）")
         DocumentType documentType,
         @Schema(description = "申请人用户 ID")
         Long applicantId,

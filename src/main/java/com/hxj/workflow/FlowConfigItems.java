@@ -24,7 +24,7 @@ public final class FlowConfigItems {
     /** 可视化节点链条目。 */
     public record FlowNodeItem(
             @Schema(description = "节点名称") String name,
-            @Schema(description = "节点类型（枚举：START/APPROVAL/COPY/END）") FlowNodeType nodeType,
+            @Schema(description = "节点类型（枚举）") FlowNodeType nodeType,
             @Schema(description = "处理角色") String assigneeRole) {
     }
 
@@ -66,7 +66,7 @@ public final class FlowConfigItems {
 
         public record FlowNodePayload(
                 @Schema(description = "节点名称") String name,
-                @Schema(description = "节点类型（枚举：START/APPROVAL/COPY/END）") FlowNodeType nodeType,
+                @Schema(description = "节点类型（枚举）") FlowNodeType nodeType,
                 @Schema(description = "处理角色") String assigneeRole) {
         }
 

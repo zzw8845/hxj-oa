@@ -14,19 +14,24 @@ import java.time.LocalDateTime;
 @Table(name = "sys_permission")
 public class SysPermission {
 
+    /** 主键。 */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** 权限点编码（唯一，如 DOCUMENT_VIEW）。 */
     @Column(nullable = false, unique = true, length = 100)
     private String code;
 
+    /** 权限点名称。 */
     @Column(nullable = false, length = 100)
     private String name;
 
+    /** 权限点说明。 */
     @Column(length = 500)
     private String description;
 
+    /** 创建时间。 */
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 

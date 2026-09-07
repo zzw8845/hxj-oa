@@ -30,19 +30,8 @@ public class ArchiveLedgerController {
         this.ledgerService = ledgerService;
     }
 
-    @Operation(summary = "归档查询", description = "仅已通过单据，按申请人、部门、单据编号、归档时间组合查询")
-    @GetMapping
-    public ApiResponse<List<ArchiveLedgerItem>> search(
-            @Parameter(description = "申请人姓名（模糊匹配）") @RequestParam(required = false) String applicant,
-            @Parameter(description = "申请部门（模糊匹配）") @RequestParam(required = false) String department,
-            @Parameter(description = "单据编号（模糊匹配）") @RequestParam(required = false) String docCode,
-            @Parameter(description = "归档时间起（含），格式 yyyy-MM-dd'T'HH:mm:ss") @RequestParam(required = false) LocalDateTime archivedFrom,
-            @Parameter(description = "归档时间止（含），格式 yyyy-MM-dd'T'HH:mm:ss") @RequestParam(required = false) LocalDateTime archivedTo) {
-        return ApiResponse.success(ledgerService.search(
-                new ArchiveLedgerQuery(applicant, department, docCode, archivedFrom, archivedTo)));
-    }
 
-    @Operation(summary = "分页归档查询", description = "同组合筛选，支持 page/size 分页，按归档时间倒序；page 从 1 开始，size 默认 10、最大 1000")
+    @Operation(summary = "分页归档查询", description = "仅已通过单据，按申请人、部门、单据编号、归档时间组合查询")
     @GetMapping("/page")
     public ApiResponse<PageResponse<ArchiveLedgerItem>> searchPaged(@Valid ArchiveLedgerPageRequest request) {
         return ApiResponse.success(ledgerService.searchPaged(request));

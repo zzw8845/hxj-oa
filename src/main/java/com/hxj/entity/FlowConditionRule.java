@@ -19,28 +19,35 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "flow_condition_rule")
 public class FlowConditionRule {
 
+    /** 主键。 */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** 所属流程配置。 */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "flow_config_id", nullable = false)
     private FlowConfig flowConfig;
 
+    /** 流程变量名（如 amount、involvesFunds）。 */
     @Column(name = "variable_name", nullable = false, length = 100)
     private String variableName;
 
+    /** 比较运算符。 */
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 50)
     private ConditionOperator operator;
 
+    /** 期望值。 */
     @Column(name = "expected_value", nullable = false, length = 200)
     private String expectedValue;
 
+    /** 命中后的目标节点。 */
     @Column(name = "target_node_name", nullable = false, length = 100)
     private String targetNodeName;
 
+    /** 规则顺序。 */
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 

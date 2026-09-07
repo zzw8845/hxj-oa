@@ -21,27 +21,33 @@ import java.time.LocalDateTime;
 @Table(name = "cc_record")
 public class CcRecord {
 
+    /** 主键。 */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** 被抄送的单据。 */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "doc_id", nullable = false)
     private OaDocument document;
 
+    /** 抄送人员（与抄送角色二选一）。 */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "target_user_id")
     private SysUser targetUser;
 
+    /** 抄送角色（与抄送人员二选一）。 */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "target_role_id")
     private SysRole targetRole;
 
+    /** 抄送来源（FLOW流程配置/SELF发起人自选）。 */
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "cc_source", nullable = false, length = 20)
     private CcSource source;
 
+    /** 创建时间。 */
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 

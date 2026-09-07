@@ -16,28 +16,39 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-/** 角色实体 */
+/**
+ * 角色实体：权限点与数据范围的载体，可分配给多名员工。
+ *
+ * <p>V1 遗留的 data_scope、permissions、members 三个文本列已由本类的 dataScope、
+ * permissions、members 关联关系取代，仅作兼容保留。
+ */
 @Entity
 @Table(name = "sys_role")
 public class SysRole {
 
+    /** 主键。 */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** 角色名称（唯一）。 */
     @Column(nullable = false, unique = true, length = 100)
     private String name;
 
+    /** 对应部门。 */
     @Column(length = 100)
     private String department;
 
+    /** 对应岗位。 */
     @Column(length = 100)
     private String post;
 
+    /** 数据范围（决定该角色可查看的单据范围）。 */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "data_scope_id", nullable = false)
     private SysDataScope dataScope;
 
+    /** 权限点集合（经 sys_role_permission 关联）。 */
     @ManyToMany
     @JoinTable(
             name = "sys_role_permission",
@@ -46,12 +57,15 @@ public class SysRole {
     )
     private Set<SysPermission> permissions = new LinkedHashSet<>();
 
+    /** 角色成员（经 sys_user_role 反向关联）。 */
     @ManyToMany(mappedBy = "roles")
     private Set<SysUser> members = new LinkedHashSet<>();
 
+    /** 创建时间。 */
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /** 更新时间。 */
     @Column(name = "updated_at", insertable = false, updatable = false)
     private LocalDateTime updatedAt;
 

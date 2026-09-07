@@ -12,27 +12,31 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 
-/** 快捷单据目录实体 */
+/** 快捷单据目录：提交单据时可选的常用单据名称。 */
 @Entity
 @Table(name = "quick_document")
 public class QuickDocument {
 
+    /** 主键。 */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /** 业务类型(日常付款/业务付款/用印申请) */
+    /** 业务类型（日常付款/业务付款/用印申请）。 */
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "business_type", nullable = false, length = 50)
     private BusinessType businessType;
 
+    /** 单据名称。 */
     @Column(nullable = false, length = 200)
     private String name;
 
+    /** 排序号。 */
     @Column(name = "sort_order")
     private Integer sortOrder = 0;
 
+    /** 创建时间。 */
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 

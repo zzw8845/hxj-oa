@@ -18,11 +18,11 @@ import java.util.List;
  * 包含业务基本信息、用印信息、关联单据、抄送人等。
  */
 public record SubmitDocumentRequest(
-        @Schema(description = "业务类型（如：采购、报销、合同等，枚举值）")
+        @Schema(description = "业务类型（枚举）")
         @NotNull BusinessType businessType,
         @Schema(description = "项目名称（必填）")
         @NotBlank String projectName,
-        @Schema(description = "所属公司（枚举值，如：海峡金、子公司等）")
+        @Schema(description = "所属公司（枚举）")
         Company company,
         @Schema(description = "金额（元，精确到分）")
         BigDecimal amount,
@@ -50,7 +50,7 @@ public record SubmitDocumentRequest(
         LocalDateTime sealTime,
         @Schema(description = "用印文件名")
         String sealFileName,
-        @Schema(description = "印章类型（枚举值，如：公章、合同章、财务章等）")
+        @Schema(description = "印章类型（枚举）")
         SealType sealType,
         @Schema(description = "用印事由")
         String sealReason,

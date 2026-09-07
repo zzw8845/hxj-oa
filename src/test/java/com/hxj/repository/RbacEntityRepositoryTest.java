@@ -84,7 +84,7 @@ class RbacEntityRepositoryTest {
     }
 
     @Test
-    void shouldExposeInactiveEmploymentStatusAsNotLoginEnabled() {
+    void shouldExposeResignedEmploymentStatusAsNotLoginEnabled() {
         SysUser resignedUser = new SysUser();
         resignedUser.setName("离职员工");
         resignedUser.setJobNo("E0002");

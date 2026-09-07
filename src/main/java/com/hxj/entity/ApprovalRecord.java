@@ -21,53 +21,67 @@ import java.time.LocalDateTime;
 @Table(name = "approval_record")
 public class ApprovalRecord {
 
+    /** 主键。 */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** 所属单据。 */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "doc_id", nullable = false)
     private OaDocument document;
 
+    /** 节点名称。 */
     @Column(name = "node_name", length = 100)
     private String nodeName;
 
+    /** 审批人。 */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "approver_id", nullable = false)
     private SysUser approver;
 
+    /** 审批操作（APPROVE通过/REJECT驳回/SUPPLEMENT补充材料/SIGN加签）。 */
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 50)
     private ApprovalAction action;
 
+    /** 审批意见。 */
     @Column(columnDefinition = "TEXT")
     private String comment;
 
+    /** 驳回目标层级。 */
     @Column(name = "reject_target", length = 100)
     private String rejectTarget;
 
+    /** 驳回需补充材料。 */
     @Column(name = "reject_materials", length = 500)
     private String rejectMaterials;
 
+    /** 补材料模式（BEFORE_PAY付款前/AFTER_PAY付款后）。 */
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "supplement_mode", length = 20)
     private SupplementMode supplementMode;
 
+    /** 补材料指定对象。 */
     @Column(name = "supplement_target", length = 100)
     private String supplementTarget;
 
+    /** 需补充材料清单。 */
     @Column(name = "supplement_materials", length = 500)
     private String supplementMaterials;
 
+    /** 加签人员。 */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sign_user_id")
     private SysUser signUser;
 
+    /** 加签说明。 */
     @Column(name = "sign_reason", length = 500)
     private String signReason;
 
+    /** 审批凭证附件。 */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "evidence_file_id")
     private OaAttachment evidenceFile;
@@ -76,6 +90,7 @@ public class ApprovalRecord {
     @Column(nullable = false)
     private boolean resolved = true;
 
+    /** 操作时间。 */
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 

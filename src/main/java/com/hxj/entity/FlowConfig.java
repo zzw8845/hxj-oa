@@ -23,29 +23,36 @@ import java.util.List;
 @Table(name = "flow_config")
 public class FlowConfig {
 
+    /** 主键。 */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** 业务单据类型（唯一，如"费用报销""应付款申请"）。 */
     @Column(nullable = false, unique = true, length = 200)
     private String type;
 
+    /** 分类（DAILY日常/BUSINESS业务/SEAL用印）。 */
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 50)
     private FlowCategory category;
 
+    /** 有序节点链。 */
     @OneToMany(mappedBy = "flowConfig", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder ASC")
     private List<FlowNodeConfig> nodes = new ArrayList<>();
 
+    /** 条件分支规则。 */
     @OneToMany(mappedBy = "flowConfig", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder ASC")
     private List<FlowConditionRule> conditionRules = new ArrayList<>();
 
+    /** 创建时间。 */
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /** 更新时间。 */
     @Column(name = "updated_at", insertable = false, updatable = false)
     private LocalDateTime updatedAt;
 

@@ -14,19 +14,24 @@ import java.time.LocalDateTime;
 @Table(name = "sys_data_scope")
 public class SysDataScope {
 
+    /** 主键。 */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** 数据范围编码（唯一）。 */
     @Column(nullable = false, unique = true, length = 100)
     private String code;
 
+    /** 数据范围名称。 */
     @Column(nullable = false, length = 100)
     private String name;
 
+    /** 数据范围说明。 */
     @Column(length = 500)
     private String description;
 
+    /** 创建时间。 */
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 

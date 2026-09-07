@@ -19,33 +19,41 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-/** 用户实体 */
+/** 用户（员工）实体，一名员工可分配多个角色。 */
 @Entity
 @Table(name = "sys_user")
 public class SysUser {
 
+    /** 主键。 */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** 姓名。 */
     @Column(nullable = false, length = 50)
     private String name;
 
+    /** 工号（唯一）。 */
     @Column(name = "job_no", unique = true, length = 50)
     private String jobNo;
 
+    /** 登录账号（唯一）。 */
     @Column(nullable = false, unique = true, length = 50)
     private String account;
 
+    /** 登录密码（BCrypt 加密）。 */
     @Column(nullable = false)
     private String password;
 
+    /** 所属部门。 */
     @Column(length = 100)
     private String department;
 
+    /** 岗位。 */
     @Column(length = 100)
     private String post;
 
+    /** 分配角色集合（经 sys_user_role 关联，权限由角色继承）。 */
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "sys_user_role",
@@ -54,14 +62,17 @@ public class SysUser {
     )
     private Set<SysRole> roles = new LinkedHashSet<>();
 
+    /** 在职状态（ACTIVE在职/RESIGNED离职），仅在职可登录。 */
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 20)
     private UserStatus status = UserStatus.ACTIVE;
 
+    /** 创建时间。 */
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /** 更新时间。 */
     @Column(name = "updated_at", insertable = false, updatable = false)
     private LocalDateTime updatedAt;
 

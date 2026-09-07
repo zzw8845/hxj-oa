@@ -12,7 +12,7 @@ public record EmployeeResponse(
         @Schema(description = "登录账号") String account,
         @Schema(description = "所属部门") String department,
         @Schema(description = "岗位") String post,
-        @Schema(description = "用户状态（枚举：ACTIVE=在职 / RESIGNED=离职）") UserStatus status,
+        @Schema(description = "用户状态（枚举）") UserStatus status,
         @Schema(description = "角色名称列表") List<String> roles) {
 
     /** 紧凑构造器：集合组件防御性拷贝为不可变列表，null 归一化为不可变空列表。 */

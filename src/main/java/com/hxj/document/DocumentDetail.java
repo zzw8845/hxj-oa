@@ -100,7 +100,7 @@ public record DocumentDetail(
             String nodeName,
             @Schema(description = "审批人姓名")
             String approver,
-            @Schema(description = "审批操作（枚举：通过/驳回/加签等）")
+            @Schema(description = "审批操作（枚举）")
             ApprovalAction action,
             @Schema(description = "审批意见")
             String comment,

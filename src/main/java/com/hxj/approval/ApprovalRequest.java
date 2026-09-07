@@ -17,7 +17,7 @@ public record ApprovalRequest(
         String rejectTarget,
         @Schema(description = "驳回时要求补充的材料说明")
         String rejectMaterials,
-        @Schema(description = "补材料模式（枚举：后补/即补）")
+        @Schema(description = "补材料模式（枚举）")
         SupplementMode supplementMode,
         @Schema(description = "补材料目标节点")
         String supplementTarget,

@@ -17,33 +17,42 @@ import java.time.LocalDateTime;
 @Table(name = "oa_attachment")
 public class OaAttachment {
 
+    /** 主键。 */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** 所属单据。 */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "doc_id", nullable = false)
     private OaDocument document;
 
+    /** 所属节点（上传该文件时所在的流程节点）。 */
     @Column(name = "node_name", length = 100)
     private String nodeName;
 
+    /** 原始文件名。 */
     @Column(name = "file_name", nullable = false, length = 255)
     private String fileName;
 
+    /** 存储路径。 */
     @Column(name = "file_path", nullable = false, length = 500)
     private String filePath;
 
+    /** 文件 MIME 类型。 */
     @Column(name = "content_type", length = 100)
     private String contentType;
 
+    /** 文件大小（字节）。 */
     @Column(name = "file_size")
     private Long fileSize;
 
+    /** 上传人。 */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "uploader_id")
     private SysUser uploader;
 
+    /** 上传时间。 */
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 

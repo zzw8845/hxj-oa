@@ -48,19 +48,8 @@ public class DocumentController {
         return ApiResponse.success(documentService.submit(request));
     }
 
-    @Operation(summary = "查询单据列表", description = "按关键字、状态、业务类型、单据类型、申请人组合筛选，按数据范围过滤")
-    @GetMapping
-    public ApiResponse<List<DocumentSummary>> search(
-            @Parameter(description = "关键字，模糊匹配单据编号/项目名称/申请人") @RequestParam(required = false) String keyword,
-            @Parameter(description = "单据状态（枚举）") @RequestParam(required = false) DocumentStatus status,
-            @Parameter(description = "业务类型（枚举）") @RequestParam(required = false) BusinessType businessType,
-            @Parameter(description = "单据类型（枚举）") @RequestParam(required = false) DocumentType documentType,
-            @Parameter(description = "申请人用户ID") @RequestParam(required = false) Long applicantId) {
-        return ApiResponse.success(documentService.search(
-                new DocumentSearchCriteria(keyword, status, businessType, documentType, applicantId)));
-    }
 
-    @Operation(summary = "分页查询单据列表", description = "同组合筛选，支持 page/size 分页，按更新时间倒序；page 从 1 开始，size 默认 10、最大 1000")
+    @Operation(summary = "分页查询单据列表", description = "按关键字、状态、业务类型、单据类型、申请人组合筛选，按数据范围过滤")
     @GetMapping("/page")
     public ApiResponse<PageResponse<DocumentSummary>> searchPaged(
             @Valid DocumentPageRequest request) {

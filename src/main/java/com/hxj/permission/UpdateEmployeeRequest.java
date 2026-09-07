@@ -13,7 +13,7 @@ public record UpdateEmployeeRequest(
         @Schema(description = "工号") @NotBlank String jobNo,
         @Schema(description = "所属部门") @NotBlank String department,
         @Schema(description = "岗位") @NotBlank String post,
-        @Schema(description = "用户状态（枚举：ACTIVE=在职 / RESIGNED=离职）") @NotNull UserStatus status,
+        @Schema(description = "用户状态（枚举）") @NotNull UserStatus status,
         @Schema(description = "新密码；为空表示不修改密码") String newPassword,
         @Schema(description = "授予的角色ID列表") @NotEmpty List<Long> roleIds) {
 

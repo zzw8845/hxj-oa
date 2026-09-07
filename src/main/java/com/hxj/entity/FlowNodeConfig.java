@@ -19,25 +19,31 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "flow_node_config")
 public class FlowNodeConfig {
 
+    /** 主键。 */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** 所属流程配置。 */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "flow_config_id", nullable = false)
     private FlowConfig flowConfig;
 
+    /** 节点名称。 */
     @Column(nullable = false, length = 100)
     private String name;
 
+    /** 节点类型（START/APPROVAL/CONDITION/HANDLER/CC/END）。 */
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "node_type", nullable = false, length = 30)
     private FlowNodeType nodeType;
 
+    /** 审批角色（指定由哪个角色处理）。 */
     @Column(name = "assignee_role", length = 100)
     private String assigneeRole;
 
+    /** 节点顺序。 */
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 
