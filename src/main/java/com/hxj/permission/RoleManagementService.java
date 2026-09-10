@@ -58,8 +58,29 @@ public class RoleManagementService {
         roleRepository.findByName(request.name())
                 .filter(other -> !other.getId().equals(roleId))
                 .ifPresent(other -> { throw new BusinessException(ErrorCodeEnum.ROLE_EXISTS, "角色名称已存在"); });
+        String oldName = role.getName();
+        boolean renamed = !oldName.equals(request.name());
         apply(role, request);
+        if (renamed) {
+            syncFlowNodeAssignee(oldName, request.name());
+        }
         return toResponse(role);
+    }
+
+    /**
+     * 角色改名后同步流程节点的审批角色字符串：组合串（"A/B"）按段精确替换，
+     * 避免改名后流程节点绑定的旧角色名失效、审批任务无人可领。
+     */
+    private void syncFlowNodeAssignee(String oldName, String newName) {
+        List<com.hxj.entity.FlowNodeConfig> nodes =
+                flowNodeConfigRepository.findByAssigneeRoleContaining(oldName);
+        for (com.hxj.entity.FlowNodeConfig node : nodes) {
+            String updated = java.util.Arrays.stream(node.getAssigneeRole().split("[/、]"))
+                    .map(segment -> segment.trim().equals(oldName) ? newName : segment.trim())
+                    .collect(java.util.stream.Collectors.joining("/"));
+            node.setAssigneeRole(updated);
+        }
+        flowNodeConfigRepository.saveAll(nodes);
     }
 
     @Transactional(readOnly = true)

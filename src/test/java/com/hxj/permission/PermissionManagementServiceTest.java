@@ -225,6 +225,32 @@ class PermissionManagementServiceTest {
     }
 
     @Test
+    void shouldSyncFlowNodeAndRolePostOnRename() {
+        // 流程节点绑定的角色组合串随角色改名按段同步
+        FlowConfig flowConfig = new FlowConfig();
+        flowConfig.setType("改名同步流程");
+        flowConfig.setCategory(FlowCategoryEnum.DAILY);
+        FlowNodeConfig node = new FlowNodeConfig("直属主管", FlowNodeTypeEnum.APPROVAL);
+        node.setAssigneeRole(role.getName() + "/其他角色");
+        flowConfig.addNode(node);
+        flowConfigRepository.saveAndFlush(flowConfig);
+
+        roleService.update(role.getId(), new SaveRoleRequest(
+                "改名后角色", departmentId, "员工", scope.getCode(), null, List.of(permission.getCode())));
+
+        assertThat(roleRepository.findById(role.getId()).orElseThrow().getName()).isEqualTo("改名后角色");
+        FlowNodeConfig updated = flowConfigRepository.findById(flowConfig.getId()).orElseThrow()
+                .getNodes().stream().filter(n -> n.getName().equals("直属主管")).findFirst().orElseThrow();
+        assertThat(updated.getAssigneeRole()).isEqualTo("改名后角色/其他角色");
+
+        // 岗位改名同步角色岗位快照
+        role.setPost("专员");
+        roleRepository.save(role);
+        postService.update(postId, new SavePostRequest("高级专员"));
+        assertThat(roleRepository.findById(role.getId()).orElseThrow().getPost()).isEqualTo("高级专员");
+    }
+
+    @Test
     void shouldListPermissionAndDataScopeDictionaries() {
         List<PermissionViews.PermissionPoint> permissions = roleService.listPermissions();
         assertThat(permissions).extracting(PermissionViews.PermissionPoint::code).contains("VIEW_OWN_FORMS");

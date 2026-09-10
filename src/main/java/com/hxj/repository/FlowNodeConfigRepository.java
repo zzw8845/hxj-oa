@@ -23,4 +23,7 @@ public interface FlowNodeConfigRepository extends JpaRepository<FlowNodeConfig, 
     @Modifying
     @Query("delete from FlowNodeConfig n where n.flowConfig.id = :configId")
     void deleteByConfigId(@Param("configId") Long configId);
+
+    /** 绑定了指定角色（子串匹配；组合串按段精确同步由服务层处理）的节点。 */
+    List<FlowNodeConfig> findByAssigneeRoleContaining(String roleName);
 }
