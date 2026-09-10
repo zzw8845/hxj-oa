@@ -40,3 +40,5 @@ build/
 
 ### 运行时上传目录（app.upload-dir） ###
 uploads/
+### JetBrains IDE ###
+.idea/
