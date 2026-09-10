@@ -21,7 +21,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
@@ -34,7 +36,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "spring.flyway.enabled=false"
 })
-@Import({EmployeeManagementService.class, RoleManagementService.class,
+@Import({EmployeeManagementService.class, EmployeeOffboardingService.class, RoleManagementService.class, PermissionManagementServiceTest.OffboardingPortConfig.class,
         DepartmentManagementService.class, PostManagementService.class,
         SecurityBeansConfig.class})
 class PermissionManagementServiceTest {
@@ -73,6 +75,28 @@ class PermissionManagementServiceTest {
         postId = postService.create(new SavePostRequest("专员")).id();
     }
 
+    /** 离职校验上下文的空工作流端口（本测试不涉及 Flowable 流转）。 */
+    @TestConfiguration
+    static class OffboardingPortConfig {
+        @Bean
+        public com.hxj.workflow.WorkflowPort offboardingWorkflowPort() {
+            return new com.hxj.workflow.WorkflowPort() {
+                @Override public String startProcess(Long configId, Long documentId, java.util.Map<String, Object> variables) { return "pid-" + documentId; }
+                @Override public void completeTask(String taskId, java.util.Map<String, Object> variables) { }
+                @Override public java.util.List<org.flowable.task.api.Task> pendingTasksForUser(String account, java.util.List<String> roleNames) { return java.util.List.of(); }
+                @Override public java.util.List<org.flowable.task.api.Task> tasksForProcess(String processInstanceId) { return java.util.List.of(); }
+                @Override public java.util.List<org.flowable.task.api.Task> allActiveTasks() { return java.util.List.of(); }
+                @Override public java.util.List<org.flowable.task.api.Task> delegatedTasks() { return java.util.List.of(); }
+                @Override public void moveTaskToActivity(String processInstanceId, String taskId, String targetActivityId) { }
+                @Override public void endProcess(String processInstanceId, String reason) { }
+                @Override public void setAssignee(String taskId, String account) { }
+                @Override public void delegateTask(String taskId, String account) { }
+                @Override public void resolveTask(String taskId) { }
+                @Override public java.util.List<com.hxj.workflow.WorkflowHistoryItemResponse> history(String processInstanceId) { return java.util.List.of(); }
+                @Override public java.util.List<com.hxj.workflow.WorkflowNodeStatResponse> nodeStatistics() { return java.util.List.of(); }
+            };
+        }
+    }
     @Test
     void shouldCreateAndEditEmployeeAccount() {
         EmployeeResponse created = employeeService.create(new CreateEmployeeRequest(

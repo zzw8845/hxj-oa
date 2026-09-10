@@ -11,6 +11,8 @@ import com.hxj.repository.OaDocumentRepository;
 import com.hxj.repository.SysDataScopeRepository;
 import com.hxj.repository.SysRoleRepository;
 import com.hxj.repository.SysUserRepository;
+import com.hxj.permission.EmployeeResponse;
+import com.hxj.permission.UpdateEmployeeRequest;
 import com.hxj.security.AuthenticatedUserResponse;
 import com.hxj.security.TestSecurityContext;
 import com.hxj.workflow.OaWorkflowService;
@@ -59,6 +61,8 @@ class ApprovalActionServiceIntegrationTest {
     @Autowired private SysDataScopeRepository dataScopeRepository;
     @Autowired private com.hxj.repository.SysDepartmentRepository departmentRepository;
     @Autowired private com.hxj.repository.SysPostRepository postRepository;
+    @Autowired private com.hxj.permission.EmployeeOffboardingService offboardingService;
+    @Autowired private com.hxj.permission.EmployeeManagementService employeeService;
     @Autowired private RuntimeService runtimeService;
 
     private AuthenticatedUserResponse manager;
@@ -322,6 +326,62 @@ class ApprovalActionServiceIntegrationTest {
         assertThat(history).extracting(ApprovalHistoryItemResponse::source)
                 .contains("BUSINESS", "FLOWABLE");
         assertThat(history).extracting(ApprovalHistoryItemResponse::nodeName).contains("直属主管");
+    }
+
+    @Test
+    void shouldTransferPendingTasksOnOffboarding() {
+        OaDocument document = submittedDocument();
+        SysUser managerUser = userRepository.findByAccount("manager1").orElseThrow();
+
+        int transferred = offboardingService.transferAll(managerUser.getId(), "gm1", "admin1");
+
+        assertThat(transferred).isGreaterThanOrEqualTo(1);
+        assertThat(workflowService.tasksForProcess(document.getProcessInstanceId()))
+                .extracting(org.flowable.task.api.Task::getAssignee)
+                .contains("gm1");
+        assertThat(offboardingService.pendingCount(managerUser.getId())).isZero();
+        assertThat(approvalRepository.findByDocumentIdOrderByCreatedAtAsc(document.getId()))
+                .extracting(ApprovalRecord::getAction)
+                .contains(ApprovalActionEnum.TRANSFER);
+    }
+
+    @Test
+    void shouldRejectPendingDocumentsOnOffboarding() {
+        OaDocument document = submittedDocument();
+        SysUser managerUser = userRepository.findByAccount("manager1").orElseThrow();
+
+        int rejected = offboardingService.rejectAll(managerUser.getId(), "admin1");
+
+        assertThat(rejected).isGreaterThanOrEqualTo(1);
+        OaDocument reloaded = documentRepository.findById(document.getId()).orElseThrow();
+        assertThat(reloaded.getStatus()).isEqualTo(DocumentStatusEnum.REJECTED);
+        assertThat(reloaded.getCurrentNode()).isEqualTo("提交人");
+        assertThat(runtimeService.createProcessInstanceQuery()
+                .processInstanceId(document.getProcessInstanceId()).singleResult()).isNull();
+        assertThat(approvalRepository.findByDocumentIdOrderByCreatedAtAsc(document.getId()))
+                .extracting(ApprovalRecord::getAction)
+                .contains(ApprovalActionEnum.REJECT);
+    }
+
+    @Test
+    void shouldBlockResignUntilOffboardingCompleted() {
+        OaDocument document = submittedDocument();
+        SysUser managerUser = userRepository.findByAccount("manager1").orElseThrow();
+
+        // 有在途待办：离职被阻止
+        assertThatThrownBy(() -> employeeService.update(managerUser.getId(), new UpdateEmployeeRequest(
+                managerUser.getName(), "M001", managerUser.getDepartmentId(), managerUser.getPostId(),
+                null, UserStatusEnum.RESIGNED, null, List.of("二级部门负责人"))))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("在途待办");
+
+        // 全部退回提交人后离职放行
+        offboardingService.rejectAll(managerUser.getId(), "admin1");
+        login(admin);
+        EmployeeResponse resp = employeeService.update(managerUser.getId(), new UpdateEmployeeRequest(
+                managerUser.getName(), "M001", managerUser.getDepartmentId(), managerUser.getPostId(),
+                null, UserStatusEnum.RESIGNED, null, List.of("二级部门负责人")));
+        assertThat(resp.status()).isEqualTo(UserStatusEnum.RESIGNED);
     }
 
     private OaDocument submittedDocument() {

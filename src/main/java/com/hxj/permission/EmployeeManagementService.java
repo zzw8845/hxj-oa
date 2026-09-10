@@ -32,18 +32,21 @@ public class EmployeeManagementService {
     private final PasswordEncoder passwordEncoder;
     private final DepartmentManagementService departmentService;
     private final PostManagementService postService;
+    private final EmployeeOffboardingService offboardingService;
 
     public EmployeeManagementService(
             SysUserRepository userRepository,
             SysRoleRepository roleRepository,
             PasswordEncoder passwordEncoder,
             DepartmentManagementService departmentService,
-            PostManagementService postService) {
+            PostManagementService postService,
+            EmployeeOffboardingService offboardingService) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.departmentService = departmentService;
         this.postService = postService;
+        this.offboardingService = offboardingService;
     }
 
     /** 创建员工账号：解析部门/岗位字典引用，写入外键与快照。 */
@@ -86,6 +89,15 @@ public class EmployeeManagementService {
         user.setJobNo(request.jobNo());
         applyDictionary(user, department, post);
         applyManager(user, request.managerAccount());
+        // 钉钉式离职交接：转为离职前必须清空在途待办（转交或退回），避免审批任务悬空
+        if (request.status() == UserStatusEnum.RESIGNED
+                && user.getStatus() == UserStatusEnum.ACTIVE) {
+            int pending = offboardingService.pendingCount(userId);
+            if (pending > 0) {
+                throw new BusinessException(ErrorCodeEnum.EMPLOYEE_PENDING_TASKS,
+                        "该员工还有 " + pending + " 笔在途待办，请先完成转交或退回");
+            }
+        }
         user.setStatus(request.status());
         if (StringUtils.hasText(request.newPassword())) {
             user.setPassword(passwordEncoder.encode(request.newPassword()));

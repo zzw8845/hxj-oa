@@ -27,16 +27,19 @@ public class PermissionManagementController {
     private final RoleManagementService roleService;
     private final DepartmentManagementService departmentService;
     private final PostManagementService postService;
+    private final EmployeeOffboardingService offboardingService;
 
     public PermissionManagementController(
             EmployeeManagementService employeeService,
             RoleManagementService roleService,
             DepartmentManagementService departmentService,
-            PostManagementService postService) {
+            PostManagementService postService,
+            EmployeeOffboardingService offboardingService) {
         this.employeeService = employeeService;
         this.roleService = roleService;
         this.departmentService = departmentService;
         this.postService = postService;
+        this.offboardingService = offboardingService;
     }
 
     @Operation(summary = "创建员工账号", description = "创建员工账号，账号密码必填，部门/岗位传字典ID")
@@ -59,6 +62,29 @@ public class PermissionManagementController {
             @PathVariable Long id,
             @Valid @RequestBody ResetPasswordRequest request) {
         return ApiResponse.success(employeeService.resetPassword(id, request));
+    }
+
+    @Operation(summary = "离职交接-在途待办", description = "列出员工名下全部在途待办（转交/退回前的盘点）")
+    @GetMapping("/employees/{id}/offboarding/pending-tasks")
+    public ApiResponse<List<EmployeeOffboardingService.PendingTask>> offboardingPending(
+            @PathVariable Long id) {
+        return ApiResponse.success(offboardingService.pendingTasks(id));
+    }
+
+    @Operation(summary = "离职交接-批量转交", description = "将员工名下全部在途待办转给交接人，逐单留痕")
+    @PostMapping("/employees/{id}/offboarding/transfer")
+    public ApiResponse<Integer> offboardingTransfer(
+            @PathVariable Long id,
+            @Valid @RequestBody OffboardingTransferRequest request) {
+        String operator = com.hxj.security.CurrentUser.require().account();
+        return ApiResponse.success(offboardingService.transferAll(id, request.transferToAccount(), operator));
+    }
+
+    @Operation(summary = "离职交接-批量退回", description = "将员工名下全部在途待办对应单据退回提交人重新发起")
+    @PostMapping("/employees/{id}/offboarding/reject")
+    public ApiResponse<Integer> offboardingReject(@PathVariable Long id) {
+        String operator = com.hxj.security.CurrentUser.require().account();
+        return ApiResponse.success(offboardingService.rejectAll(id, operator));
     }
 
     @Operation(summary = "员工列表", description = "查询员工，支持按部门/岗位/在职状态筛选")

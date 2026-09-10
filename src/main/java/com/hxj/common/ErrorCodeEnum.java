@@ -147,6 +147,8 @@ public enum ErrorCodeEnum {
     MANAGER_NOT_FOUND("直属主管不存在"),
     /** 直属主管不能是自己 */
     MANAGER_SELF_REFERENCE("直属主管不能是自己"),
+    /** 员工有在途待办，须先完成离职交接 */
+    EMPLOYEE_PENDING_TASKS("员工有在途待办，请先完成转交或退回"),
 
     // —— 流程配置 ——
     /** 流程配置不存在 / 未配置对应审批流程 */

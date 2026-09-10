@@ -65,6 +65,7 @@ document.querySelector('#app').insertAdjacentHTML('beforeend',`<el-dialog v-mode
 document.querySelector('#app').insertAdjacentHTML('beforeend',`<el-dialog v-model="postVisible" :title="editingPost?.isNew?'新增岗位':'编辑岗位'" width="420px" append-to-body><el-form label-position="top"><el-form-item label="岗位名称"><el-input v-model="editingPost.name" placeholder="请输入岗位名称"></el-input></el-form-item></el-form><template #footer><el-button @click="postVisible=false">取消</el-button><el-button type="primary" @click="savePost">保存岗位</el-button></template></el-dialog>`);
 document.querySelector('#app').insertAdjacentHTML('beforeend',`<el-dialog v-model="quickVisible" :title="editingQuick?.isNew?'新增快捷名目':'编辑快捷名目'" width="480px" append-to-body><el-form label-position="top"><el-form-item label="业务类型"><el-select v-model="editingQuick.businessType" style="width:100%"><el-option label="日常付款" value="DAILY_PAYMENT"></el-option><el-option label="业务付款" value="BUSINESS_PAYMENT"></el-option><el-option label="用印申请" value="SEAL_APPLICATION"></el-option></el-select></el-form-item><el-form-item label="名目名称"><el-input v-model="editingQuick.name" placeholder="请输入名目名称"></el-input></el-form-item><el-form-item label="排序号"><el-input-number v-model="editingQuick.sortOrder" :min="0" :controls="false"></el-input-number></el-form-item></el-form><template #footer><el-button @click="quickVisible=false">取消</el-button><el-button type="primary" @click="saveQuick">保存名目</el-button></template></el-dialog>`);
 document.querySelector('#app').insertAdjacentHTML('beforeend',`<el-dialog v-model="voidVisible" title="作废单据" width="480px" append-to-body><el-form label-position="top"><el-form-item label="作废原因（留痕必填）"><el-input v-model="voidForm.comment" type="textarea" :rows="3" placeholder="请填写作废原因"></el-input></el-form-item></el-form><template #footer><el-button @click="voidVisible=false">取消</el-button><el-button type="danger" @click="confirmVoid">确认作废</el-button></template></el-dialog>`);
+document.querySelector('#app').insertAdjacentHTML('beforeend',`<el-dialog v-model="offboardingVisible" title="离职交接" width="760px" append-to-body><el-alert title="该员工名下还有在途待办，请先批量转交给交接人或退回提交人，完成后离职状态才会生效。" type="warning" :closable="false" style="margin-bottom:12px"></el-alert><el-table :data="offboardingList" size="small"><el-table-column prop="docCode" label="单据编号" width="150"></el-table-column><el-table-column prop="projectName" label="申请事项" min-width="180"></el-table-column><el-table-column prop="nodeName" label="当前节点" width="130"></el-table-column><el-table-column prop="applicantName" label="提交人" width="100"></el-table-column></el-table><div style="margin-top:12px;display:flex;align-items:center;gap:8px"><span>全部转交给：</span><el-select v-model="offboardingTransferTo" filterable style="width:220px" placeholder="选择交接人"><el-option v-for="m in managerOptions" :key="m.account" :label="m.name" :value="m.account"></el-option></el-select><el-button type="primary" @click="completeOffboarding('transfer')">批量转交</el-button><el-button type="danger" plain @click="completeOffboarding('reject')">全部退回提交人</el-button></div></el-dialog>`);
 document.querySelector('el-select[v-model="statusFilter"]')?.setAttribute('v-if',"page!=='approve'");
 const submitTemplate=document.querySelector('.submit-form');if(submitTemplate){const genericGrid=submitTemplate.querySelector('.form2');genericGrid?.setAttribute('v-if',"!submitForm.type.includes('盖章')");genericGrid?.insertAdjacentHTML('beforebegin',`<div v-if="submitForm.type.includes('盖章')" class="form2 stamp-form"><el-form-item label="用印项目"><el-input v-model="submitForm.sealProject" placeholder="请输入用印项目"></el-input></el-form-item><el-form-item label="用印部门"><el-select v-model="submitForm.sealDepartment"><el-option v-for="d in departments" :label="d" :value="d"></el-option></el-select></el-form-item><el-form-item label="用印时间"><el-date-picker v-model="submitForm.sealTime" type="datetime" placeholder="选择用印时间" style="width:100%"></el-date-picker></el-form-item><el-form-item label="用印文件名称"><el-input v-model="submitForm.fileName" placeholder="请输入文件名称"></el-input></el-form-item><el-form-item label="用章类型"><el-radio-group v-model="submitForm.sealType"><el-radio-button label="合同章">合同章</el-radio-button><el-radio-button label="公章">公章</el-radio-button></el-radio-group></el-form-item><el-form-item label="用印原因"><el-input v-model="submitForm.sealReason" type="textarea" :rows="3" placeholder="请输入用印原因"></el-input></el-form-item></div>`);const directItems=[...submitTemplate.children].filter(x=>x.tagName==='EL-FORM-ITEM');directItems[0]?.setAttribute('v-if',"!submitForm.type.includes('盖章')");const linkButton=submitTemplate.querySelector('.attachment-item > el-button');linkButton?.setAttribute('v-if','i===0');const upload=submitTemplate.querySelector('.attachment-item > el-upload');upload?.removeAttribute('v-else');upload?.setAttribute('v-if',"i>0 || submitForm.type.includes('盖章')");const spans=submitTemplate.querySelectorAll('.attachment-item span');spans[0]?.setAttribute('v-if',"i===0 && !submitForm.type.includes('盖章')");spans[1]?.removeAttribute('v-else');spans[1]?.setAttribute('v-if',"i>0 || submitForm.type.includes('盖章')");} // 审批流程提示已改为按匹配流程配置动态显示（matchedFlow），不再写死文案
 const personSetupDialog=document.querySelector('el-dialog[title="增加人员与审批权限"]');if(personSetupDialog){personSetupDialog.removeAttribute('title');personSetupDialog.setAttribute(':title',"editingEmployeeId ? '编辑员工' : '增加员工'");personSetupDialog.innerHTML=`<el-form label-position="top"><div class="form2"><el-form-item label="姓名"><el-input v-model="newPerson.name"></el-input></el-form-item><el-form-item label="工号"><el-input v-model="newPerson.jobNo"></el-input></el-form-item><el-form-item label="登录账号"><el-input v-model="newPerson.account" autocomplete="off" placeholder="请输入员工登录账号"></el-input></el-form-item><el-form-item v-if="!editingEmployeeId" label="登录密码"><el-input v-model="newPerson.password" type="password" show-password autocomplete="new-password" placeholder="请设置初始密码"></el-input></el-form-item><el-form-item label="所属部门"><el-tree-select v-model="newPerson.departmentId" :data="departmentsTree" node-key="id" check-strictly :props="{label:'name',children:'children'}" default-expand-all placeholder="从部门字典中选择" style="width:100%"></el-tree-select></el-form-item><el-form-item label="岗位"><el-select v-model="newPerson.postId" filterable placeholder="从岗位字典中选择" style="width:100%"><el-option v-for="p in postDicts" :key="p.id" :label="p.name" :value="p.id"></el-option></el-select></el-form-item><el-form-item label="分配角色"><el-select v-model="newPerson.position"><el-option v-for="r in roleConfigs" :label="r.name" :value="r.name"></el-option></el-select></el-form-item><el-form-item label="直属主管（汇报线）"><el-select v-model="newPerson.managerAccount" filterable clearable placeholder="选择直属主管，可留空" style="width:100%"><el-option v-for="m in managerOptions" :key="m.account" :label="m.name" :value="m.account"></el-option></el-select></el-form-item><el-form-item v-if="editingEmployeeId" label="在职状态"><el-select v-model="newPerson.status" style="width:100%"><el-option label="在职" value="ACTIVE"></el-option><el-option label="离职" value="RESIGNED"></el-option></el-select></el-form-item><el-form-item v-if="editingEmployeeId" label="重置密码（留空表示不修改）"><el-input v-model="newPerson.password" type="password" show-password autocomplete="new-password" placeholder="留空则不修改密码"></el-input></el-form-item></div><el-alert title="员工权限由所分配角色自动继承，无需单独配置。" type="info" :closable="false"></el-alert></el-form><template #footer><el-button @click="personVisible=false">取消</el-button><el-button type="primary" @click="saveEmployee">保存员工</el-button></template>`}
@@ -339,6 +340,10 @@ createApp({
     const employeePostOptions = computed(() => postDicts.value.filter(p => !p.departmentId || p.departmentId === newPerson.departmentId));
     // 直属主管候选：全部在职员工，编辑时排除自己
     const managerOptions = computed(() => people.filter(p => !editingEmployeeId.value || p.id !== editingEmployeeId.value));
+    const offboardingVisible = ref(false);
+    const offboardingList = ref([]);
+    const offboardingTransferTo = ref('');
+    let offboardingEmployeeId = null;
     const postDicts = ref([]);
     const permissionDicts = ref([]);
     async function loadDictionaries() {
@@ -436,6 +441,16 @@ createApp({
       if (!editingEmployeeId.value && !p.password) {
         return ElementPlus.ElMessage.warning('请设置初始密码');
       }
+      if (editingEmployeeId.value && p.status === 'RESIGNED') {
+        const pending = await apiCall('get', `/admin/employees/${editingEmployeeId.value}/offboarding/pending-tasks`);
+        if (pending && pending.length) {
+          offboardingList.value = pending;
+          offboardingTransferTo.value = p.managerAccount || '';
+          offboardingEmployeeId = editingEmployeeId.value;
+          offboardingVisible.value = true;
+          return;
+        }
+      }
       try {
         const payload = {
           name: p.name, jobNo: p.jobNo, account: p.account,
@@ -452,7 +467,24 @@ createApp({
         }
         personVisible.value = false;
         ElementPlus.ElMessage.success('员工已保存');
+        editingEmployeeId.value = null;
         await loadEmployees();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    }
+
+    async function completeOffboarding(mode) {
+      if (mode === 'transfer' && !offboardingTransferTo.value) {
+        return ElementPlus.ElMessage.warning('请选择交接人');
+      }
+      try {
+        if (mode === 'transfer') {
+          await apiCall('post', `/admin/employees/${offboardingEmployeeId}/offboarding/transfer`, { transferToAccount: offboardingTransferTo.value });
+        } else {
+          await apiCall('post', `/admin/employees/${offboardingEmployeeId}/offboarding/reject`);
+        }
+        offboardingVisible.value = false;
+        ElementPlus.ElMessage.success('离职交接已完成');
+        await saveEmployee();
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     }
     async function resetEmployeePassword(row) {
@@ -1188,6 +1220,7 @@ createApp({
       pageNames, roles, departments, documents, stats, boardStats, efficiency, statusDistribution,
       dailyQuick, businessQuick, stampQuick, submitForm, attachmentRules,
       people, newPerson, roleConfigs, flowConfigs, departmentsTree, postDicts, permissionDicts, loadDictionaries, managerOptions,
+      offboardingVisible, offboardingList, offboardingTransferTo, completeOffboarding,
       deptVisible, editingDepartment, newDepartment, editDepartment, saveDepartment, deleteDepartment,
       postVisible, editingPost, newPost, editPost, savePost, deletePost,
       editingEmployeeId, openEmployee, saveEmployee, resetEmployeePassword,

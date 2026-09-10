@@ -16,7 +16,9 @@ public enum ApprovalActionEnum {
     /** 加签：在当前节点追加审批人。 */
     SIGN(4,"加签"),
     /** 作废：申请人撤回或管理员作废，流程终止留痕。 */
-    VOID(5,"作废");
+    VOID(5,"作废"),
+    /** 转交：离职交接/管理员调整，将待办任务转给其他审批人。 */
+    TRANSFER(6,"转交");
 
     private final Integer code;
     private final String text;
