@@ -31,12 +31,15 @@ public class DepartmentManagementService {
 
     private final SysDepartmentRepository departmentRepository;
     private final SysUserRepository userRepository;
+    private final com.hxj.repository.SysRoleRepository roleRepository;
 
     public DepartmentManagementService(
             SysDepartmentRepository departmentRepository,
-            SysUserRepository userRepository) {
+            SysUserRepository userRepository,
+            com.hxj.repository.SysRoleRepository roleRepository) {
         this.departmentRepository = departmentRepository;
         this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
     }
 
     /** 新建部门并初始化闭包路径。 */
@@ -88,12 +91,12 @@ public class DepartmentManagementService {
         department.setParentId(newParent == null ? null : newParent.getId());
         department.setSortOrder(request.sortOrder());
         if (renamed) {
-            syncEmployeeSnapshot(department.getId(), request.name());
+            syncDepartmentRename(department.getId(), request.name());
         }
         return toLeafNode(departmentRepository.save(department));
     }
 
-    /** 删除部门：仅允许无下级、无员工的叶部门。 */
+    /** 删除部门：仅允许无下级、无员工、且未被角色引用的叶部门。 */
     @Transactional
     public void delete(Long departmentId) {
         SysDepartment department = departmentRepository.findById(departmentId)
@@ -103,6 +106,9 @@ public class DepartmentManagementService {
         }
         if (userRepository.existsByDepartmentId(departmentId)) {
             throw new BusinessException(ErrorCodeEnum.DEPARTMENT_HAS_EMPLOYEES, "部门下存在员工，无法删除");
+        }
+        if (roleRepository.existsByDepartmentId(departmentId)) {
+            throw new BusinessException(ErrorCodeEnum.DEPARTMENT_HAS_ROLES, "部门被角色引用，无法删除");
         }
         departmentRepository.deleteAllPathsOf(departmentId);
         departmentRepository.delete(department);
@@ -161,13 +167,18 @@ public class DepartmentManagementService {
         }
     }
 
-    /** 部门改名后同步在职员工的展示快照（历史单据快照不受影响）。 */
-    private void syncEmployeeSnapshot(Long departmentId, String newName) {
+    /** 部门改名后同步员工与角色的展示快照（历史单据快照不受影响）。 */
+    private void syncDepartmentRename(Long departmentId, String newName) {
         List<SysUser> members = userRepository.findByDepartmentId(departmentId);
         for (SysUser member : members) {
             member.setDepartment(newName);
         }
         userRepository.saveAll(members);
+        List<com.hxj.entity.SysRole> roles = roleRepository.findByDepartmentId(departmentId);
+        for (com.hxj.entity.SysRole role : roles) {
+            role.setDepartment(newName);
+        }
+        roleRepository.saveAll(roles);
     }
 
     private DepartmentViews.Department toLeafNode(SysDepartment department) {

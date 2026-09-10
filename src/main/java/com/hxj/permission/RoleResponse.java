@@ -7,7 +7,8 @@ import java.util.List;
 public record RoleResponse(
         @Schema(description = "角色ID") Long id,
         @Schema(description = "角色名称") String name,
-        @Schema(description = "适用部门（该角色在此部门下生效）") String department,
+        @Schema(description = "归属部门ID") Long departmentId,
+        @Schema(description = "归属部门名称") String department,
         @Schema(description = "适用岗位") String post,
         @Schema(description = "数据范围类型（ALL=全部 / OWN=仅本人 / DEPT=本部门 / DEPT_AND_CHILD=本部门及以下 / CUSTOM=自定义部门集合）")
         String dataScope,

@@ -3,12 +3,14 @@ package com.hxj.permission;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
 
 public record SaveRoleRequest(
         @Schema(description = "角色名称") @NotBlank String name,
-        @Schema(description = "适用部门") @NotBlank String department,
+        @Schema(description = "归属部门ID（sys_department 字典），与 RoleResponse.departmentId 同源可原样回写")
+        @NotNull Long departmentId,
         @Schema(description = "适用岗位") @NotBlank String post,
         @Schema(description = "数据范围类型（ALL/OWN/DEPT/DEPT_AND_CHILD/CUSTOM），与 RoleResponse.dataScope 同源可原样回写")
         @NotBlank String dataScope,

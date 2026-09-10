@@ -141,11 +141,11 @@ class PermissionManagementServiceTest {
                 new SysPermission("DEPARTMENT_HEAD_APPROVAL", "部门负责人审批"));
 
         RoleResponse created = roleService.create(new SaveRoleRequest(
-                "部门负责人", "业务部", "经理", scope.getCode(), null, List.of(permission.getCode(), approve.getCode())));
+                "部门负责人", departmentId, "经理", scope.getCode(), null, List.of(permission.getCode(), approve.getCode())));
         assertThat(created.permissions()).containsExactlyInAnyOrder("VIEW_OWN_FORMS", "DEPARTMENT_HEAD_APPROVAL");
 
         RoleResponse updated = roleService.update(created.id(), new SaveRoleRequest(
-                "部门经理", "业务部", "经理", scope.getCode(), null, List.of(approve.getCode())));
+                "部门经理", departmentId, "经理", scope.getCode(), null, List.of(approve.getCode())));
         assertThat(updated.name()).isEqualTo("部门经理");
         assertThat(updated.permissions()).containsExactly("DEPARTMENT_HEAD_APPROVAL");
 
@@ -201,7 +201,7 @@ class PermissionManagementServiceTest {
 
         // 解除员工引用（转入过渡角色）后，被流程节点引用（含组合角色串的段）仍禁止删除
         RoleResponse bridgeRole = roleService.create(new SaveRoleRequest(
-                "过渡角色", "业务部", "助理", scope.getCode(), null, List.of(permission.getCode())));
+                "过渡角色", departmentId, "助理", scope.getCode(), null, List.of(permission.getCode())));
         employeeService.update(employee.id(), new UpdateEmployeeRequest(
                 "张三", "HXJ100", departmentId, postId, UserStatusEnum.RESIGNED,
                 null, List.of(bridgeRole.name())));
@@ -219,7 +219,7 @@ class PermissionManagementServiceTest {
 
         // 名称部分重叠但不同段的角色不受误伤，无引用角色可正常删除
         RoleResponse freeRole = roleService.create(new SaveRoleRequest(
-                "二级部门负责人助理", "业务部", "助理", scope.getCode(), null, List.of(permission.getCode())));
+                "二级部门负责人助理", departmentId, "助理", scope.getCode(), null, List.of(permission.getCode())));
         roleService.delete(freeRole.id());
         assertThat(roleRepository.existsById(freeRole.id())).isFalse();
     }

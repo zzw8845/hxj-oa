@@ -118,7 +118,8 @@ public class RoleManagementService {
     @Transactional(readOnly = true)
     public List<DepartmentRoleNodeResponse> departmentTree() {
         Map<String, List<SysRole>> grouped = roleRepository.findAll().stream()
-                .collect(Collectors.groupingBy(SysRole::getDepartment));
+                .collect(Collectors.groupingBy(
+                        role -> role.getDepartment() == null ? "未分配" : role.getDepartment()));
         return grouped.entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
                 .map(entry -> new DepartmentRoleNodeResponse(
@@ -138,13 +139,16 @@ public class RoleManagementService {
         if (permissionCodes.isEmpty() || permissions.size() != permissionCodes.size()) {
             throw new BusinessException(ErrorCodeEnum.PERMISSION_NOT_FOUND, "权限点不存在");
         }
+        com.hxj.entity.SysDepartment department = departmentRepository.findById(request.departmentId())
+                .orElseThrow(() -> new BusinessException(ErrorCodeEnum.DEPARTMENT_NOT_FOUND, "归属部门不存在"));
         List<com.hxj.entity.SysDepartment> scopeDepartments =
                 departmentRepository.findAllById(request.scopeDepartmentIds());
         if (scopeDepartments.size() != request.scopeDepartmentIds().size()) {
             throw new BusinessException(ErrorCodeEnum.DEPARTMENT_NOT_FOUND, "自定义数据范围部门不存在");
         }
         role.setName(request.name());
-        role.setDepartment(request.department());
+        role.setDepartmentId(department.getId());
+        role.setDepartment(department.getName());
         role.setPost(request.post());
         role.setDataScope(dataScope);
         role.setScopeDepartments(new LinkedHashSet<>(scopeDepartments));
@@ -153,7 +157,7 @@ public class RoleManagementService {
 
     private RoleResponse toResponse(SysRole role) {
         return new RoleResponse(
-                role.getId(), role.getName(), role.getDepartment(), role.getPost(),
+                role.getId(), role.getName(), role.getDepartmentId(), role.getDepartment(), role.getPost(),
                 role.getDataScope().getCode(), scopeDepartmentIds(role),
                 permissionCodes(role), memberNames(role));
     }
