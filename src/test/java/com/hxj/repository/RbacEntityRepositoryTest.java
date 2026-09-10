@@ -4,7 +4,8 @@ import com.hxj.entity.SysDataScope;
 import com.hxj.entity.SysPermission;
 import com.hxj.entity.SysRole;
 import com.hxj.entity.SysUser;
-import com.hxj.entity.UserStatus;
+import com.hxj.enums.UserStatusEnum;
+import com.hxj.support.DictionaryTestSupport;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +38,12 @@ class RbacEntityRepositoryTest {
     @Autowired
     private EntityManager entityManager;
 
+    @Autowired
+    private SysDepartmentRepository departmentRepository;
+
+    @Autowired
+    private SysPostRepository postRepository;
+
     @Test
     void shouldPersistUserRolePermissionsAndDataScopeAssociations() {
         SysDataScope ownScope = dataScopeRepository.save(
@@ -60,9 +67,10 @@ class RbacEntityRepositoryTest {
         user.setJobNo("E0001");
         user.setAccount("employee01");
         user.setPassword("encoded-password");
-        user.setDepartment("业务支持中心");
-        user.setPost("员工");
-        user.setStatus(UserStatus.ACTIVE);
+        DictionaryTestSupport.applyDictionary(user,
+                DictionaryTestSupport.ensureDepartment(departmentRepository, "业务支持中心"),
+                DictionaryTestSupport.ensurePost(postRepository, "员工"));
+        user.setStatus(UserStatusEnum.ACTIVE);
         user.setRole(employeeRole);
         userRepository.saveAndFlush(user);
 
@@ -90,7 +98,7 @@ class RbacEntityRepositoryTest {
         resignedUser.setJobNo("E0002");
         resignedUser.setAccount("resigned01");
         resignedUser.setPassword("encoded-password");
-        resignedUser.setStatus(UserStatus.RESIGNED);
+        resignedUser.setStatus(UserStatusEnum.RESIGNED);
 
         assertThat(resignedUser.isLoginEnabled()).isFalse();
     }

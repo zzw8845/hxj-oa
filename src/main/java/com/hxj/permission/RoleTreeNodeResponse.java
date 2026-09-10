@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
-public record RoleTreeNode(
+public record RoleTreeNodeResponse(
         @Schema(description = "角色ID") Long id,
         @Schema(description = "角色名称") String name,
         @Schema(description = "适用岗位") String post,
@@ -13,7 +13,7 @@ public record RoleTreeNode(
         @Schema(description = "成员姓名列表") List<String> members) {
 
     /** 紧凑构造器：集合组件防御性拷贝为不可变列表，null 归一化为不可变空列表。 */
-    public RoleTreeNode {
+    public RoleTreeNodeResponse {
         permissions = permissions == null ? List.of() : List.copyOf(permissions);
         members = members == null ? List.of() : List.copyOf(members);
     }

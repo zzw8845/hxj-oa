@@ -1,23 +1,7 @@
 package com.hxj.repository;
 
-import com.hxj.entity.ApprovalAction;
-import com.hxj.entity.ApprovalRecord;
-import com.hxj.entity.ArchiveLedger;
-import com.hxj.entity.BusinessType;
-import com.hxj.entity.CcRecord;
-import com.hxj.entity.CcSource;
-import com.hxj.entity.ConditionOperator;
-import com.hxj.entity.DocumentStatus;
-import com.hxj.entity.FlowCategory;
-import com.hxj.entity.FlowConditionRule;
-import com.hxj.entity.FlowConfig;
-import com.hxj.entity.FlowNodeConfig;
-import com.hxj.entity.FlowNodeType;
-import com.hxj.entity.OaAttachment;
-import com.hxj.entity.OaDocument;
-import com.hxj.entity.SysDataScope;
-import com.hxj.entity.SysRole;
-import com.hxj.entity.SysUser;
+import com.hxj.entity.*;
+import com.hxj.enums.*;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,6 +45,12 @@ class ProcessPersistenceRepositoryTest {
     @Autowired
     private EntityManager entityManager;
 
+    @Autowired
+    private com.hxj.repository.SysDepartmentRepository departmentRepository;
+
+    @Autowired
+    private com.hxj.repository.SysPostRepository postRepository;
+
     @Test
     void shouldPersistApprovalCcAndArchiveRecordsWithDomainAssociations() {
         SysUser applicant = createUser("applicant", "普通员工");
@@ -68,12 +58,12 @@ class ProcessPersistenceRepositoryTest {
 
         OaDocument document = new OaDocument();
         document.setDocCode("FK202608290010");
-        document.setBusinessType(BusinessType.BUSINESS_PAYMENT);
+        document.setBusinessType(BusinessTypeEnum.BUSINESS_PAYMENT);
         document.setApplicant(applicant);
         document.setDepartment("业务支持中心");
         document.setProjectName("应付款申请");
         document.setAmount(new BigDecimal("120000.00"));
-        document.setStatus(DocumentStatus.APPROVED);
+        document.setStatus(DocumentStatusEnum.APPROVED);
 
         OaAttachment evidence = new OaAttachment(
                 "approval-proof.pdf", "/data/oa/approval-proof.pdf", "application/pdf", 2048L);
@@ -86,13 +76,13 @@ class ProcessPersistenceRepositoryTest {
         approvalRecord.setDocument(document);
         approvalRecord.setNodeName("会计主管&内控");
         approvalRecord.setApprover(approver);
-        approvalRecord.setAction(ApprovalAction.APPROVE);
+        approvalRecord.setAction(ApprovalActionEnum.APPROVE);
         approvalRecord.setComment("资料齐全，同意付款");
         approvalRecord.setEvidenceFile(evidence);
         approvalRecordRepository.save(approvalRecord);
 
-        CcRecord ccToUser = CcRecord.toUser(document, applicant, CcSource.SELF_SELECTED);
-        CcRecord ccToRole = CcRecord.toRole(document, approver.getRole(), CcSource.FLOW);
+        CcRecord ccToUser = CcRecord.toUser(document, applicant, CcSourceEnum.SELF_SELECTED);
+        CcRecord ccToRole = CcRecord.toRole(document, approver.getRole(), CcSourceEnum.FLOW);
         ccRecordRepository.save(ccToUser);
         ccRecordRepository.save(ccToRole);
 
@@ -103,7 +93,7 @@ class ProcessPersistenceRepositoryTest {
         ApprovalRecord persistedApproval = approvalRecordRepository
                 .findByDocumentIdOrderByCreatedAtAsc(document.getId()).get(0);
         assertThat(persistedApproval.getApprover().getAccount()).isEqualTo("approver");
-        assertThat(persistedApproval.getAction()).isEqualTo(ApprovalAction.APPROVE);
+        assertThat(persistedApproval.getAction()).isEqualTo(ApprovalActionEnum.APPROVE);
         assertThat(persistedApproval.getEvidenceFile().getFileName()).isEqualTo("approval-proof.pdf");
 
         assertThat(ccRecordRepository.findByDocumentIdOrderByCreatedAtAsc(document.getId()))
@@ -115,32 +105,32 @@ class ProcessPersistenceRepositoryTest {
         assertThat(persistedLedger.getApplicant()).isEqualTo("测试用户-applicant");
         assertThat(persistedLedger.getDepartment()).isEqualTo("业务支持中心");
         assertThat(persistedLedger.getAmount()).isEqualByComparingTo("120000.00");
-        assertThat(persistedLedger.getDocument().getStatus()).isEqualTo(DocumentStatus.APPROVED);
+        assertThat(persistedLedger.getDocument().getStatus()).isEqualTo(DocumentStatusEnum.APPROVED);
     }
 
     @Test
     void shouldPersistOrderedFlowNodesAndConditionBranchRules() {
         FlowConfig config = new FlowConfig();
         config.setType("采购申请");
-        config.setCategory(FlowCategory.DAILY);
-        config.addNode(new FlowNodeConfig("发起人", FlowNodeType.START));
-        config.addNode(new FlowNodeConfig("直属主管", FlowNodeType.APPROVAL));
-        config.addNode(new FlowNodeConfig("执行总经理", FlowNodeType.APPROVAL));
-        config.addNode(new FlowNodeConfig("采购办理", FlowNodeType.HANDLER));
+        config.setCategory(FlowCategoryEnum.DAILY);
+        config.addNode(new FlowNodeConfig("发起人", FlowNodeTypeEnum.START));
+        config.addNode(new FlowNodeConfig("直属主管", FlowNodeTypeEnum.APPROVAL));
+        config.addNode(new FlowNodeConfig("执行总经理", FlowNodeTypeEnum.APPROVAL));
+        config.addNode(new FlowNodeConfig("采购办理", FlowNodeTypeEnum.HANDLER));
         config.addConditionRule(new FlowConditionRule(
-                "amount", ConditionOperator.GREATER_THAN_OR_EQUAL, "20000", "执行总经理"));
+                "amount", ConditionOperatorEnum.GREATER_THAN_OR_EQUAL, "20000", "执行总经理"));
 
         flowConfigRepository.saveAndFlush(config);
         entityManager.clear();
 
         FlowConfig persisted = flowConfigRepository.findByType("采购申请").orElseThrow();
-        assertThat(persisted.getCategory()).isEqualTo(FlowCategory.DAILY);
+        assertThat(persisted.getCategory()).isEqualTo(FlowCategoryEnum.DAILY);
         assertThat(persisted.getNodes())
                 .extracting(FlowNodeConfig::getName)
                 .containsExactly("发起人", "直属主管", "执行总经理", "采购办理");
         assertThat(persisted.getConditionRules()).singleElement().satisfies(rule -> {
             assertThat(rule.getVariableName()).isEqualTo("amount");
-            assertThat(rule.getOperator()).isEqualTo(ConditionOperator.GREATER_THAN_OR_EQUAL);
+            assertThat(rule.getOperator()).isEqualTo(ConditionOperatorEnum.GREATER_THAN_OR_EQUAL);
             assertThat(rule.getExpectedValue()).isEqualTo("20000");
             assertThat(rule.getTargetNodeName()).isEqualTo("执行总经理");
         });
@@ -162,8 +152,9 @@ class ProcessPersistenceRepositoryTest {
         user.setJobNo("JOB-" + account);
         user.setAccount(account);
         user.setPassword("encoded-password");
-        user.setDepartment("财务中心");
-        user.setPost(roleName);
+        com.hxj.support.DictionaryTestSupport.applyDictionary(user,
+                com.hxj.support.DictionaryTestSupport.ensureDepartment(departmentRepository, "财务中心"),
+                com.hxj.support.DictionaryTestSupport.ensurePost(postRepository, roleName));
         user.setRole(role);
         return userRepository.save(user);
     }

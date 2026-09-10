@@ -1,15 +1,7 @@
 package com.hxj.repository;
 
-import com.hxj.entity.BusinessType;
-import com.hxj.entity.Company;
-import com.hxj.entity.DocumentStatus;
-import com.hxj.entity.DocumentType;
-import com.hxj.entity.OaAttachment;
-import com.hxj.entity.OaDocument;
-import com.hxj.entity.SealType;
-import com.hxj.entity.SysDataScope;
-import com.hxj.entity.SysRole;
-import com.hxj.entity.SysUser;
+import com.hxj.entity.*;
+import com.hxj.enums.*;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,25 +34,31 @@ class DocumentEntityRepositoryTest {
     @Autowired
     private EntityManager entityManager;
 
+    @Autowired
+    private com.hxj.repository.SysDepartmentRepository departmentRepository;
+
+    @Autowired
+    private com.hxj.repository.SysPostRepository postRepository;
+
     @Test
     void shouldPersistPaymentDocumentWithPreviousDocumentAndAttachment() {
         SysUser applicant = createApplicant("payment-user");
 
         OaDocument approvedContract = new OaDocument();
         approvedContract.setDocCode("FK202608290001");
-        approvedContract.setBusinessType(BusinessType.BUSINESS_PAYMENT);
+        approvedContract.setBusinessType(BusinessTypeEnum.BUSINESS_PAYMENT);
         approvedContract.setApplicant(applicant);
-        approvedContract.setCompany(Company.HAI_XIA_JIN);
+        approvedContract.setCompany(CompanyEnum.HAI_XIA_JIN);
         approvedContract.setProjectName("合同审批");
         approvedContract.setAmount(new BigDecimal("50000.00"));
-        approvedContract.setStatus(DocumentStatus.APPROVED);
+        approvedContract.setStatus(DocumentStatusEnum.APPROVED);
         documentRepository.save(approvedContract);
 
         OaDocument payment = new OaDocument();
         payment.setDocCode("FK202608290002");
-        payment.setBusinessType(BusinessType.BUSINESS_PAYMENT);
+        payment.setBusinessType(BusinessTypeEnum.BUSINESS_PAYMENT);
         payment.setApplicant(applicant);
-        payment.setCompany(Company.HAI_XIA_JIN_SUPPLY_CHAIN);
+        payment.setCompany(CompanyEnum.HAI_XIA_JIN_SUPPLY_CHAIN);
         payment.setDepartment("业务支持中心");
         payment.setProjectName("供应商货款");
         payment.setAmount(new BigDecimal("88000.50"));
@@ -68,7 +66,7 @@ class DocumentEntityRepositoryTest {
         payment.setReason("支付供应商货款");
         payment.setNeedPostMaterial(true);
         payment.setContractNo("HT-2026-001");
-        payment.setStatus(DocumentStatus.APPROVING);
+        payment.setStatus(DocumentStatusEnum.APPROVING);
         payment.setCurrentNode("会计主管&内控");
         payment.setLinkedDocument(approvedContract);
         payment.setProcessInstanceId("process-001");
@@ -84,15 +82,15 @@ class DocumentEntityRepositoryTest {
         entityManager.clear();
 
         OaDocument persisted = documentRepository.findByDocCode("FK202608290002").orElseThrow();
-        assertThat(persisted.getBusinessType()).isEqualTo(BusinessType.BUSINESS_PAYMENT);
-        assertThat(persisted.getDocumentType()).isEqualTo(DocumentType.PAYMENT_APPLICATION);
+        assertThat(persisted.getBusinessType()).isEqualTo(BusinessTypeEnum.BUSINESS_PAYMENT);
+        assertThat(persisted.getDocumentType()).isEqualTo(DocumentTypeEnum.PAYMENT_APPLICATION);
         assertThat(persisted.getApplicant().getAccount()).isEqualTo("payment-user");
         assertThat(persisted.getApplicantName()).isEqualTo("测试申请人");
-        assertThat(persisted.getCompany()).isEqualTo(Company.HAI_XIA_JIN_SUPPLY_CHAIN);
+        assertThat(persisted.getCompany()).isEqualTo(CompanyEnum.HAI_XIA_JIN_SUPPLY_CHAIN);
         assertThat(persisted.getAmount()).isEqualByComparingTo("88000.50");
         assertThat(persisted.isNeedPostMaterial()).isTrue();
         assertThat(persisted.getContractNo()).isEqualTo("HT-2026-001");
-        assertThat(persisted.getStatus()).isEqualTo(DocumentStatus.APPROVING);
+        assertThat(persisted.getStatus()).isEqualTo(DocumentStatusEnum.APPROVING);
         assertThat(persisted.getCurrentNode()).isEqualTo("会计主管&内控");
         assertThat(persisted.getLinkedDocument().getDocCode()).isEqualTo("FK202608290001");
         assertThat(persisted.getProcessInstanceId()).isEqualTo("process-001");
@@ -103,7 +101,7 @@ class DocumentEntityRepositoryTest {
             assertThat(attachment.getUploader().getAccount()).isEqualTo("payment-user");
             assertThat(attachment.getDocument().getDocCode()).isEqualTo("FK202608290002");
         });
-        assertThat(documentRepository.findByStatus(DocumentStatus.APPROVING)).containsExactly(persisted);
+        assertThat(documentRepository.findByStatus(DocumentStatusEnum.APPROVING)).containsExactly(persisted);
         assertThat(documentRepository.findByRiskFlagTrue()).containsExactly(persisted);
     }
 
@@ -113,26 +111,26 @@ class DocumentEntityRepositoryTest {
 
         OaDocument sealDocument = new OaDocument();
         sealDocument.setDocCode("YY202608290001");
-        sealDocument.setBusinessType(BusinessType.SEAL_APPLICATION);
+        sealDocument.setBusinessType(BusinessTypeEnum.SEAL_APPLICATION);
         sealDocument.setApplicant(applicant);
         sealDocument.setProjectName("非标合同审批及用印");
         sealDocument.setSealProject("供应商合同盖章");
         sealDocument.setSealDepartment("法务部");
         sealDocument.setSealTime(LocalDateTime.of(2026, 8, 30, 10, 0));
         sealDocument.setSealFileName("供应商合同.pdf");
-        sealDocument.setSealType(SealType.CONTRACT_SEAL);
+        sealDocument.setSealType(SealTypeEnum.CONTRACT_SEAL);
         sealDocument.setSealReason("合同签署");
 
         documentRepository.saveAndFlush(sealDocument);
         entityManager.clear();
 
         OaDocument persisted = documentRepository.findByDocCode("YY202608290001").orElseThrow();
-        assertThat(persisted.getBusinessType()).isEqualTo(BusinessType.SEAL_APPLICATION);
-        assertThat(persisted.getDocumentType()).isEqualTo(DocumentType.SEAL_APPLICATION);
+        assertThat(persisted.getBusinessType()).isEqualTo(BusinessTypeEnum.SEAL_APPLICATION);
+        assertThat(persisted.getDocumentType()).isEqualTo(DocumentTypeEnum.SEAL_APPLICATION);
         assertThat(persisted.getAmount()).isNull();
-        assertThat(persisted.getSealType()).isEqualTo(SealType.CONTRACT_SEAL);
+        assertThat(persisted.getSealType()).isEqualTo(SealTypeEnum.CONTRACT_SEAL);
         assertThat(persisted.getSealFileName()).isEqualTo("供应商合同.pdf");
-        assertThat(persisted.getStatus()).isEqualTo(DocumentStatus.PENDING);
+        assertThat(persisted.getStatus()).isEqualTo(DocumentStatusEnum.PENDING);
     }
 
     private SysUser createApplicant(String account) {
@@ -151,8 +149,9 @@ class DocumentEntityRepositoryTest {
         applicant.setJobNo("JOB-" + account);
         applicant.setAccount(account);
         applicant.setPassword("encoded-password");
-        applicant.setDepartment("业务支持中心");
-        applicant.setPost("员工");
+        com.hxj.support.DictionaryTestSupport.applyDictionary(applicant,
+                com.hxj.support.DictionaryTestSupport.ensureDepartment(departmentRepository, "业务支持中心"),
+                com.hxj.support.DictionaryTestSupport.ensurePost(postRepository, "员工"));
         applicant.setRole(role);
         return userRepository.save(applicant);
     }

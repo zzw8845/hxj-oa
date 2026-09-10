@@ -1,7 +1,7 @@
 package com.hxj.repository;
 
 import com.hxj.entity.SysUser;
-import com.hxj.entity.UserStatus;
+import com.hxj.enums.UserStatusEnum;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -17,7 +17,15 @@ public interface SysUserRepository extends JpaRepository<SysUser, Long> {
 
     List<SysUser> findByDepartment(String department);
 
+    List<SysUser> findByDepartmentId(Long departmentId);
+
+    boolean existsByDepartmentId(Long departmentId);
+
+    boolean existsByPostId(Long postId);
+
+    List<SysUser> findByPostId(Long postId);
+
     List<SysUser> findDistinctByRolesId(Long roleId);
 
-    List<SysUser> findByStatus(UserStatus status);
+    List<SysUser> findByStatus(UserStatusEnum status);
 }

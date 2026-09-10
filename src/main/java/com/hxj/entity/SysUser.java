@@ -1,5 +1,6 @@
 package com.hxj.entity;
 
+import com.hxj.enums.UserStatusEnum;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -45,11 +46,19 @@ public class SysUser {
     @Column(nullable = false)
     private String password;
 
-    /** 所属部门。 */
+    /** 部门ID（sys_department 外键，管理入口的唯一事实来源）。 */
+    @Column(name = "department_id", nullable = false)
+    private Long departmentId;
+
+    /** 所属部门展示快照（提交单据时随单快照，由服务层与字典同步维护）。 */
     @Column(length = 100)
     private String department;
 
-    /** 岗位。 */
+    /** 岗位ID（sys_post 外键）。 */
+    @Column(name = "post_id", nullable = false)
+    private Long postId;
+
+    /** 岗位展示快照。 */
     @Column(length = 100)
     private String post;
 
@@ -66,7 +75,7 @@ public class SysUser {
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 20)
-    private UserStatus status = UserStatus.ACTIVE;
+    private UserStatusEnum status = UserStatusEnum.ACTIVE;
 
     /** 创建时间。 */
     @Column(name = "created_at", insertable = false, updatable = false)
@@ -86,8 +95,12 @@ public class SysUser {
     public void setAccount(String account) { this.account = account; }
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
+    public Long getDepartmentId() { return departmentId; }
+    public void setDepartmentId(Long departmentId) { this.departmentId = departmentId; }
     public String getDepartment() { return department; }
     public void setDepartment(String department) { this.department = department; }
+    public Long getPostId() { return postId; }
+    public void setPostId(Long postId) { this.postId = postId; }
     public String getPost() { return post; }
     public void setPost(String post) { this.post = post; }
     /** 兼容单角色调用方，返回分配顺序中的首个角色。 */
@@ -112,9 +125,9 @@ public class SysUser {
     public void clearRoles() {
         new LinkedHashSet<>(roles).forEach(this::removeRole);
     }
-    public UserStatus getStatus() { return status; }
-    public void setStatus(UserStatus status) { this.status = status; }
-    public boolean isLoginEnabled() { return status == UserStatus.ACTIVE; }
+    public UserStatusEnum getStatus() { return status; }
+    public void setStatus(UserStatusEnum status) { this.status = status; }
+    public boolean isLoginEnabled() { return status == UserStatusEnum.ACTIVE; }
     public boolean hasPermission(String permissionCode) {
         return roles.stream().anyMatch(role -> role.hasPermission(permissionCode));
     }

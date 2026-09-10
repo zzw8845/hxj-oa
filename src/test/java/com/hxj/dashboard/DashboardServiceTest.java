@@ -1,20 +1,20 @@
 package com.hxj.dashboard;
 
-import com.hxj.entity.ApprovalAction;
+import com.hxj.enums.ApprovalActionEnum;
 import com.hxj.entity.ApprovalRecord;
-import com.hxj.entity.BusinessType;
-import com.hxj.entity.Company;
-import com.hxj.entity.DocumentStatus;
+import com.hxj.enums.BusinessTypeEnum;
+import com.hxj.enums.CompanyEnum;
+import com.hxj.enums.DocumentStatusEnum;
 import com.hxj.entity.OaDocument;
 import com.hxj.entity.SysUser;
 import com.hxj.repository.ApprovalRecordRepository;
 import com.hxj.repository.OaDocumentRepository;
 import com.hxj.repository.SysUserRepository;
-import com.hxj.security.AuthenticatedUser;
+import com.hxj.security.AuthenticatedUserResponse;
 import com.hxj.security.DocumentAccessPolicy;
 import com.hxj.security.TestSecurityContext;
-import com.hxj.workflow.WorkflowHistoryItem;
-import com.hxj.workflow.WorkflowNodeStat;
+import com.hxj.workflow.WorkflowHistoryItemResponse;
+import com.hxj.workflow.WorkflowNodeStatResponse;
 import com.hxj.workflow.WorkflowPort;
 import org.flowable.task.api.Task;
 import org.junit.jupiter.api.AfterEach;
@@ -55,10 +55,12 @@ class DashboardServiceTest {
     @Autowired private OaDocumentRepository documentRepository;
     @Autowired private ApprovalRecordRepository approvalRepository;
     @Autowired private SysUserRepository userRepository;
+    @Autowired private com.hxj.repository.SysDepartmentRepository departmentRepository;
+    @Autowired private com.hxj.repository.SysPostRepository postRepository;
     @Autowired private FakeWorkflowPort workflowPort;
 
     private SysUser applicant;
-    private AuthenticatedUser principal;
+    private AuthenticatedUserResponse principal;
 
     @BeforeEach
     void setUp() {
@@ -72,11 +74,12 @@ class DashboardServiceTest {
         applicant.setJobNo("JOB-zhangsan");
         applicant.setAccount("zhangsan");
         applicant.setPassword("encoded");
-        applicant.setDepartment("财务部");
-        applicant.setPost("员工");
+        com.hxj.support.DictionaryTestSupport.applyDictionary(applicant,
+                com.hxj.support.DictionaryTestSupport.ensureDepartment(departmentRepository, "财务部"),
+                com.hxj.support.DictionaryTestSupport.ensurePost(postRepository, "员工"));
         applicant = userRepository.save(applicant);
-        principal = new AuthenticatedUser(applicant.getId(), applicant.getAccount(), applicant.getName(),
-                applicant.getDepartment(), applicant.getPost(), List.of(), List.of(), List.of("OWN_DOCUMENTS"));
+        principal = new AuthenticatedUserResponse(applicant.getId(), applicant.getAccount(), applicant.getName(),
+                applicant.getDepartment(), applicant.getPost(), List.of(), List.of(), List.of("OWN"));
     }
 
     @AfterEach
@@ -87,13 +90,13 @@ class DashboardServiceTest {
     @Test
     void shouldReturnHomeStatsWithMomComplianceAndBadge() {
         TestSecurityContext.mock(principal);
-        OaDocument rejected = document("BX202609010001", DocumentStatus.REJECTED, new BigDecimal("100"));
-        OaDocument compliant = document("BX202609010002", DocumentStatus.APPROVED, new BigDecimal("200"));
-        OaDocument nonCompliant = document("BX202609010003", DocumentStatus.APPROVED, new BigDecimal("90000"));
-        approvalRepository.save(record(nonCompliant, ApprovalAction.REJECT));
+        OaDocument rejected = document("BX202609010001", DocumentStatusEnum.REJECTED, new BigDecimal("100"));
+        OaDocument compliant = document("BX202609010002", DocumentStatusEnum.APPROVED, new BigDecimal("200"));
+        OaDocument nonCompliant = document("BX202609010003", DocumentStatusEnum.APPROVED, new BigDecimal("90000"));
+        approvalRepository.save(record(nonCompliant, ApprovalActionEnum.REJECT));
         workflowPort.pendingTaskIds = List.of(compliant.getId());
 
-        DashboardViews.HomeStats stats = dashboardService.homeStats();
+        DashboardViews.Home stats = dashboardService.homeStats();
 
         assertThat(stats.rejectedCount()).isEqualTo(1);
         assertThat(stats.pendingMyApprovalCount()).isEqualTo(1);
@@ -106,37 +109,37 @@ class DashboardServiceTest {
     @Test
     void shouldReturnTodoListSortedByNearestTimeout() {
         TestSecurityContext.mock(principal);
-        OaDocument urgent = document("BX202609010001", DocumentStatus.APPROVING, new BigDecimal("100"));
-        OaDocument later = document("BX202609010002", DocumentStatus.APPROVING, new BigDecimal("200"));
+        OaDocument urgent = document("BX202609010001", DocumentStatusEnum.APPROVING, new BigDecimal("100"));
+        OaDocument later = document("BX202609010002", DocumentStatusEnum.APPROVING, new BigDecimal("200"));
         // urgent 更新时间更早 → 更临近超时
         touch(urgent, today().minusDays(1).atTime(8, 0));
         touch(later, today().atTime(6, 0));
         workflowPort.pendingTaskIds = List.of(later.getId(), urgent.getId());
 
-        List<DashboardViews.TodoItem> todos = dashboardService.todoList();
+        List<DashboardViews.Todo> todos = dashboardService.todoList();
 
-        assertThat(todos).extracting(DashboardViews.TodoItem::docCode)
+        assertThat(todos).extracting(DashboardViews.Todo::docCode)
                 .containsExactly("BX202609010001", "BX202609010002");
     }
 
     @Test
     void shouldReturnBoardStatsWithNodeEfficiencyAndDistribution() {
         TestSecurityContext.mock(principal);
-        document("BX202609010001", DocumentStatus.APPROVING, new BigDecimal("100"));
-        document("BX202609010002", DocumentStatus.APPROVED, new BigDecimal("200"));
-        document("BX202609010003", DocumentStatus.REJECTED, new BigDecimal("300"));
-        workflowPort.nodeStats = List.of(new WorkflowNodeStat("直属主管", 8, 2, 3.5));
+        document("BX202609010001", DocumentStatusEnum.APPROVING, new BigDecimal("100"));
+        document("BX202609010002", DocumentStatusEnum.APPROVED, new BigDecimal("200"));
+        document("BX202609010003", DocumentStatusEnum.REJECTED, new BigDecimal("300"));
+        workflowPort.nodeStats = List.of(new WorkflowNodeStatResponse("直属主管", 8, 2, 3.5));
 
-        DashboardViews.BoardStats board = dashboardService.boardStats();
+        DashboardViews.Board board = dashboardService.boardStats();
 
         assertThat(board.totalCount()).isEqualTo(3);
         assertThat(board.approvingCount()).isEqualTo(1);
         assertThat(board.approvedCount()).isEqualTo(1);
         assertThat(board.statusDistribution())
                 .extracting(DashboardViews.StatusDistribution::status, DashboardViews.StatusDistribution::count)
-                .contains(org.assertj.core.groups.Tuple.tuple(DocumentStatus.APPROVING, 1L),
-                        org.assertj.core.groups.Tuple.tuple(DocumentStatus.APPROVED, 1L),
-                        org.assertj.core.groups.Tuple.tuple(DocumentStatus.REJECTED, 1L));
+                .contains(org.assertj.core.groups.Tuple.tuple(DocumentStatusEnum.APPROVING, 1L),
+                        org.assertj.core.groups.Tuple.tuple(DocumentStatusEnum.APPROVED, 1L),
+                        org.assertj.core.groups.Tuple.tuple(DocumentStatusEnum.REJECTED, 1L));
         assertThat(board.nodeEfficiencies()).hasSize(1);
         assertThat(board.nodeEfficiencies().get(0).nodeName()).isEqualTo("直属主管");
         assertThat(board.nodeEfficiencies().get(0).completionRatePercent()).isEqualTo(80.0);
@@ -145,7 +148,7 @@ class DashboardServiceTest {
     @Test
     void shouldReturnWeeklyTrendWithSevenPoints() {
         TestSecurityContext.mock(principal);
-        document("BX202609010001", DocumentStatus.APPROVED, new BigDecimal("100"));
+        document("BX202609010001", DocumentStatusEnum.APPROVED, new BigDecimal("100"));
 
         List<DashboardViews.TrendPoint> trend = dashboardService.weeklyTrend();
 
@@ -158,24 +161,24 @@ class DashboardServiceTest {
     @Test
     void shouldReturnRiskListForHighAmountDocuments() {
         TestSecurityContext.mock(principal);
-        document("BX202609010001", DocumentStatus.APPROVING, new BigDecimal("90000"));
-        document("BX202609010002", DocumentStatus.APPROVING, new BigDecimal("100"));
+        document("BX202609010001", DocumentStatusEnum.APPROVING, new BigDecimal("90000"));
+        document("BX202609010002", DocumentStatusEnum.APPROVING, new BigDecimal("100"));
 
-        List<DashboardViews.RiskItem> risks = dashboardService.riskList();
+        List<DashboardViews.Risk> risks = dashboardService.riskList();
 
         assertThat(risks).hasSize(1);
         assertThat(risks.get(0).docCode()).isEqualTo("BX202609010001");
         assertThat(risks.get(0).amount()).isEqualByComparingTo(new BigDecimal("90000"));
     }
 
-    private OaDocument document(String docCode, DocumentStatus status, BigDecimal amount) {
+    private OaDocument document(String docCode, DocumentStatusEnum status, BigDecimal amount) {
         OaDocument doc = new OaDocument();
         doc.setDocCode(docCode);
-        doc.setBusinessType(docCode.startsWith("YY") ? BusinessType.SEAL_APPLICATION
-                : docCode.startsWith("FK") ? BusinessType.BUSINESS_PAYMENT : BusinessType.DAILY_PAYMENT);
+        doc.setBusinessType(docCode.startsWith("YY") ? BusinessTypeEnum.SEAL_APPLICATION
+                : docCode.startsWith("FK") ? BusinessTypeEnum.BUSINESS_PAYMENT : BusinessTypeEnum.DAILY_PAYMENT);
         doc.setProjectName("费用报销");
         doc.setApplicant(applicant);
-        doc.setCompany(Company.HAI_XIA_JIN);
+        doc.setCompany(CompanyEnum.HAI_XIA_JIN);
         doc.setDepartment("财务部");
         doc.setAmount(amount);
         doc.setNeedPostMaterial(false);
@@ -203,7 +206,7 @@ class DashboardServiceTest {
         entityManager.clear();
     }
 
-    private ApprovalRecord record(OaDocument doc, ApprovalAction action) {
+    private ApprovalRecord record(OaDocument doc, ApprovalActionEnum action) {
         ApprovalRecord record = new ApprovalRecord();
         record.setDocument(doc);
         record.setNodeName("直属主管");
@@ -222,7 +225,7 @@ class DashboardServiceTest {
 
     static class FakeWorkflowPort implements WorkflowPort {
         List<Long> pendingTaskIds = List.of();
-        List<WorkflowNodeStat> nodeStats = List.of();
+        List<WorkflowNodeStatResponse> nodeStats = List.of();
 
         void reset() {
             pendingTaskIds = List.of();
@@ -237,13 +240,15 @@ class DashboardServiceTest {
             return pendingTaskIds.stream().map(this::task).toList();
         }
         @Override public List<Task> tasksForProcess(String processInstanceId) { return List.of(); }
+        @Override public List<Task> allActiveTasks() { return List.of(); }
+        @Override public List<Task> delegatedTasks() { return List.of(); }
         @Override public void moveTaskToActivity(String processInstanceId, String taskId, String targetActivityId) {}
         @Override public void endProcess(String processInstanceId, String reason) {}
         @Override public void setAssignee(String taskId, String account) {}
         @Override public void delegateTask(String taskId, String account) {}
         @Override public void resolveTask(String taskId) {}
-        @Override public List<WorkflowHistoryItem> history(String processInstanceId) { return List.of(); }
-        @Override public List<WorkflowNodeStat> nodeStatistics() { return nodeStats; }
+        @Override public List<WorkflowHistoryItemResponse> history(String processInstanceId) { return List.of(); }
+        @Override public List<WorkflowNodeStatResponse> nodeStatistics() { return nodeStats; }
 
         private Task task(Long documentId) {
             Task task = org.mockito.Mockito.mock(Task.class);
