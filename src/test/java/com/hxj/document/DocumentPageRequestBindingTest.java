@@ -123,7 +123,7 @@ class DocumentPageRequestBindingTest {
 
     @Test
     void shouldReturnUnpagedWhenSizeIsMinusOne() {
-        DocumentPageRequest request = new DocumentPageRequest(null, null, null, null, null, 1, -1);
+        DocumentPageRequest request = new DocumentPageRequest(null, null, null, null, null, null, 1, -1);
 
         assertThat(request.toPageable(Sort.by(Sort.Direction.DESC, "updatedAt")))
                 .isSameAs(Pageable.unpaged());
@@ -131,7 +131,7 @@ class DocumentPageRequestBindingTest {
 
     @Test
     void shouldConvertToSpringDataPageable() {
-        DocumentPageRequest request = new DocumentPageRequest(null, null, null, null, null, 3, 20);
+        DocumentPageRequest request = new DocumentPageRequest(null, null, null, null, null, null, 3, 20);
 
         Pageable pageable = request.toPageable(Sort.by(Sort.Direction.DESC, "updatedAt"));
 

@@ -1,7 +1,7 @@
 package com.hxj.common;
 
 import com.hxj.exception.BusinessException;
-import com.hxj.security.AuthenticatedUser;
+import com.hxj.security.AuthenticatedUserResponse;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,8 +49,8 @@ class IdempotencyAspectTest {
         request = new MockHttpServletRequest();
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
         // 模拟已登录用户
-        AuthenticatedUser user = new AuthenticatedUser(1L, "zhangsan", "张三", "财务部", "员工",
-                List.of(), List.of(), List.of("OWN_DOCUMENTS"));
+        AuthenticatedUserResponse user = new AuthenticatedUserResponse(1L, "zhangsan", "张三", "财务部", "员工",
+                List.of(), List.of(), List.of("OWN"));
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(user, null, List.of()));
     }

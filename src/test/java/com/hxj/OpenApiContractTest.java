@@ -47,11 +47,11 @@ class OpenApiContractTest {
         assertDescription(schemas, "EmployeeResponse", "id", "用户ID");
         assertDescription(schemas, "RoleResponse", "permissions", "权限编码列表");
         assertDescription(schemas, "CreateEmployeeRequest", "account", "登录账号");
-        assertDescription(schemas, "ArchiveLedgerItem", "amount", "金额");
-        assertDescription(schemas, "ApprovalHistoryItem", "operator", "操作人");
+        assertDescription(schemas, "ArchiveLedgerItemResponse", "amount", "金额");
+        assertDescription(schemas, "ApprovalHistoryItemResponse", "operator", "操作人");
         // 泛型 PageResponse<T> 的裸 schema 在 SpringDoc 下字段描述可能丢失，
         // 验证具体引用实例 PageResponseArchiveLedgerItem（字段描述来源相同）即可
-        assertDescription(schemas, "PageResponseArchiveLedgerItem", "totalElements", "总记录数");
+        assertDescription(schemas, "PageResponseArchiveLedgerItemResponse", "totalElements", "总记录数");
         assertDescription(schemas, "Badge", "pendingApprovalCount", "待审批单据数");
         // record 分页请求：证明「保持 record」后文档注释依然完整
         assertDescription(schemas, "DocumentPageRequest", "size", "每页条数");

@@ -43,10 +43,19 @@ public class SysRole {
     @Column(length = 100)
     private String post;
 
-    /** 数据范围（决定该角色可查看的单据范围）。 */
+    /** 数据范围（决定该角色可查看的单据范围，code 为 ALL/OWN/DEPT/DEPT_AND_CHILD/CUSTOM）。 */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "data_scope_id", nullable = false)
     private SysDataScope dataScope;
+
+    /** 自定义数据范围部门集合（仅 dataScope 为 CUSTOM 时生效，经 sys_role_scope_department 关联）。 */
+    @ManyToMany
+    @JoinTable(
+            name = "sys_role_scope_department",
+            joinColumns = @JoinColumn(name = "role_id"),
+            inverseJoinColumns = @JoinColumn(name = "department_id")
+    )
+    private Set<SysDepartment> scopeDepartments = new LinkedHashSet<>();
 
     /** 权限点集合（经 sys_role_permission 关联）。 */
     @ManyToMany
@@ -79,6 +88,11 @@ public class SysRole {
     public void setPost(String post) { this.post = post; }
     public SysDataScope getDataScope() { return dataScope; }
     public void setDataScope(SysDataScope dataScope) { this.dataScope = dataScope; }
+    public Set<SysDepartment> getScopeDepartments() { return scopeDepartments; }
+    public void setScopeDepartments(Set<SysDepartment> scopeDepartments) {
+        this.scopeDepartments = scopeDepartments == null
+                ? new LinkedHashSet<>() : new LinkedHashSet<>(scopeDepartments);
+    }
     public Set<SysPermission> getPermissions() { return permissions; }
     public void setPermissions(Set<SysPermission> permissions) {
         this.permissions = permissions == null ? new LinkedHashSet<>() : new LinkedHashSet<>(permissions);

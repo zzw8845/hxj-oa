@@ -1,11 +1,11 @@
 package com.hxj.workflow;
 
-import com.hxj.entity.ConditionOperator;
-import com.hxj.entity.FlowCategory;
+import com.hxj.enums.ConditionOperatorEnum;
+import com.hxj.enums.FlowCategoryEnum;
 import com.hxj.entity.FlowConditionRule;
 import com.hxj.entity.FlowConfig;
 import com.hxj.entity.FlowNodeConfig;
-import com.hxj.entity.FlowNodeType;
+import com.hxj.enums.FlowNodeTypeEnum;
 import com.hxj.repository.FlowConfigRepository;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.RepositoryService;
@@ -55,17 +55,17 @@ class FlowableWorkflowIntegrationTest {
         flowConfigRepository.deleteAll();
         config = new FlowConfig();
         config.setType("采购申请");
-        config.setCategory(FlowCategory.DAILY);
-        config.addNode(new FlowNodeConfig("发起人", FlowNodeType.START));
-        FlowNodeConfig manager = new FlowNodeConfig("直属主管", FlowNodeType.APPROVAL);
+        config.setCategory(FlowCategoryEnum.DAILY);
+        config.addNode(new FlowNodeConfig("发起人", FlowNodeTypeEnum.START));
+        FlowNodeConfig manager = new FlowNodeConfig("直属主管", FlowNodeTypeEnum.APPROVAL);
         manager.setAssigneeRole("二级部门负责人");
         config.addNode(manager);
-        FlowNodeConfig gm = new FlowNodeConfig("执行总经理（≥2万元）", FlowNodeType.APPROVAL);
+        FlowNodeConfig gm = new FlowNodeConfig("执行总经理（≥2万元）", FlowNodeTypeEnum.APPROVAL);
         gm.setAssigneeRole("执行总经理");
         config.addNode(gm);
-        config.addNode(new FlowNodeConfig("抄送财务", FlowNodeType.CC));
+        config.addNode(new FlowNodeConfig("抄送财务", FlowNodeTypeEnum.CC));
         config.addConditionRule(new FlowConditionRule(
-                "amount", ConditionOperator.GREATER_THAN_OR_EQUAL, "20000", "执行总经理（≥2万元）"));
+                "amount", ConditionOperatorEnum.GREATER_THAN_OR_EQUAL, "20000", "执行总经理（≥2万元）"));
         flowConfigRepository.saveAndFlush(config);
     }
 
@@ -94,7 +94,7 @@ class FlowableWorkflowIntegrationTest {
                 .processInstanceId(processInstanceId).singleResult();
         assertThat(history.getEndTime()).isNotNull();
         assertThat(workflowService.history(processInstanceId))
-                .extracting(WorkflowHistoryItem::nodeName)
+                .extracting(WorkflowHistoryItemResponse::nodeName)
                 .contains("直属主管", "执行总经理（≥2万元）", "抄送财务");
     }
 
@@ -108,8 +108,8 @@ class FlowableWorkflowIntegrationTest {
 
         assertThat(runtimeService.createProcessInstanceQuery()
                 .processInstanceId(processInstanceId).singleResult()).isNull();
-        List<WorkflowHistoryItem> history = workflowService.history(processInstanceId);
-        assertThat(history).extracting(WorkflowHistoryItem::nodeName)
+        List<WorkflowHistoryItemResponse> history = workflowService.history(processInstanceId);
+        assertThat(history).extracting(WorkflowHistoryItemResponse::nodeName)
                 .doesNotContain("执行总经理（≥2万元）")
                 .contains("抄送财务");
     }

@@ -4,7 +4,7 @@ import com.hxj.entity.SysDataScope;
 import com.hxj.entity.SysPermission;
 import com.hxj.entity.SysRole;
 import com.hxj.entity.SysUser;
-import com.hxj.entity.UserStatus;
+import com.hxj.enums.UserStatusEnum;
 import com.hxj.config.SecurityBeansConfig;
 import com.hxj.config.TimeConfig;
 import com.hxj.exception.GlobalExceptionHandler;
@@ -65,7 +65,7 @@ class AuthLoginIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        SysDataScope scope = new SysDataScope("ALL_DEPARTMENTS_ALL_NODES", "全部部门与全部节点");
+        SysDataScope scope = new SysDataScope("ALL", "全部单据");
         SysPermission permission = new SysPermission("VIEW_ALL_FORMS", "查看全部表单");
 
         SysRole role = new SysRole();
@@ -82,7 +82,7 @@ class AuthLoginIntegrationTest {
         activeUser.setPassword(passwordEncoder.encode("password"));
         activeUser.setDepartment("总经办");
         activeUser.setPost("系统管理员");
-        activeUser.setStatus(UserStatus.ACTIVE);
+        activeUser.setStatus(UserStatusEnum.ACTIVE);
         activeUser.addRole(role);
 
         SysUser resignedUser = new SysUser();
@@ -92,7 +92,7 @@ class AuthLoginIntegrationTest {
         resignedUser.setPassword(passwordEncoder.encode("password"));
         resignedUser.setDepartment("总经办");
         resignedUser.setPost("员工");
-        resignedUser.setStatus(UserStatus.RESIGNED);
+        resignedUser.setStatus(UserStatusEnum.RESIGNED);
         resignedUser.addRole(role);
 
         when(userRepository.findByAccount("linanran")).thenReturn(Optional.of(activeUser));
@@ -243,7 +243,7 @@ class AuthLoginIntegrationTest {
     }
 
     private SysUser buildTestUser() {
-        SysDataScope scope = new SysDataScope("ALL_DEPARTMENTS_ALL_NODES", "全部部门与全部节点");
+        SysDataScope scope = new SysDataScope("ALL", "全部单据");
         SysPermission permission = new SysPermission("VIEW_ALL_FORMS", "查看全部表单");
 
         SysRole role = new SysRole();
@@ -260,7 +260,7 @@ class AuthLoginIntegrationTest {
         user.setPassword(passwordEncoder.encode("password"));
         user.setDepartment("总经办");
         user.setPost("系统管理员");
-        user.setStatus(UserStatus.ACTIVE);
+        user.setStatus(UserStatusEnum.ACTIVE);
         user.addRole(role);
         return user;
     }

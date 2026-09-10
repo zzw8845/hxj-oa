@@ -1,5 +1,5 @@
 package com.hxj.service;
-import com.hxj.entity.BusinessType;
+import com.hxj.enums.BusinessTypeEnum;
 import com.hxj.repository.JdbcDocumentSequenceAllocator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,9 +55,9 @@ class DocumentCodeGeneratorTest {
 
     @Test
     void shouldGeneratePrefixDateAndFourDigitSequence() {
-        assertThat(generator.generate(BusinessType.DAILY_PAYMENT)).isEqualTo("BX202608290001");
-        assertThat(generator.generate(BusinessType.BUSINESS_PAYMENT)).isEqualTo("FK202608290002");
-        assertThat(generator.generate(BusinessType.SEAL_APPLICATION)).isEqualTo("YY202608290003");
+        assertThat(generator.generate(BusinessTypeEnum.DAILY_PAYMENT)).isEqualTo("BX202608290001");
+        assertThat(generator.generate(BusinessTypeEnum.BUSINESS_PAYMENT)).isEqualTo("FK202608290002");
+        assertThat(generator.generate(BusinessTypeEnum.SEAL_APPLICATION)).isEqualTo("YY202608290003");
     }
 
     @Test
@@ -66,9 +66,9 @@ class DocumentCodeGeneratorTest {
         ExecutorService executor = Executors.newFixedThreadPool(12);
         try {
             List<Callable<String>> tasks = new ArrayList<>();
-            BusinessType[] types = BusinessType.values();
+            BusinessTypeEnum[] types = BusinessTypeEnum.values();
             for (int index = 0; index < count; index++) {
-                BusinessType type = types[index % types.length];
+                BusinessTypeEnum type = types[index % types.length];
                 tasks.add(() -> generator.generate(type));
             }
 

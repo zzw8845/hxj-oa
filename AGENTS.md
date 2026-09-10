@@ -32,14 +32,16 @@ src/main/java/com/hxj/
 │   ├── ApprovalActionController.java
 │   ├── ApprovalActionService.java
 │   ├── ApprovalRequest.java        # 审批请求 DTO
-│   ├── ApprovalResult.java         # 审批结果 DTO
+│   ├── ApprovalResultResponse.java # 审批结果 DTO
 │   ├── SignRequest.java            # 加签请求 DTO
-│   └── ApprovalHistoryItem.java    # 审批历史项 DTO
+│   ├── VoidDocumentRequest.java    # 作废单据请求 DTO
+│   └── ApprovalHistoryItemResponse.java # 审批历史项 DTO
 ├── archive/                        # 归档台账模块
 │   ├── ArchiveLedgerController.java
 │   ├── ArchiveLedgerService.java
-│   ├── ArchiveLedgerQuery.java     # 归档查询条件 DTO
-│   └── ArchiveLedgerItem.java      # 归档条目 DTO
+│   ├── ArchiveLedgerPageRequest.java   # 归档分页查询请求 DTO
+│   ├── ArchiveLedgerQueryRequest.java  # 归档查询条件 DTO
+│   └── ArchiveLedgerItemResponse.java  # 归档条目 DTO
 ├── auth/                           # 认证模块
 │   ├── AuthController.java
 │   ├── AuthService.java
@@ -49,8 +51,9 @@ src/main/java/com/hxj/
 ├── common/                         # 通用组件
 │   ├── ApiResponse.java            # 统一响应封装
 │   ├── ApiResponseAdvice.java      # 响应体增强（统一注入 requestId）
-│   ├── ErrorCode.java              # 全局业务错误码枚举（前端契约单一出处）
+│   ├── ErrorCodeEnum.java              # 全局业务错误码枚举（前端契约单一出处）
 │   ├── PageResponse.java           # 分页响应封装
+│   ├── PageableRequest.java        # 分页查询请求统一契约（record 分页参数转换）
 │   ├── RequestLoggingAspect.java   # 请求日志切面
 │   ├── Idempotent.java             # 幂等性注解
 │   ├── IdempotencyAspect.java      # 幂等性切面
@@ -72,37 +75,46 @@ src/main/java/com/hxj/
 │   ├── DocumentController.java
 │   ├── DocumentApplicationService.java
 │   ├── DocumentClassifier.java     # 单据分类器
-│   ├── DocumentDetail.java         # 单据详情 DTO
-│   ├── DocumentSummary.java        # 单据摘要 DTO
-│   ├── DocumentSearchCriteria.java # 单据查询条件 DTO
+│   ├── DocumentDetailResponse.java         # 单据详情 DTO
+│   ├── DocumentSummaryResponse.java        # 单据摘要 DTO
+│   ├── DocumentPageRequest.java    # 单据分页查询请求 DTO
+│   ├── DocumentSearchCondition.java # 单据查询条件 DTO
 │   ├── SubmitDocumentRequest.java  # 提交单据请求 DTO
 │   ├── AttachmentRequirementService.java # 必传附件服务
 │   ├── LocalAttachmentStorage.java # 本地附件存储
-│   └── QuickDocumentItem.java      # 快捷单据项 DTO
+│   ├── QuickDocumentAdminController.java  # 快捷单据目录管理接口
+│   ├── QuickDocumentManagementService.java # 快捷单据目录管理服务
+│   ├── QuickDocumentItemResponse.java # 快捷单据项 DTO
+│   ├── SaveQuickDocumentRequest.java # 保存快捷单据请求 DTO
+│   └── QuickDocumentViews.java     # 快捷单据管理视图容器（嵌套 Entry record）
 ├── entity/                         # 数据库实体（JPA Entity）
 │   ├── OaDocument.java             # 单据实体
 │   ├── OaAttachment.java           # 附件实体
 │   ├── ApprovalRecord.java         # 审批记录实体
-│   ├── ApprovalAction.java         # 审批操作枚举
+│   ├── ArchiveLedger.java          # 归档台账实体
+│   ├── ApprovalActionEnum.java         # 审批操作枚举
 │   ├── CcRecord.java               # 抄送记录实体
-│   ├── CcSource.java               # 抄送来源枚举
-│   ├── Company.java                # 公司枚举
-│   ├── DocumentStatus.java         # 单据状态枚举
-│   ├── DocumentType.java           # 单据类型枚举
+│   ├── CcSourceEnum.java               # 抄送来源枚举
+│   ├── CompanyEnum.java                # 公司枚举
+│   ├── DocumentStatusEnum.java         # 单据状态枚举
+│   ├── DocumentTypeEnum.java           # 单据类型枚举
 │   ├── FlowConfig.java             # 流程配置实体
 │   ├── FlowNodeConfig.java         # 流程节点配置实体
-│   ├── FlowNodeType.java           # 流程节点类型枚举
+│   ├── FlowNodeTypeEnum.java           # 流程节点类型枚举
 │   ├── FlowConditionRule.java      # 流程条件规则实体
-│   ├── FlowCategory.java           # 流程分类枚举
-│   ├── ConditionOperator.java      # 条件操作符枚举
-│   ├── BusinessType.java           # 业务类型枚举
-│   ├── SealType.java               # 印章类型枚举
-│   ├── SupplementMode.java         # 补材料模式枚举
-│   ├── SysUser.java                # 系统用户实体
+│   ├── FlowCategoryEnum.java           # 流程分类枚举
+│   ├── ConditionOperatorEnum.java      # 条件操作符枚举
+│   ├── BusinessTypeEnum.java           # 业务类型枚举
+│   ├── SealTypeEnum.java               # 印章类型枚举
+│   ├── SupplementModeEnum.java         # 补材料模式枚举
+│   ├── SysUser.java                # 系统用户实体（部门/岗位为字典外键+名称快照）
 │   ├── SysRole.java                # 系统角色实体
 │   ├── SysPermission.java          # 系统权限实体
 │   ├── SysDataScope.java           # 数据范围实体
-│   ├── UserStatus.java             # 用户状态枚举
+│   ├── SysDepartment.java          # 部门实体（闭包表模型，支持任意层级）
+│   ├── SysDepartmentClosure.java   # 部门闭包表实体（祖先-后代路径）
+│   ├── SysPost.java                # 岗位字典实体
+│   ├── UserStatusEnum.java             # 用户状态枚举
 │   └── QuickDocument.java          # 快捷单据实体
 ├── exception/                      # 异常处理
 │   ├── BusinessException.java      # 业务异常
@@ -111,13 +123,22 @@ src/main/java/com/hxj/
 │   ├── PermissionManagementController.java
 │   ├── EmployeeManagementService.java
 │   ├── RoleManagementService.java
-│   ├── CreateEmployeeRequest.java  # 创建员工请求 DTO
+│   ├── DepartmentManagementService.java # 部门管理服务（闭包表维护：建树/移动/环检测）
+│   ├── PostManagementService.java  # 岗位字典管理服务
+│   ├── CreateEmployeeRequest.java  # 创建员工请求 DTO（部门/岗位传字典ID）
 │   ├── UpdateEmployeeRequest.java  # 更新员工请求 DTO
+│   ├── ResetPasswordRequest.java   # 重置密码请求 DTO
 │   ├── EmployeeResponse.java       # 员工响应 DTO
+│   ├── SaveDepartmentRequest.java  # 保存部门请求 DTO（新增/编辑共用）
+│   ├── SavePostRequest.java        # 保存岗位请求 DTO
+│   ├── DepartmentViews.java        # 部门树视图容器（嵌套 Department record）
+│   ├── PostViews.java              # 岗位视图容器（嵌套 Post record）
+│   ├── PermissionViews.java        # 权限点只读视图容器（嵌套 PermissionPoint record）
+│   └── DataScopeViews.java         # 数据范围只读视图容器（嵌套 Scope record）
 │   ├── SaveRoleRequest.java        # 保存角色请求 DTO
 │   ├── RoleResponse.java           # 角色响应 DTO
-│   ├── RoleTreeNode.java           # 角色树节点 DTO
-│   └── DepartmentRoleNode.java     # 部门角色节点 DTO
+│   ├── RoleTreeNodeResponse.java   # 角色树节点 DTO
+│   └── DepartmentRoleNodeResponse.java # 部门角色节点 DTO
 ├── repository/                     # 数据访问层（JPA Repository）
 │   ├── OaDocumentRepository.java
 │   ├── OaAttachmentRepository.java
@@ -134,9 +155,11 @@ src/main/java/com/hxj/
 │   └── DocumentSequenceAllocator.java    # 序列分配器接口
 ├── security/                       # 安全相关
 │   ├── AuthenticatedUser.java      # 已认证用户信息
+│   ├── AuthenticatedUserResponse.java # 当前登录用户响应 DTO
 │   ├── JwtService.java             # JWT 生成与验证
 │   ├── JwtAuthenticationFilter.java # JWT 认证过滤器
-│   ├── DocumentAccessPolicy.java   # 单据访问策略
+│   ├── TokenBlacklistService.java  # Token 黑名单（退出登录立即失效）
+│   ├── DocumentAccessPolicy.java   # 单据访问策略（5 种数据范围类型 + 闭包子树 + 自定义部门集合）
 │   ├── JsonAccessDeniedHandler.java # 403 处理
 │   ├── JsonAuthenticationEntryPoint.java # 401 处理
 │   └── SecurityResponseWriter.java # Security 阶段统一 JSON 响应写出
@@ -150,8 +173,8 @@ src/main/java/com/hxj/
     ├── FlowConfigController.java   # 流程配置控制器
     ├── FlowConfigItems.java        # 流程配置项 DTO
     ├── OaCcNodeDelegate.java       # 抄送节点委托
-    ├── WorkflowHistoryItem.java    # 流程历史项 DTO
-    ├── WorkflowNodeStat.java       # 流程节点统计 DTO
+    ├── WorkflowHistoryItemResponse.java # 流程历史项 DTO
+    ├── WorkflowNodeStatResponse.java    # 流程节点统计 DTO
     └── WorkflowPort.java           # 流程引擎端口接口
 ```
 
@@ -195,7 +218,7 @@ src/main/java/com/hxj/
 - **职责**：请求参数封装与响应数据封装
 - **规范**：
   - 请求 DTO：放在对应模块包内，以 `Request` 结尾（如 `SubmitDocumentRequest`）
-  - 响应 DTO：放在对应模块包内，以 `Response`、`Item`、`Summary`、`Detail` 等结尾
+  - 响应 DTO：放在对应模块包内，以 `Response` 结尾
   - 所有字段必须添加中文注释（`/** 字段说明 */`）
   - 使用 Jackson 注解控制序列化（`@JsonProperty`、`@JsonIgnore` 等）
 
@@ -210,11 +233,33 @@ src/main/java/com/hxj/
 | Repository | `{业务}Repository` | `OaDocumentRepository` |
 | Entity | `{业务}（大驼峰，无后缀）` | `OaDocument` |
 | 请求 DTO | `{业务}{操作}Request` | `SubmitDocumentRequest` |
-| 响应 DTO | `{业务}{视图}` | `DocumentSummary`、`DocumentDetail` |
-| 枚举 | `{业务}{属性}枚举语义` | `DocumentStatus`、`ApprovalAction` |
+| 响应 DTO | `{业务}{视图}Response` | `DocumentSummaryResponse`、`DocumentDetailResponse` |
+| 枚举 | `{业务}{属性}Enum` | `DocumentStatusEnum`、`ApprovalActionEnum` |
 | 配置类 | `{功能}Config` | `SecurityConfig` |
 | 切面 | `{功能}Aspect` | `IdempotencyAspect` |
 | 异常 | `{业务}Exception` | `BusinessException` |
+
+### 4.1 DTO 后缀边界：只有 `Request` 和 `Response` 两种
+
+DTO 的类名后缀**只有 `Request` 和 `Response` 两种**；不作为独立 HTTP 契约的内部/嵌套结构**直接不带后缀**。按下表判定：
+
+| 位置 | 后缀 | 示例 |
+|---|---|---|
+| 顶层请求 DTO（Controller 入参） | `Request` | `SubmitDocumentRequest`、`DocumentPageRequest` |
+| 顶层响应 DTO（Controller 返回，或作为 `ApiResponse<T>` / `List<T>` 载荷元素） | `Response` | `DocumentSummaryResponse`、`DepartmentRoleNodeResponse`、`AuthenticatedUserResponse` |
+| 容器类（`final class` + 私有构造，仅作嵌套 record 命名空间） | 不带后缀 | `DashboardViews`、`FlowConfigItems` |
+| 嵌套/内部结构（外层 DTO 的组件，非独立契约） | 不带后缀 | `DocumentDetailResponse.Attachment`、`DashboardViews.Home`、`FlowConfigItems.Config` |
+
+约束与理由：
+
+- DTO 后缀**禁止**出现 `Item`/`Summary`/`Detail`/`Query`/`Criteria`/`Result`/`Node`/`Stat(s)` 等中间态——
+  这些曾让「命名 → 规则」映射多达十种，已被 ArchUnit 规则 `noLegacyDtoSuffixes` 禁止。
+- 容器类**禁止**加 `Response`：它不是 DTO，加后缀会被 ArchUnit 规则
+  `dataTransferObjectsShouldBeRecords`（要求以后缀结尾的类必须是 `record`）判定违规；
+  正确做法是保持 `final class` 且不带后缀，**不要**为它新增规则豁免。
+- 嵌套结构不带后缀：其限定名已包含外层语义（`DocumentDetailResponse.Attachment`），
+  再加 `Response` 冗余且会改变 OpenAPI schema 名、破坏前端已生成的类型契约。
+- 枚举统一以 `Enum` 结尾（含嵌套枚举），由 ArchUnit 规则 `enumsShouldEndWithEnumSuffix` 强制。
 
 ---
 
@@ -330,12 +375,15 @@ public ApiResponse<DocumentSummary> submit(@Valid @RequestBody SubmitDocumentReq
 | 约束 | 对应规范 |
 |------|---------|
 | `@RestController` 类必须以 `Controller` 结尾 | 第 4 章命名规范 |
-| Controller 公开方法必须返回 `ApiResponse` 或 `ResponseEntity`（文件下载等场景） | 3.1 统一响应 |
+| Controller 公开方法必须返回 `ApiResponse` 或 `ResponseEntity`（文件下载用 `ResponseEntity<byte[]>` 返回字节流，不再豁免 `void`） | 3.1 统一响应 |
+| Controller 禁止直接接收 `HttpServletResponse` 并手写出响应流（下载统一用 `ResponseEntity<byte[]>`） | 9.4 响应统一性 |
 | `service/` 包禁止依赖 Servlet API（HTTP 概念不得渗入业务层） | 3.2 分层职责 |
 | Controller 禁止直接调用 `ApiResponse.error()` 吞异常（必须抛异常交给 `GlobalExceptionHandler`） | 5.2 异常处理 |
 | JPA `@Entity` 禁止声明为 `record` | 11.1 class 与 record 使用规范 |
 | Spring 受管 Bean（`@Component` 及其元注解派生）禁止声明为 `record` | 11.1 class 与 record 使用规范 |
-| DTO（类名以 `Request`/`Response`/`Item`/`Summary`/`Detail`/`Query`/`Criteria`/`Result`/`Node`/`Stat(s)` 结尾）必须是 `record`，继承 `PageParam` 的分页查询请求除外 | 11.1 class 与 record 使用规范 |
+| DTO（类名以 `Request`/`Response` 结尾）必须是 `record` | 11.1 class 与 record 使用规范 |
+| 任何类**不得**以 `Item`/`Summary`/`Detail`/`Query`/`Criteria`/`Result`/`Node`/`Stat(s)` 结尾（DTO 后缀只保留 `Request`/`Response` 两种；内部/嵌套结构直接不带后缀，如 `Attachment`、`Home`） | 第 4 章命名规范 |
+| 枚举类名（含嵌套枚举）必须以 `Enum` 结尾，无豁免 | 第 4 章命名规范 |
 
 新增架构约束时必须同步更新本小节。文档规范与自动化约束冲突时，以自动化约束为准并修订文档。
 
@@ -358,6 +406,36 @@ public ApiResponse<DocumentSummary> submit(@Valid @RequestBody SubmitDocumentReq
 
 ## 11. class 与 record 使用规范
 
+### 11.0 如何判断用 class / final class / record
+
+三者不是风格偏好，而是由「这个类要不要被框架代理或继承」决定的：
+
+```mermaid
+flowchart TD
+    A[这个类是否只装数据?] -->|否: 有行为/可变状态| B[class]
+    A -->|是| C{会被 Hibernate 或 Spring 代理/继承吗?}
+    C -->|会: Entity/Service/Controller/Config/要 extends| B
+    C -->|不会| D[record]
+    B --> E{是 Spring 受管 Bean 吗?}
+    E -->|是| F[class, 禁止加 final]
+    E -->|否: 纯工具类/命名空间| G[final class + 私有构造]
+```
+
+**为什么 `record` 不能用于 Entity 和 Spring Bean（都会踩坑，且第二个不报错）：**
+
+- JPA `@Entity`：Hibernate 懒加载依赖生成实体代理子类，`record` 隐式 `final` 无法继承 → `LazyInitializationException`；
+- Spring 受管 Bean：`@Transactional` / `@Aspect` / `@Idempotent` 依赖 CGLIB 子类代理，`record` 为 `final` → **代理失败但不抛异常，注解静默失效**（代码能跑，事务却不回滚）。
+
+`record` **可以** `implements` 接口（如 `DocumentPageRequest implements PageableRequest`），只是不能 `extends` 类。
+
+**为什么 Spring Bean 不能加 `final`：** CGLIB 需要通过继承生成代理子类，`final` 类无法被继承。
+对照：`SecurityResponseWriter` 标注 `@Component` → 必须是普通 `class`；`CurrentUser` 是不归 Spring 管的静态工具类 → `final class` + 私有构造。
+
+**容器类（如 `DashboardViews`、`FlowConfigItems`）为何是 `final class`：**
+它们本身不承载数据，只是嵌套 `record` 的命名空间，因此用 `final class` + 私有构造禁止实例化与继承。
+正因如此，容器类**禁止**取 `Request`/`Response`/`Item` 等 DTO 后缀（见 4.1 节），否则会与 ArchUnit 的
+`dataTransferObjectsShouldBeRecords` 冲突。
+
 ### 11.1 基本原则
 Java 17 提供 `record` 作为"仅承载不可变数据"的载体，与 `class` 的"封装状态与行为"本质不同。项目按以下约定使用：
 
@@ -367,8 +445,8 @@ Java 17 提供 `record` 作为"仅承载不可变数据"的载体，与 `class` 
 | `@Service` / `@RestController` / `@Configuration` / `@Aspect` | `class` | Spring DI、AOP CGLIB 代理要求 ( record 为 `final` 无法被代理) |
 | 枚举 | `enum` | Java 枚举类型 |
 | 请求 DTO (Request) | `record` | 参数不可变、自动生成 equals/toString/getter |
-| 响应 DTO (Response/Item/Summary/Detail) | `record` | 数据不可变、自动生成 equals/toString/getter |
-| 嵌套视图 (如 `DashboardViews.*`, `FlowConfigItems.*`) | `record` | 仅承载数据，嵌套在 `final class` 内 |
+| 响应 DTO（顶层，以 `Response` 结尾） | `record` | 数据不可变、自动生成 equals/toString/getter |
+| 嵌套/内部结构（只作为外层 DTO 的组件、不作为独立 HTTP 契约） | `record` | 仅承载数据；**直接不带后缀**（如 `DocumentDetailResponse.Attachment`、`DashboardViews.Home`、`FlowConfigItems.Config`），避免与 `Response` 后缀冲突 |
 | 请求/响应统一包装体 `ApiResponse` | `record` | 数据不可变；`requestId` 由 `ApiResponseAdvice` 构造新实例注入 |
 | 容器类（如 `DashboardViews`、`FlowConfigItems`） | `final class` + 私有构造 | 仅作为嵌套 record 的命名空间 |
 | Port 接口 | `interface` | 领域端口 |
@@ -501,8 +579,8 @@ public record SaveRoleRequest(..., List<Long> permissionIds) {
 | Repository | `repository/` | 统一存放，如 `repository/OaDocumentRepository.java` |
 | Entity | `entity/` | 统一存放，如 `entity/OaDocument.java` |
 | 请求 DTO | `模块/` 根目录 | 如 `document/SubmitDocumentRequest.java` |
-| 响应 DTO | `模块/` 根目录 | 如 `document/DocumentSummary.java` |
-| 枚举 | `entity/` | 统一存放，如 `entity/DocumentStatus.java` |
+| 响应 DTO | `模块/` 根目录 | 如 `document/DocumentSummaryResponse.java` |
+| 枚举 | `entity/` | 统一存放，如 `entity/DocumentStatusEnum.java` |
 | 配置类 | `config/` | 如 `config/SecurityConfig.java` |
 | 切面 | `common/` | 如 `common/IdempotencyAspect.java` |
 | 异常 | `exception/` | 如 `exception/BusinessException.java` |
@@ -584,7 +662,7 @@ public record SaveRoleRequest(..., List<Long> permissionIds) {
 ```
 
 ### 15.3 错误码规范
-业务码必须从 `common/ErrorCode` 枚举选取（枚举名即对外输出的业务码字符串），**禁止**使用裸字符串构造 `BusinessException`/`AuthException`。每个枚举值绑定语义化 HTTP 状态码：
+业务码必须从 `common/ErrorCodeEnum` 枚举选取（枚举名即对外输出的业务码字符串），**禁止**使用裸字符串构造 `BusinessException`/`AuthException`。每个枚举值绑定语义化 HTTP 状态码：
 
 | 分类 | HTTP 状态 | 示例 |
 |------|-----------|------|
@@ -594,7 +672,7 @@ public record SaveRoleRequest(..., List<Long> permissionIds) {
 | 业务规则/参数问题 | 400 | `SEAL_INFO_INCOMPLETE`、`DUPLICATE_REQUEST`、`LINKED_DOCUMENT_NOT_APPROVED` |
 | 系统错误 | 500 | `FILE_STORE_FAILED`、`FILE_READ_FAILED` |
 
-新增错误码必须在 `ErrorCode` 枚举登记并绑定 HTTP 状态；命名规范：大写下划线，`资源_原因`。
+新增错误码必须在 `ErrorCodeEnum` 枚举登记并绑定 HTTP 状态；命名规范：大写下划线，`资源_原因`。
 
 ---
 

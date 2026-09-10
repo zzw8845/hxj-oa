@@ -71,7 +71,7 @@ class JwtSecurityIntegrationTest {
 
     @Test
     void shouldAuthenticateValidBearerTokenAndExposeCurrentIdentity() throws Exception {
-        SysDataScope scope = new SysDataScope("ALL_DEPARTMENTS_ALL_NODES", "全部部门与全部节点");
+        SysDataScope scope = new SysDataScope("ALL", "全部单据");
         SysPermission permission = new SysPermission("VIEW_ALL_FORMS", "查看全部表单");
         SysRole role = new SysRole();
         role.setName("超级管理员");

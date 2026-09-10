@@ -18,9 +18,9 @@ public final class TestSecurityContext {
      *
      * @param user 模拟的已认证用户
      */
-    public static void mock(AuthenticatedUser user) {
+    public static void mock(AuthenticatedUserResponse user) {
         SecurityContext context = SecurityContextHolder.createEmptyContext();
-        // 使用 TestingAuthenticationToken 作为 Authentication，principal 即为 AuthenticatedUser
+        // 使用 TestingAuthenticationToken 作为 Authentication，principal 即为 AuthenticatedUserResponse
         TestingAuthenticationToken authentication =
                 new TestingAuthenticationToken(user, null, user.permissions().toArray(new String[0]));
         authentication.setAuthenticated(true);

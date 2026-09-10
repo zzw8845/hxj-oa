@@ -3,7 +3,7 @@ package com.hxj.exception;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hxj.auth.AuthException;
 import com.hxj.common.ApiResponse;
-import com.hxj.common.ErrorCode;
+import com.hxj.common.ErrorCodeEnum;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
@@ -25,7 +25,7 @@ class GlobalExceptionHandlerTest {
     @DisplayName("BusinessException 响应的 code 字段应为字符串业务码，success 为 false")
     void businessExceptionShouldCarryErrorCode() {
         ResponseEntity<ApiResponse<Void>> entity = handler.handleBusiness(
-                new BusinessException(ErrorCode.DOCUMENT_NOT_FOUND, "单据不存在或无权查看"));
+                new BusinessException(ErrorCodeEnum.DOCUMENT_NOT_FOUND, "单据不存在或无权查看"));
 
         // 阿里风格：HTTP 统一 200
         assertThat(entity.getStatusCode().value()).isEqualTo(200);
@@ -40,7 +40,7 @@ class GlobalExceptionHandlerTest {
     @DisplayName("序列化后的 JSON 应包含 code 与 success 字段")
     void serializedJsonShouldContainCodeAndSuccess() throws Exception {
         ResponseEntity<ApiResponse<Void>> entity = handler.handleBusiness(
-                new BusinessException(ErrorCode.DOCUMENT_NOT_FOUND, "单据不存在或无权查看"));
+                new BusinessException(ErrorCodeEnum.DOCUMENT_NOT_FOUND, "单据不存在或无权查看"));
 
         ApiResponse<Void> body = entity.getBody();
         assertThat(body).isNotNull();
@@ -54,7 +54,7 @@ class GlobalExceptionHandlerTest {
     void authExceptionShouldCarryErrorCode() {
         MockHttpServletResponse response = new MockHttpServletResponse();
         ResponseEntity<ApiResponse<Void>> entity = handler.handleAuth(
-                new AuthException(ErrorCode.TOKEN_EXPIRED, "登录已过期，请重新登录"), response);
+                new AuthException(ErrorCodeEnum.TOKEN_EXPIRED, "登录已过期，请重新登录"), response);
 
         // AuthException 返回 401
         assertThat(response.getStatus()).isEqualTo(401);
@@ -66,10 +66,10 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    @DisplayName("BusinessException 使用 ErrorCode 默认提示")
+    @DisplayName("BusinessException 使用 ErrorCodeEnum 默认提示")
     void businessExceptionShouldUseDefaultMessage() {
         ResponseEntity<ApiResponse<Void>> entity = handler.handleBusiness(
-                new BusinessException(ErrorCode.DOCUMENT_NOT_FOUND));
+                new BusinessException(ErrorCodeEnum.DOCUMENT_NOT_FOUND));
 
         ApiResponse<Void> body = entity.getBody();
         assertThat(body).isNotNull();

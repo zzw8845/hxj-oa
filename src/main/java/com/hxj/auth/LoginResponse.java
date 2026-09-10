@@ -40,7 +40,7 @@ public record LoginResponse(
             List<String> roles,
             @Schema(description = "权限编码列表")
             List<String> permissions,
-            @Schema(description = "数据范围列表（如 OWN_DOCUMENTS、DEPARTMENT、ALL）")
+            @Schema(description = "数据范围类型列表（ALL/OWN/DEPT/DEPT_AND_CHILD/CUSTOM）")
             List<String> dataScopes) {
 
         /** 紧凑构造器：集合组件防御性拷贝为不可变列表，null 归一化为不可变空列表。 */
