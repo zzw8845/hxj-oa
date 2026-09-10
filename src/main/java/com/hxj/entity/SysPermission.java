@@ -19,8 +19,13 @@ public class SysPermission {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /** 权限点编码（唯一，如 DOCUMENT_VIEW）。 */
-    @Column(nullable = false, unique = true, length = 100)
+    /**
+     * 权限点编码（唯一，如 DOCUMENT_VIEW）。
+     *
+     * <p>该编码是角色写接口 {@code SaveRoleRequest.permissions} 引用的业务标识，
+     * 也是 Spring Security 权限比对依据，因此生成后不可变更。
+     */
+    @Column(nullable = false, unique = true, length = 100, updatable = false)
     private String code;
 
     /** 权限点名称。 */

@@ -62,6 +62,18 @@ public class OaWorkflowService implements WorkflowPort {
     }
 
     @Override
+    public List<Task> allActiveTasks() {
+        return taskService.createTaskQuery().active().list();
+    }
+
+    @Override
+    public List<Task> delegatedTasks() {
+        return taskService.createTaskQuery()
+                .taskDelegationState(org.flowable.task.api.DelegationState.PENDING)
+                .list();
+    }
+
+    @Override
     public List<Task> tasksForProcess(String processInstanceId) {
         return taskService.createTaskQuery().processInstanceId(processInstanceId).list();
     }
@@ -96,7 +108,7 @@ public class OaWorkflowService implements WorkflowPort {
     }
 
     @Override
-    public List<WorkflowHistoryItem> history(String processInstanceId) {
+    public List<WorkflowHistoryItemResponse> history(String processInstanceId) {
         return historyService.createHistoricActivityInstanceQuery()
                 .processInstanceId(processInstanceId)
                 .orderByHistoricActivityInstanceStartTime().asc()
@@ -104,13 +116,13 @@ public class OaWorkflowService implements WorkflowPort {
                 .stream()
                 .filter(activity -> activity.getActivityName() != null)
                 .map(this::toHistoryItem)
-                .sorted(Comparator.comparing(WorkflowHistoryItem::startedAt,
+                .sorted(Comparator.comparing(WorkflowHistoryItemResponse::startedAt,
                         Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
     }
 
     @Override
-    public List<WorkflowNodeStat> nodeStatistics() {
+    public List<WorkflowNodeStatResponse> nodeStatistics() {
         Map<String, List<HistoricTaskInstance>> completed = new LinkedHashMap<>();
         for (HistoricTaskInstance task : historyService.createHistoricTaskInstanceQuery().finished().list()) {
             if (task.getName() != null) {
@@ -123,26 +135,26 @@ public class OaWorkflowService implements WorkflowPort {
                 active.merge(task.getName(), 1L, Long::sum);
             }
         }
-        List<WorkflowNodeStat> stats = new ArrayList<>();
+        List<WorkflowNodeStatResponse> stats = new ArrayList<>();
         for (Map.Entry<String, List<HistoricTaskInstance>> entry : completed.entrySet()) {
             double avgHours = entry.getValue().stream()
                     .filter(task -> task.getDurationInMillis() != null)
                     .mapToLong(HistoricTaskInstance::getDurationInMillis)
                     .average()
                     .orElse(0d) / 3_600_000d;
-            stats.add(new WorkflowNodeStat(
+            stats.add(new WorkflowNodeStatResponse(
                     entry.getKey(), entry.getValue().size(), active.getOrDefault(entry.getKey(), 0L), avgHours));
         }
         for (Map.Entry<String, Long> entry : active.entrySet()) {
             if (!completed.containsKey(entry.getKey())) {
-                stats.add(new WorkflowNodeStat(entry.getKey(), 0L, entry.getValue(), 0d));
+                stats.add(new WorkflowNodeStatResponse(entry.getKey(), 0L, entry.getValue(), 0d));
             }
         }
         return stats;
     }
 
-    private WorkflowHistoryItem toHistoryItem(HistoricActivityInstance activity) {
-        return new WorkflowHistoryItem(
+    private WorkflowHistoryItemResponse toHistoryItem(HistoricActivityInstance activity) {
+        return new WorkflowHistoryItemResponse(
                 activity.getActivityId(),
                 activity.getActivityName(),
                 activity.getActivityType(),

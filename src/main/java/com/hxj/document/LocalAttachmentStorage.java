@@ -1,6 +1,6 @@
 package com.hxj.document;
 
-import com.hxj.common.ErrorCode;
+import com.hxj.common.ErrorCodeEnum;
 import com.hxj.exception.BusinessException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
@@ -24,7 +24,7 @@ public class LocalAttachmentStorage {
 
     public StoredFile store(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new BusinessException(ErrorCode.EMPTY_FILE, "上传文件不能为空");
+            throw new BusinessException(ErrorCodeEnum.EMPTY_FILE, "上传文件不能为空");
         }
         try {
             Files.createDirectories(root);
@@ -33,12 +33,12 @@ public class LocalAttachmentStorage {
             String storedName = UUID.randomUUID() + "-" + original;
             Path target = root.resolve(storedName).normalize();
             if (!target.startsWith(root)) {
-                throw new BusinessException(ErrorCode.INVALID_FILE_NAME, "文件名不合法");
+                throw new BusinessException(ErrorCodeEnum.INVALID_FILE_NAME, "文件名不合法");
             }
             file.transferTo(target);
             return new StoredFile(original, target.toString(), file.getContentType(), file.getSize());
         } catch (IOException ex) {
-            throw new BusinessException(ErrorCode.FILE_STORE_FAILED, "文件保存失败");
+            throw new BusinessException(ErrorCodeEnum.FILE_STORE_FAILED, "文件保存失败");
         }
     }
 
@@ -46,15 +46,15 @@ public class LocalAttachmentStorage {
         try {
             Path path = Path.of(filePath).toAbsolutePath().normalize();
             if (!path.startsWith(root)) {
-                throw new BusinessException(ErrorCode.INVALID_FILE_PATH, "文件路径不合法");
+                throw new BusinessException(ErrorCodeEnum.INVALID_FILE_PATH, "文件路径不合法");
             }
             Resource resource = new UrlResource(path.toUri());
             if (!resource.exists() || !resource.isReadable()) {
-                throw new BusinessException(ErrorCode.FILE_NOT_FOUND, "文件不存在");
+                throw new BusinessException(ErrorCodeEnum.FILE_NOT_FOUND, "文件不存在");
             }
             return resource;
         } catch (IOException ex) {
-            throw new BusinessException(ErrorCode.FILE_READ_FAILED, "文件读取失败");
+            throw new BusinessException(ErrorCodeEnum.FILE_READ_FAILED, "文件读取失败");
         }
     }
 

@@ -19,8 +19,13 @@ public class SysDataScope {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /** 数据范围编码（唯一）。 */
-    @Column(nullable = false, unique = true, length = 100)
+    /**
+     * 数据范围编码（唯一）。
+     *
+     * <p>该编码是角色写接口 {@code SaveRoleRequest.dataScope} 引用的业务标识，
+     * 因此生成后不可变更，与 OaDocument.docCode 同一原则。
+     */
+    @Column(nullable = false, unique = true, length = 100, updatable = false)
     private String code;
 
     /** 数据范围名称。 */

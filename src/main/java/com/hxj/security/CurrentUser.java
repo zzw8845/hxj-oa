@@ -5,7 +5,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
  * 当前登录用户获取工具类。
- * 从 Spring Security 的 SecurityContext 中直接获取 AuthenticatedUser，
+ * 从 Spring Security 的 SecurityContext 中直接获取 AuthenticatedUserResponse，
  * 避免在 Controller 方法参数中显式声明 @AuthenticationPrincipal。
  */
 public final class CurrentUser {
@@ -18,13 +18,13 @@ public final class CurrentUser {
      *
      * @return 当前登录用户，如果未登录或未认证则返回 null
      */
-    public static AuthenticatedUser get() {
+    public static AuthenticatedUserResponse get() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
             return null;
         }
         Object principal = authentication.getPrincipal();
-        if (principal instanceof AuthenticatedUser user) {
+        if (principal instanceof AuthenticatedUserResponse user) {
             return user;
         }
         return null;
@@ -36,8 +36,8 @@ public final class CurrentUser {
      * @return 当前登录用户
      * @throws IllegalStateException 如果未登录或未认证
      */
-    public static AuthenticatedUser require() {
-        AuthenticatedUser user = get();
+    public static AuthenticatedUserResponse require() {
+        AuthenticatedUserResponse user = get();
         if (user == null) {
             throw new IllegalStateException("当前用户未登录或未认证");
         }
@@ -50,7 +50,7 @@ public final class CurrentUser {
      * @return 用户 ID，如果未登录则返回 null
      */
     public static Long getUserId() {
-        AuthenticatedUser user = get();
+        AuthenticatedUserResponse user = get();
         return user != null ? user.userId() : null;
     }
 
@@ -60,7 +60,7 @@ public final class CurrentUser {
      * @return 用户账号，如果未登录则返回 null
      */
     public static String getAccount() {
-        AuthenticatedUser user = get();
+        AuthenticatedUserResponse user = get();
         return user != null ? user.account() : null;
     }
 }

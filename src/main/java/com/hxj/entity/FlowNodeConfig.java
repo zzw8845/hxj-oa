@@ -1,5 +1,6 @@
 package com.hxj.entity;
 
+import com.hxj.enums.FlowNodeTypeEnum;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -37,7 +38,7 @@ public class FlowNodeConfig {
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "node_type", nullable = false, length = 30)
-    private FlowNodeType nodeType;
+    private FlowNodeTypeEnum nodeType;
 
     /** 审批角色（指定由哪个角色处理）。 */
     @Column(name = "assignee_role", length = 100)
@@ -50,7 +51,7 @@ public class FlowNodeConfig {
     protected FlowNodeConfig() {
     }
 
-    public FlowNodeConfig(String name, FlowNodeType nodeType) {
+    public FlowNodeConfig(String name, FlowNodeTypeEnum nodeType) {
         this.name = name;
         this.nodeType = nodeType;
     }
@@ -60,8 +61,8 @@ public class FlowNodeConfig {
     void setFlowConfig(FlowConfig flowConfig) { this.flowConfig = flowConfig; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
-    public FlowNodeType getNodeType() { return nodeType; }
-    public void setNodeType(FlowNodeType nodeType) { this.nodeType = nodeType; }
+    public FlowNodeTypeEnum getNodeType() { return nodeType; }
+    public void setNodeType(FlowNodeTypeEnum nodeType) { this.nodeType = nodeType; }
     public String getAssigneeRole() { return assigneeRole; }
     public void setAssigneeRole(String assigneeRole) { this.assigneeRole = assigneeRole; }
     public int getSortOrder() { return sortOrder; }

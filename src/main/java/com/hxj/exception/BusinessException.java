@@ -1,6 +1,6 @@
 package com.hxj.exception;
 
-import com.hxj.common.ErrorCode;
+import com.hxj.common.ErrorCodeEnum;
 import lombok.Getter;
 
 /**
@@ -8,24 +8,24 @@ import lombok.Getter;
  *
  * <p>支持两种构造方式：
  * <ul>
- *   <li>{@link #BusinessException(ErrorCode)} — 使用 ErrorCode 的默认提示</li>
- *   <li>{@link #BusinessException(ErrorCode, String)} — 覆盖默认提示（场景化文案）</li>
+ *   <li>{@link #BusinessException(ErrorCodeEnum)} — 使用 ErrorCodeEnum 的默认提示</li>
+ *   <li>{@link #BusinessException(ErrorCodeEnum, String)} — 覆盖默认提示（场景化文案）</li>
  * </ul>
  */
 @Getter
 public class BusinessException extends RuntimeException {
 
     /** 业务错误码 */
-    private final ErrorCode errorCode;
+    private final ErrorCodeEnum errorCode;
 
-    /** 使用 ErrorCode 默认提示 */
-    public BusinessException(ErrorCode errorCode) {
+    /** 使用 ErrorCodeEnum 默认提示 */
+    public BusinessException(ErrorCodeEnum errorCode) {
         super(errorCode.getDefaultMessage());
         this.errorCode = errorCode;
     }
 
     /** 覆盖默认提示（场景化文案） */
-    public BusinessException(ErrorCode errorCode, String message) {
+    public BusinessException(ErrorCodeEnum errorCode, String message) {
         super(message);
         this.errorCode = errorCode;
     }

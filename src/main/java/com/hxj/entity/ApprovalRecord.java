@@ -1,5 +1,7 @@
 package com.hxj.entity;
 
+import com.hxj.enums.ApprovalActionEnum;
+import com.hxj.enums.SupplementModeEnum;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -44,7 +46,7 @@ public class ApprovalRecord {
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 50)
-    private ApprovalAction action;
+    private ApprovalActionEnum action;
 
     /** 审批意见。 */
     @Column(columnDefinition = "TEXT")
@@ -62,7 +64,7 @@ public class ApprovalRecord {
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "supplement_mode", length = 20)
-    private SupplementMode supplementMode;
+    private SupplementModeEnum supplementMode;
 
     /** 补材料指定对象。 */
     @Column(name = "supplement_target", length = 100)
@@ -101,16 +103,16 @@ public class ApprovalRecord {
     public void setNodeName(String nodeName) { this.nodeName = nodeName; }
     public SysUser getApprover() { return approver; }
     public void setApprover(SysUser approver) { this.approver = approver; }
-    public ApprovalAction getAction() { return action; }
-    public void setAction(ApprovalAction action) { this.action = action; }
+    public ApprovalActionEnum getAction() { return action; }
+    public void setAction(ApprovalActionEnum action) { this.action = action; }
     public String getComment() { return comment; }
     public void setComment(String comment) { this.comment = comment; }
     public String getRejectTarget() { return rejectTarget; }
     public void setRejectTarget(String rejectTarget) { this.rejectTarget = rejectTarget; }
     public String getRejectMaterials() { return rejectMaterials; }
     public void setRejectMaterials(String rejectMaterials) { this.rejectMaterials = rejectMaterials; }
-    public SupplementMode getSupplementMode() { return supplementMode; }
-    public void setSupplementMode(SupplementMode supplementMode) { this.supplementMode = supplementMode; }
+    public SupplementModeEnum getSupplementMode() { return supplementMode; }
+    public void setSupplementMode(SupplementModeEnum supplementMode) { this.supplementMode = supplementMode; }
     public String getSupplementTarget() { return supplementTarget; }
     public void setSupplementTarget(String supplementTarget) { this.supplementTarget = supplementTarget; }
     public String getSupplementMaterials() { return supplementMaterials; }

@@ -1,5 +1,7 @@
 package com.hxj.entity;
 
+import com.hxj.enums.FlowCategoryEnum;
+import com.hxj.enums.FlowNodeTypeEnum;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -36,7 +38,7 @@ public class FlowConfig {
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 50)
-    private FlowCategory category;
+    private FlowCategoryEnum category;
 
     /** 有序节点链。 */
     @OneToMany(mappedBy = "flowConfig", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -59,15 +61,15 @@ public class FlowConfig {
     public Long getId() { return id; }
     public String getType() { return type; }
     public void setType(String type) { this.type = type; }
-    public FlowCategory getCategory() { return category; }
-    public void setCategory(FlowCategory category) { this.category = category; }
+    public FlowCategoryEnum getCategory() { return category; }
+    public void setCategory(FlowCategoryEnum category) { this.category = category; }
     public List<FlowNodeConfig> getNodes() { return nodes; }
     public FlowNodeConfig firstActionNode() {
         return nodes.stream()
-                .filter(node -> node.getNodeType() != FlowNodeType.START)
-                .filter(node -> node.getNodeType() != FlowNodeType.CONDITION)
-                .filter(node -> node.getNodeType() != FlowNodeType.CC)
-                .filter(node -> node.getNodeType() != FlowNodeType.END)
+                .filter(node -> node.getNodeType() != FlowNodeTypeEnum.START)
+                .filter(node -> node.getNodeType() != FlowNodeTypeEnum.CONDITION)
+                .filter(node -> node.getNodeType() != FlowNodeTypeEnum.CC)
+                .filter(node -> node.getNodeType() != FlowNodeTypeEnum.END)
                 .findFirst()
                 .orElse(null);
     }

@@ -1,6 +1,6 @@
 package com.hxj.auth;
 
-import com.hxj.common.ErrorCode;
+import com.hxj.common.ErrorCodeEnum;
 import com.hxj.entity.SysUser;
 import com.hxj.repository.SysUserRepository;
 import com.hxj.security.JwtService;
@@ -44,7 +44,7 @@ public class AuthService {
             throw invalidCredentials();
         }
         if (!user.isLoginEnabled()) {
-            throw new AuthException(ErrorCode.ACCOUNT_DISABLED, "账号已停用");
+            throw new AuthException(ErrorCodeEnum.ACCOUNT_DISABLED, "账号已停用");
         }
 
         String token = jwtService.issueAccessToken(user);
@@ -69,12 +69,12 @@ public class AuthService {
         try {
             account = jwtService.parseRefreshToken(refreshToken);
         } catch (Exception ex) {
-            throw new AuthException(ErrorCode.AUTH_FAILED, "Refresh Token 无效或已过期");
+            throw new AuthException(ErrorCodeEnum.AUTH_FAILED, "Refresh Token 无效或已过期");
         }
         SysUser user = userRepository.findByAccount(account)
-                .orElseThrow(() -> new AuthException(ErrorCode.AUTH_FAILED, "账号或密码错误"));
+                .orElseThrow(() -> new AuthException(ErrorCodeEnum.AUTH_FAILED, "账号或密码错误"));
         if (!user.isLoginEnabled()) {
-            throw new AuthException(ErrorCode.ACCOUNT_DISABLED, "账号已停用");
+            throw new AuthException(ErrorCodeEnum.ACCOUNT_DISABLED, "账号已停用");
         }
         String token = jwtService.issueAccessToken(user);
         String newRefreshToken = jwtService.issueRefreshToken(user);
@@ -97,6 +97,6 @@ public class AuthService {
     }
 
     private AuthException invalidCredentials() {
-        return new AuthException(ErrorCode.AUTH_FAILED, "账号或密码错误");
+        return new AuthException(ErrorCodeEnum.AUTH_FAILED, "账号或密码错误");
     }
 }

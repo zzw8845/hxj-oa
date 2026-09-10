@@ -47,7 +47,7 @@ public record ArchiveLedgerPageRequest(
     }
 
     /** 转换为查询条件 DTO（分页参数不参与筛选）。 */
-    public ArchiveLedgerQuery toQuery() {
-        return new ArchiveLedgerQuery(applicant, department, docCode, archivedFrom, archivedTo);
+    public ArchiveLedgerQueryRequest toQuery() {
+        return new ArchiveLedgerQueryRequest(applicant, department, docCode, archivedFrom, archivedTo);
     }
 }

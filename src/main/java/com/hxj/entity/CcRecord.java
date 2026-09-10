@@ -1,5 +1,6 @@
 package com.hxj.entity;
 
+import com.hxj.enums.CcSourceEnum;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -45,7 +46,7 @@ public class CcRecord {
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "cc_source", nullable = false, length = 20)
-    private CcSource source;
+    private CcSourceEnum source;
 
     /** 创建时间。 */
     @Column(name = "created_at", insertable = false, updatable = false)
@@ -54,7 +55,7 @@ public class CcRecord {
     protected CcRecord() {
     }
 
-    public static CcRecord toUser(OaDocument document, SysUser user, CcSource source) {
+    public static CcRecord toUser(OaDocument document, SysUser user, CcSourceEnum source) {
         CcRecord record = new CcRecord();
         record.document = document;
         record.targetUser = user;
@@ -62,7 +63,7 @@ public class CcRecord {
         return record;
     }
 
-    public static CcRecord toRole(OaDocument document, SysRole role, CcSource source) {
+    public static CcRecord toRole(OaDocument document, SysRole role, CcSourceEnum source) {
         CcRecord record = new CcRecord();
         record.document = document;
         record.targetRole = role;
@@ -74,7 +75,7 @@ public class CcRecord {
     public OaDocument getDocument() { return document; }
     public SysUser getTargetUser() { return targetUser; }
     public SysRole getTargetRole() { return targetRole; }
-    public CcSource getSource() { return source; }
+    public CcSourceEnum getSource() { return source; }
     public String getTargetName() {
         return targetUser != null ? targetUser.getName() : targetRole == null ? null : targetRole.getName();
     }

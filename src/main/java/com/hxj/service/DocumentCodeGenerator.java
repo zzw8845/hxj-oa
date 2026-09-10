@@ -1,6 +1,6 @@
 package com.hxj.service;
 
-import com.hxj.entity.BusinessType;
+import com.hxj.enums.BusinessTypeEnum;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -23,7 +23,7 @@ public class DocumentCodeGenerator {
         this.clock = clock;
     }
 
-    public String generate(BusinessType businessType) {
+    public String generate(BusinessTypeEnum businessType) {
         Objects.requireNonNull(businessType, "业务类型不能为空");
         String date = LocalDate.now(clock).format(DATE_FORMATTER);
         long sequence = sequenceAllocator.nextValue(date);

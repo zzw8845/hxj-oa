@@ -1,9 +1,9 @@
 package com.hxj.document;
 
 import com.hxj.common.PageableRequest;
-import com.hxj.entity.BusinessType;
-import com.hxj.entity.DocumentStatus;
-import com.hxj.entity.DocumentType;
+import com.hxj.enums.BusinessTypeEnum;
+import com.hxj.enums.DocumentStatusEnum;
+import com.hxj.enums.DocumentTypeEnum;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
@@ -19,13 +19,15 @@ public record DocumentPageRequest(
         @Schema(description = "关键字，模糊匹配单据编号、项目名称、申请人姓名")
         String keyword,
         @Schema(description = "单据状态（枚举）")
-        DocumentStatus status,
+        DocumentStatusEnum status,
         @Schema(description = "业务类型（枚举)")
-        BusinessType businessType,
+        BusinessTypeEnum businessType,
         @Schema(description = "单据类型（枚举）")
-        DocumentType documentType,
+        DocumentTypeEnum documentType,
         @Schema(description = "申请人用户 ID")
         Long applicantId,
+        @Schema(description = "是否只查待我审批（当前用户是流程任务的处理人或候选）")
+        Boolean myPending,
         @Schema(description = "页码，从 1 开始，默认 1")
         @Min(value = 1, message = "页码最小值为 1")
         Integer page,
@@ -56,7 +58,7 @@ public record DocumentPageRequest(
     }
 
     /** 转换为查询条件 DTO（分页参数不参与筛选）。 */
-    public DocumentSearchCriteria toCriteria() {
-        return new DocumentSearchCriteria(keyword, status, businessType, documentType, applicantId);
+    public DocumentSearchCondition toCriteria() {
+        return new DocumentSearchCondition(keyword, status, businessType, documentType, applicantId);
     }
 }

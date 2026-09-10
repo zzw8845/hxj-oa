@@ -1,7 +1,7 @@
 package com.hxj.dashboard;
 
-import com.hxj.entity.BusinessType;
-import com.hxj.entity.DocumentStatus;
+import com.hxj.enums.BusinessTypeEnum;
+import com.hxj.enums.DocumentStatusEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -11,12 +11,11 @@ import java.util.List;
 
 /** 统计看板与风险预警的视图模型集合。 */
 public final class DashboardViews {
+    private DashboardViews() {}
 
-    private DashboardViews() {
-    }
 
     /** 8.1 首页统计卡片：数量、环比、合规率与菜单角标。 */
-    public record HomeStats(
+    public record Home(
             @Schema(description = "本月驳回单据数") long rejectedCount,
             @Schema(description = "待我审批的单据数") long pendingMyApprovalCount,
             @Schema(description = "本月办结单据数") long monthlyCompletedCount,
@@ -32,7 +31,7 @@ public final class DashboardViews {
     }
 
     /** 8.2 首页待办审批条目（按临近超时优先排序）。 */
-    public record TodoItem(
+    public record Todo(
             @Schema(description = "单据ID") Long documentId,
             @Schema(description = "单据编号") String docCode,
             @Schema(description = "项目名称") String projectName,
@@ -44,7 +43,7 @@ public final class DashboardViews {
     }
 
     /** 8.3 工作看板统计。 */
-    public record BoardStats(
+    public record Board(
             @Schema(description = "单据总数") long totalCount,
             @Schema(description = "审批中单据数") long approvingCount,
             @Schema(description = "已通过单据数") long approvedCount,
@@ -53,7 +52,7 @@ public final class DashboardViews {
             @Schema(description = "单据状态分布列表") List<StatusDistribution> statusDistribution) {
 
         /** 紧凑构造器：集合组件防御性拷贝为不可变列表，null 归一化为不可变空列表。 */
-        public BoardStats {
+        public Board {
             nodeEfficiencies = nodeEfficiencies == null ? List.of() : List.copyOf(nodeEfficiencies);
             statusDistribution = statusDistribution == null ? List.of() : List.copyOf(statusDistribution);
         }
@@ -67,7 +66,7 @@ public final class DashboardViews {
             @Schema(description = "平均完成时长（小时）") double avgCompletionHours,
             @Schema(description = "完成率，单位 %") double completionRatePercent) {
 
-        static NodeEfficiency from(com.hxj.workflow.WorkflowNodeStat stat) {
+        static NodeEfficiency from(com.hxj.workflow.WorkflowNodeStatResponse stat) {
             long total = stat.completedCount() + stat.activeCount();
             double rate = total == 0 ? 0.0 : stat.completedCount() * 100.0 / total;
             return new NodeEfficiency(
@@ -78,7 +77,7 @@ public final class DashboardViews {
 
     /** 单据状态分布。 */
     public record StatusDistribution(
-            @Schema(description = "单据状态（枚举）") DocumentStatus status,
+            @Schema(description = "单据状态（枚举）") DocumentStatusEnum status,
             @Schema(description = "该状态单据数") long count) {
     }
 
@@ -90,15 +89,15 @@ public final class DashboardViews {
     }
 
     /** 8.5 风险预警条目。 */
-    public record RiskItem(
+    public record Risk(
             @Schema(description = "单据ID") Long documentId,
             @Schema(description = "单据编号") String docCode,
             @Schema(description = "项目名称") String projectName,
-            @Schema(description = "业务类型（枚举）") BusinessType businessType,
+            @Schema(description = "业务类型（枚举）") BusinessTypeEnum businessType,
             @Schema(description = "申请人姓名") String applicantName,
             @Schema(description = "申请部门") String department,
             @Schema(description = "单据金额") BigDecimal amount,
-            @Schema(description = "单据状态（枚举）") DocumentStatus status,
+            @Schema(description = "单据状态（枚举）") DocumentStatusEnum status,
             @Schema(description = "更新时间") LocalDateTime updatedAt) {
     }
 

@@ -1,6 +1,6 @@
 package com.hxj.repository;
 
-import com.hxj.entity.ApprovalAction;
+import com.hxj.enums.ApprovalActionEnum;
 import com.hxj.entity.ApprovalRecord;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -16,5 +16,5 @@ public interface ApprovalRecordRepository extends JpaRepository<ApprovalRecord, 
 
     boolean existsByDocumentIdAndApproverId(Long documentId, Long approverId);
 
-    List<ApprovalRecord> findByAction(ApprovalAction action);
+    List<ApprovalRecord> findByAction(ApprovalActionEnum action);
 }

@@ -13,6 +13,12 @@ public interface WorkflowPort {
 
     List<Task> pendingTasksForUser(String account, List<String> roleNames);
 
+    /** 系统当前全部活动中的用户任务（供超级审批视图反查单据）。 */
+    List<Task> allActiveTasks();
+
+    /** 处于加签委派中（未归还）的用户任务。 */
+    List<Task> delegatedTasks();
+
     /** 流程实例当前所有活动中的用户任务。 */
     List<Task> tasksForProcess(String processInstanceId);
 
@@ -29,7 +35,7 @@ public interface WorkflowPort {
 
     void resolveTask(String taskId);
 
-    List<WorkflowHistoryItem> history(String processInstanceId);
+    List<WorkflowHistoryItemResponse> history(String processInstanceId);
 
-    List<WorkflowNodeStat> nodeStatistics();
+    List<WorkflowNodeStatResponse> nodeStatistics();
 }

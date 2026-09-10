@@ -1,8 +1,9 @@
 package com.hxj.document;
 
-import com.hxj.entity.BusinessType;
-import com.hxj.entity.Company;
-import com.hxj.entity.SealType;
+import com.hxj.enums.BusinessModeEnum;
+import com.hxj.enums.BusinessTypeEnum;
+import com.hxj.enums.CompanyEnum;
+import com.hxj.enums.SealTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -19,11 +20,11 @@ import java.util.List;
  */
 public record SubmitDocumentRequest(
         @Schema(description = "业务类型（枚举）")
-        @NotNull BusinessType businessType,
+        @NotNull BusinessTypeEnum businessType,
         @Schema(description = "项目名称（必填）")
         @NotBlank String projectName,
         @Schema(description = "所属公司（枚举）")
-        Company company,
+        CompanyEnum company,
         @Schema(description = "金额（元，精确到分）")
         BigDecimal amount,
         @Schema(description = "发票摘要/事由简述")
@@ -40,8 +41,8 @@ public record SubmitDocumentRequest(
         boolean involvesFunds,
         @Schema(description = "是否需要行政审核")
         boolean requiresAdminReview,
-        @Schema(description = "业务模式（如：线上、线下、混合）")
-        String businessMode,
+        @Schema(description = "业务模式（直销/代销，闭店类业务的条件分支变量，可选）")
+        BusinessModeEnum businessMode,
         @Schema(description = "用印项目")
         String sealProject,
         @Schema(description = "用印部门")
@@ -51,7 +52,7 @@ public record SubmitDocumentRequest(
         @Schema(description = "用印文件名")
         String sealFileName,
         @Schema(description = "印章类型（枚举）")
-        SealType sealType,
+        SealTypeEnum sealType,
         @Schema(description = "用印事由")
         String sealReason,
         @Schema(description = "抄送人用户 ID 列表")

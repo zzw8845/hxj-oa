@@ -51,13 +51,13 @@ public record ApiResponse<T>(
         return new ApiResponse<>(true, "SUCCESS", null, null, null);
     }
 
-    /** 错误响应：使用 ErrorCode 默认提示 */
-    public static <T> ApiResponse<T> error(ErrorCode errorCode) {
+    /** 错误响应：使用 ErrorCodeEnum 默认提示 */
+    public static <T> ApiResponse<T> error(ErrorCodeEnum errorCode) {
         return new ApiResponse<>(false, errorCode.getCode(), errorCode.getDefaultMessage(), null, null);
     }
 
-    /** 错误响应：覆盖 ErrorCode 默认提示 */
-    public static <T> ApiResponse<T> error(ErrorCode errorCode, String message) {
+    /** 错误响应：覆盖 ErrorCodeEnum 默认提示 */
+    public static <T> ApiResponse<T> error(ErrorCodeEnum errorCode, String message) {
         return new ApiResponse<>(false, errorCode.getCode(), message, null, null);
     }
 }

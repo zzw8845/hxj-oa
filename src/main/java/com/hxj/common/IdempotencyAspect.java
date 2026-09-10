@@ -2,7 +2,7 @@ package com.hxj.common;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hxj.exception.BusinessException;
-import com.hxj.security.AuthenticatedUser;
+import com.hxj.security.AuthenticatedUserResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -84,7 +84,7 @@ public class IdempotencyAspect {
 
         // 原子占位：仅一个请求能获得执行权，其余直接返回（幂等拒绝）
         if (!tryAcquire(cacheKey, ttl)) {
-            throw new BusinessException(ErrorCode.DUPLICATE_REQUEST, "重复请求，请勿重复提交");
+            throw new BusinessException(ErrorCodeEnum.DUPLICATE_REQUEST, "重复请求，请勿重复提交");
         }
 
         try {
@@ -144,7 +144,7 @@ public class IdempotencyAspect {
 
     private String currentUser() {
         var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.getPrincipal() instanceof AuthenticatedUser u) {
+        if (auth != null && auth.getPrincipal() instanceof AuthenticatedUserResponse u) {
             return u.account();
         }
         return "";

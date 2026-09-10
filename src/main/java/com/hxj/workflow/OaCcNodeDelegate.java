@@ -1,7 +1,7 @@
 package com.hxj.workflow;
 
 import com.hxj.entity.CcRecord;
-import com.hxj.entity.CcSource;
+import com.hxj.enums.CcSourceEnum;
 import com.hxj.entity.OaDocument;
 import com.hxj.entity.SysRole;
 import com.hxj.entity.SysUser;
@@ -64,10 +64,10 @@ public class OaCcNodeDelegate implements JavaDelegate {
         String nodeName = execution.getCurrentFlowElement() == null
                 ? null : execution.getCurrentFlowElement().getName();
         for (SysRole role : resolveRoles(nodeName)) {
-            ccRepository.save(CcRecord.toRole(document, role, CcSource.FLOW));
+            ccRepository.save(CcRecord.toRole(document, role, CcSourceEnum.FLOW));
         }
         for (SysUser user : resolveUsers(nodeName)) {
-            ccRepository.save(CcRecord.toUser(document, user, CcSource.FLOW));
+            ccRepository.save(CcRecord.toUser(document, user, CcSourceEnum.FLOW));
         }
     }
 

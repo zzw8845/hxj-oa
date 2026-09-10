@@ -1,9 +1,9 @@
 package com.hxj.workflow;
-import com.hxj.common.ErrorCode;
+import com.hxj.common.ErrorCodeEnum;
 import com.hxj.entity.FlowConditionRule;
 import com.hxj.entity.FlowConfig;
 import com.hxj.entity.FlowNodeConfig;
-import com.hxj.entity.FlowNodeType;
+import com.hxj.enums.FlowNodeTypeEnum;
 import com.hxj.exception.BusinessException;
 import com.hxj.repository.FlowConfigRepository;
 import org.flowable.bpmn.model.BpmnModel;
@@ -42,10 +42,11 @@ public class ConfigDrivenProcessDefinitionService {
         this.repositoryService = repositoryService;
     }
 
-    @Transactional(readOnly = true)
+    /** 部署是写操作，不能标 readOnly：只读事务会让 Flowable 复用只读连接执行部署写入。 */
+    @Transactional
     public String deploy(Long configId) {
         FlowConfig config = flowConfigRepository.findById(configId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.FLOW_CONFIG_NOT_FOUND, "流程配置不存在"));
+                .orElseThrow(() -> new BusinessException(ErrorCodeEnum.FLOW_CONFIG_NOT_FOUND, "流程配置不存在"));
         String processKey = processKey(configId);
         BpmnModel model = buildModel(config, processKey);
         Deployment deployment = repositoryService.createDeployment()
@@ -98,15 +99,16 @@ public class ConfigDrivenProcessDefinitionService {
         process.addFlowElement(end);
 
         List<FlowNodeConfig> executableNodes = config.getNodes().stream()
-                .filter(node -> node.getNodeType() != FlowNodeType.START)
-                .filter(node -> node.getNodeType() != FlowNodeType.CONDITION)
-                .filter(node -> node.getNodeType() != FlowNodeType.END)
+                .filter(node -> node.getNodeType() != FlowNodeTypeEnum.START)
+                .filter(node -> node.getNodeType() != FlowNodeTypeEnum.CONDITION)
+                .filter(node -> node.getNodeType() != FlowNodeTypeEnum.END)
                 .toList();
-        Map<String, FlowElement> elements = new LinkedHashMap<>();
+        // 按节点顺序存放元素：早期实现以节点名为 key，重名节点会被覆盖并静默丢失审批环节，改为按下标取用
+        List<FlowElement> elements = new ArrayList<>();
         for (int index = 0; index < executableNodes.size(); index++) {
             FlowNodeConfig node = executableNodes.get(index);
             FlowElement element = createElement(node, "node_" + index);
-            elements.put(node.getName(), element);
+            elements.add(element);
             process.addFlowElement(element);
         }
 
@@ -119,7 +121,7 @@ public class ConfigDrivenProcessDefinitionService {
         String previousId = start.getId();
         for (int index = 0; index < executableNodes.size(); index++) {
             FlowNodeConfig node = executableNodes.get(index);
-            FlowElement element = elements.get(node.getName());
+            FlowElement element = elements.get(index);
             List<FlowConditionRule> rules = rulesByTarget.getOrDefault(node.getName(), List.of());
             if (rules.isEmpty()) {
                 addFlow(process, previousId, element.getId(), null, false);
@@ -149,7 +151,7 @@ public class ConfigDrivenProcessDefinitionService {
     }
 
     private FlowElement createElement(FlowNodeConfig node, String id) {
-        if (node.getNodeType() == FlowNodeType.CC) {
+        if (node.getNodeType() == FlowNodeTypeEnum.CC) {
             ServiceTask task = new ServiceTask();
             task.setId(id);
             task.setName(node.getName());
@@ -160,15 +162,19 @@ public class ConfigDrivenProcessDefinitionService {
         UserTask task = new UserTask();
         task.setId(id);
         task.setName(node.getName());
-        if (node.getAssigneeRole() != null && !node.getAssigneeRole().isBlank()) {
+        if (node.getName().startsWith("发起人")) {
+            // 发起人回环节点（签收/归还/上传归档附件等）：动态指派给单据申请人
+            task.setAssignee("${initiator}");
+        } else if (node.getAssigneeRole() != null && !node.getAssigneeRole().isBlank()) {
             task.setCandidateGroups(splitGroups(node.getAssigneeRole()));
         }
         return task;
     }
 
     private List<String> splitGroups(String groups) {
-        String normalized = groups.replace("&", "_");
-        String[] pieces = normalized.split("[/、]");
+        // 注意：不能对角色名做 &→_ 之类的改写——候选组与 RBAC 角色名必须逐字一致
+        //（如「会计主管&内控」改写后部署出的候选组任何角色都无法命中，节点任务将无人可审）。
+        String[] pieces = groups.split("[/、]");
         List<String> result = new ArrayList<>();
         for (String piece : pieces) {
             if (!piece.isBlank()) {

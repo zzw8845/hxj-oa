@@ -34,13 +34,13 @@ public class ArchiveLedgerService {
     }
 
     @Transactional(readOnly = true)
-    public List<ArchiveLedgerItem> search(ArchiveLedgerQuery query) {
+    public List<ArchiveLedgerItemResponse> search(ArchiveLedgerQueryRequest query) {
         return ledgerRepository.findAll(specification(query)).stream().map(this::toItem).toList();
     }
 
     /** 分页版归档查询：分页参数见 {@link ArchiveLedgerPageRequest}，按归档时间倒序。 */
     @Transactional(readOnly = true)
-    public PageResponse<ArchiveLedgerItem> searchPaged(ArchiveLedgerPageRequest request) {
+    public PageResponse<ArchiveLedgerItemResponse> searchPaged(ArchiveLedgerPageRequest request) {
         return PageResponse.of(ledgerRepository
                 .findAll(specification(request.toQuery()),
                         request.toPageable(Sort.by(Sort.Direction.DESC, "archivedAt")))
@@ -49,8 +49,8 @@ public class ArchiveLedgerService {
 
     /** 台账导出：xlsx 使用 EasyExcel，csv 使用 UTF-8（带 BOM）文本。 */
     @Transactional(readOnly = true)
-    public ExportFile export(ArchiveLedgerQuery query, ExportFormat format) {
-        List<ArchiveLedgerItem> items = search(query);
+    public ExportFile export(ArchiveLedgerQueryRequest query, ExportFormatEnum format) {
+        List<ArchiveLedgerItemResponse> items = search(query);
         return switch (format) {
             case XLSX -> new ExportFile("archive-ledger.xlsx",
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -59,7 +59,7 @@ public class ArchiveLedgerService {
         };
     }
 
-    private Specification<ArchiveLedger> specification(ArchiveLedgerQuery query) {
+    private Specification<ArchiveLedger> specification(ArchiveLedgerQueryRequest query) {
         return (root, cq, builder) -> {
             var predicates = new ArrayList<jakarta.persistence.criteria.Predicate>();
             if (query != null) {
@@ -87,14 +87,14 @@ public class ArchiveLedgerService {
         return "%" + value.toLowerCase() + "%";
     }
 
-    private ArchiveLedgerItem toItem(ArchiveLedger ledger) {
-        return new ArchiveLedgerItem(
+    private ArchiveLedgerItemResponse toItem(ArchiveLedger ledger) {
+        return new ArchiveLedgerItemResponse(
                 ledger.getId(), ledger.getDocument().getId(), ledger.getDocCode(), ledger.getProjectName(),
                 ledger.getBusinessType(), ledger.getDocumentType(), ledger.getCompany(),
                 ledger.getApplicant(), ledger.getDepartment(), ledger.getAmount(), ledger.getArchivedAt());
     }
 
-    private byte[] toExcel(List<ArchiveLedgerItem> items) {
+    private byte[] toExcel(List<ArchiveLedgerItemResponse> items) {
         List<List<String>> rows = new ArrayList<>();
         rows.add(List.of(EXPORT_HEADERS));
         items.forEach(item -> rows.add(row(item)));
@@ -106,12 +106,12 @@ public class ArchiveLedgerService {
         }
     }
 
-    private byte[] toCsv(List<ArchiveLedgerItem> items) {
+    private byte[] toCsv(List<ArchiveLedgerItemResponse> items) {
         try (ByteArrayOutputStream bytes = new ByteArrayOutputStream();
              Writer writer = new OutputStreamWriter(bytes, StandardCharsets.UTF_8)) {
             writer.write('\ufeff');
             writer.write(String.join(",", EXPORT_HEADERS) + System.lineSeparator());
-            for (ArchiveLedgerItem item : items) {
+            for (ArchiveLedgerItemResponse item : items) {
                 writer.write(String.join(",", csvRow(item)) + System.lineSeparator());
             }
             writer.flush();
@@ -121,7 +121,7 @@ public class ArchiveLedgerService {
         }
     }
 
-    private List<String> row(ArchiveLedgerItem item) {
+    private List<String> row(ArchiveLedgerItemResponse item) {
         return List.of(
                 nvl(item.docCode()), nvl(item.projectName()), nvl(item.businessType()),
                 nvl(item.documentType()), nvl(item.company()), nvl(item.applicant()),
@@ -129,7 +129,7 @@ public class ArchiveLedgerService {
                 item.archivedAt() == null ? "" : TIME_FORMAT.format(item.archivedAt()));
     }
 
-    private List<String> csvRow(ArchiveLedgerItem item) {
+    private List<String> csvRow(ArchiveLedgerItemResponse item) {
         return row(item).stream().map(this::escape).toList();
     }
 
@@ -144,7 +144,7 @@ public class ArchiveLedgerService {
         return value == null ? "" : value;
     }
 
-    public enum ExportFormat { XLSX, CSV }
+    public enum ExportFormatEnum { XLSX, CSV }
 
     public record ExportFile(String fileName, String contentType, byte[] content) {}
 }

@@ -1,7 +1,7 @@
 package com.hxj.auth;
 
 import com.hxj.common.ApiResponse;
-import com.hxj.security.AuthenticatedUser;
+import com.hxj.security.AuthenticatedUserResponse;
 import com.hxj.security.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -34,13 +34,13 @@ public class AuthController {
 
     @Operation(summary = "当前用户", description = "获取当前登录用户信息（需携带 Bearer Token）")
     @GetMapping("/me")
-    public ApiResponse<AuthenticatedUser> currentUser() {
+    public ApiResponse<AuthenticatedUserResponse> currentUser() {
         return ApiResponse.success(CurrentUser.get());
     }
 
     @Operation(summary = "刷新 Token", description = "使用 Refresh Token 换取新的 Access Token（同时轮换 Refresh Token）")
     @PostMapping("/refresh")
-    public ApiResponse<LoginResponse> refresh(@RequestBody RefreshTokenRequest request) {
+    public ApiResponse<LoginResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
         return ApiResponse.success(authService.refresh(request.refreshToken()));
     }
 

@@ -23,8 +23,8 @@ Content-Type: application/json
 
 ```json
 {
-  "account": "admin",
-  "password": "123456"
+  "account": "linanran",
+  "password": "password"
 }
 ```
 
@@ -136,7 +136,7 @@ Authorization: Bearer <accessToken>
 
 ```json
 {
-  "businessType": "DAILY_PAYMENT",
+  "businessTypeEnum": "DAILY_PAYMENT",
   "projectName": "办公用品采购",
   "company": "HAI_XIA_JIN",
   "amount": 5000.00,
@@ -198,8 +198,8 @@ Authorization: Bearer <accessToken>
 
 ```json
 {
-  "signUserId": 5,
-  "comment": "请财务经理会签"
+  "signUserAccount": "linanran",
+  "reason": "请财务经理会签"
 }
 ```
 
@@ -342,7 +342,7 @@ PENDING ──提交──> APPROVING ──通过──> APPROVED ──归档�
 
 **加签（sign）**：
 
-- `signUserId`：加签目标用户 ID，当前允许加签任意在职用户；加签人需填写意见（sign-comment）后流程才继续。循环加签由流程引擎防重机制约束（同一单据同一节点不可重复加签同一人）。
+- `signUserAccount`：加签目标用户**账号**（与 `EmployeeResponse.account` 同源，前端可直接从员工列表取得，无需另行换取 ID）；当前允许加签任意在职用户；加签人需填写意见（sign-comment）后流程才继续。循环加签由流程引擎防重机制约束（同一单据同一节点不可重复加签同一人）。
 
 ## 9. 分页与幂等性
 

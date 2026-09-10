@@ -1,5 +1,6 @@
 package com.hxj.entity;
 
+import com.hxj.enums.BusinessTypeEnum;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -26,7 +27,7 @@ public class QuickDocument {
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "business_type", nullable = false, length = 50)
-    private BusinessType businessType;
+    private BusinessTypeEnum businessType;
 
     /** 单据名称。 */
     @Column(nullable = false, length = 200)
@@ -42,8 +43,8 @@ public class QuickDocument {
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
-    public BusinessType getBusinessType() { return businessType; }
-    public void setBusinessType(BusinessType businessType) { this.businessType = businessType; }
+    public BusinessTypeEnum getBusinessType() { return businessType; }
+    public void setBusinessType(BusinessTypeEnum businessType) { this.businessType = businessType; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     public Integer getSortOrder() { return sortOrder; }

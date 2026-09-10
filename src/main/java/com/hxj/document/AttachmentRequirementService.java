@@ -1,6 +1,6 @@
 package com.hxj.document;
 
-import com.hxj.entity.BusinessType;
+import com.hxj.enums.BusinessTypeEnum;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -8,8 +8,8 @@ import java.util.List;
 @Service
 public class AttachmentRequirementService {
 
-    public List<String> requiredFor(BusinessType type, String projectName) {
-        if (type == BusinessType.SEAL_APPLICATION) {
+    public List<String> requiredFor(BusinessTypeEnum type, String projectName) {
+        if (type == BusinessTypeEnum.SEAL_APPLICATION) {
             return List.of("用印文件附件");
         }
         String project = projectName == null ? "" : projectName;

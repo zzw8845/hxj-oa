@@ -1,6 +1,6 @@
 package com.hxj.security;
 
-import com.hxj.common.ErrorCode;
+import com.hxj.common.ErrorCodeEnum;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -25,6 +25,6 @@ public class JsonAuthenticationEntryPoint implements AuthenticationEntryPoint {
             HttpServletRequest request,
             HttpServletResponse response,
             AuthenticationException authException) throws IOException, ServletException {
-        responseWriter.writeUnauthorized(response, ErrorCode.AUTH_FAILED, ErrorCode.AUTH_FAILED.getDefaultMessage());
+        responseWriter.writeUnauthorized(response, ErrorCodeEnum.AUTH_FAILED, ErrorCodeEnum.AUTH_FAILED.getDefaultMessage());
     }
 }

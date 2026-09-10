@@ -24,21 +24,21 @@ public class DashboardController {
     /** 8.1 首页统计卡片与菜单角标。 */
     @Operation(summary = "首页统计", description = "已驳回/待我审批/本月已办结数量及环比、流程合规率、菜单角标数量")
     @GetMapping("/home")
-    public ApiResponse<DashboardViews.HomeStats> home() {
+    public ApiResponse<DashboardViews.Home> home() {
         return ApiResponse.success(dashboardService.homeStats());
     }
 
     /** 8.2 首页待办审批列表（临近超时优先）。 */
     @Operation(summary = "首页待办审批列表", description = "按临近超时优先排序返回待办审批单据")
     @GetMapping("/todos")
-    public ApiResponse<List<DashboardViews.TodoItem>> todos() {
+    public ApiResponse<List<DashboardViews.Todo>> todos() {
         return ApiResponse.success(dashboardService.todoList());
     }
 
     /** 8.3 工作看板统计。 */
     @Operation(summary = "工作看板统计", description = "申请总量/审批中/已办结/平均审批时长/节点处理效率/状态分布")
     @GetMapping("/board")
-    public ApiResponse<DashboardViews.BoardStats> board() {
+    public ApiResponse<DashboardViews.Board> board() {
         return ApiResponse.success(dashboardService.boardStats());
     }
 
@@ -52,7 +52,7 @@ public class DashboardController {
     /** 8.5 风险预警列表。 */
     @Operation(summary = "风险预警列表", description = "金额 ≥ 8 万元的风险单据列表与数量")
     @GetMapping("/risks")
-    public ApiResponse<List<DashboardViews.RiskItem>> risks() {
+    public ApiResponse<List<DashboardViews.Risk>> risks() {
         return ApiResponse.success(dashboardService.riskList());
     }
 }

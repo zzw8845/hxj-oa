@@ -1,6 +1,6 @@
 package com.hxj.approval;
 
-import com.hxj.entity.SupplementMode;
+import com.hxj.enums.SupplementModeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
@@ -18,7 +18,7 @@ public record ApprovalRequest(
         @Schema(description = "驳回时要求补充的材料说明")
         String rejectMaterials,
         @Schema(description = "补材料模式（枚举）")
-        SupplementMode supplementMode,
+        SupplementModeEnum supplementMode,
         @Schema(description = "补材料目标节点")
         String supplementTarget,
         @Schema(description = "补材料要求说明")

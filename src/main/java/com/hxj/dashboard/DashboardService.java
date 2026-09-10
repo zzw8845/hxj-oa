@@ -1,11 +1,11 @@
 package com.hxj.dashboard;
 
-import com.hxj.entity.ApprovalAction;
-import com.hxj.entity.DocumentStatus;
+import com.hxj.enums.ApprovalActionEnum;
+import com.hxj.enums.DocumentStatusEnum;
 import com.hxj.entity.OaDocument;
 import com.hxj.repository.ApprovalRecordRepository;
 import com.hxj.repository.OaDocumentRepository;
-import com.hxj.security.AuthenticatedUser;
+import com.hxj.security.AuthenticatedUserResponse;
 import com.hxj.security.CurrentUser;
 import com.hxj.security.DocumentAccessPolicy;
 import com.hxj.workflow.WorkflowPort;
@@ -57,11 +57,11 @@ public class DashboardService {
 
     /** 8.1 首页统计：已驳回/待我审批/本月已办结（含环比）、合规率与菜单角标。 */
     @Transactional(readOnly = true)
-    public DashboardViews.HomeStats homeStats() {
-        AuthenticatedUser currentUser = CurrentUser.require();
+    public DashboardViews.Home homeStats() {
+        AuthenticatedUserResponse currentUser = CurrentUser.require();
         Specification<OaDocument> visible = accessPolicy.visibleTo(currentUser);
         long rejected = documentRepository.count(visible
-                .and((root, cq, builder) -> builder.equal(root.get("status"), DocumentStatus.REJECTED)));
+                .and((root, cq, builder) -> builder.equal(root.get("status"), DocumentStatusEnum.REJECTED)));
         long pendingMyApproval = workflowPort
                 .pendingTasksForUser(currentUser.account(), currentUser.roles()).size();
 
@@ -73,15 +73,15 @@ public class DashboardService {
                 : DashboardViews.round((monthlyCompleted - lastMonthCompleted) * 100.0 / lastMonthCompleted);
 
         long approvedTotal = documentRepository.count(visible
-                .and((root, cq, builder) -> builder.equal(root.get("status"), DocumentStatus.APPROVED)));
+                .and((root, cq, builder) -> builder.equal(root.get("status"), DocumentStatusEnum.APPROVED)));
         long compliant = 0;
         if (approvedTotal > 0) {
             List<OaDocument> approvedDocs = documentRepository.findAll(visible.and(
-                    (root, cq, builder) -> builder.equal(root.get("status"), DocumentStatus.APPROVED)));
+                    (root, cq, builder) -> builder.equal(root.get("status"), DocumentStatusEnum.APPROVED)));
             compliant = approvedDocs.stream()
                     .filter(doc -> approvalRepository
                             .findByDocumentIdOrderByCreatedAtAsc(doc.getId()).stream()
-                            .noneMatch(record -> record.getAction() == ApprovalAction.REJECT))
+                            .noneMatch(record -> record.getAction() == ApprovalActionEnum.REJECT))
                     .count();
         }
         double complianceRate = approvedTotal == 0
@@ -89,15 +89,15 @@ public class DashboardService {
 
         long riskCount = documentRepository.count(visible
                 .and((root, cq, builder) -> builder.isTrue(root.get("riskFlag"))));
-        return new DashboardViews.HomeStats(
+        return new DashboardViews.Home(
                 rejected, pendingMyApproval, monthlyCompleted, mom, complianceRate,
                 new DashboardViews.Badge(pendingMyApproval, riskCount));
     }
 
     /** 8.2 首页待办审批：按临近超时（剩余时间最短）优先排序。 */
     @Transactional(readOnly = true)
-    public List<DashboardViews.TodoItem> todoList() {
-        AuthenticatedUser currentUser = CurrentUser.require();
+    public List<DashboardViews.Todo> todoList() {
+        AuthenticatedUserResponse currentUser = CurrentUser.require();
         List<OaDocument> pending = workflowPort
                 .pendingTasksForUser(currentUser.account(), currentUser.roles()).stream()
                 .map(task -> documentRepository.findByProcessInstanceId(task.getProcessInstanceId()))
@@ -108,7 +108,7 @@ public class DashboardService {
         LocalDateTime now = LocalDateTime.now(zone);
         return pending.stream()
                 .sorted(Comparator.comparingLong(doc -> remainingHours(doc, now)))
-                .map(doc -> new DashboardViews.TodoItem(
+                .map(doc -> new DashboardViews.Todo(
                         doc.getId(), doc.getDocCode(), doc.getProjectName(), doc.getApplicantName(),
                         doc.getDepartment(), doc.getCurrentNode(), doc.getAmount(), doc.getUpdatedAt()))
                 .toList();
@@ -116,17 +116,17 @@ public class DashboardService {
 
     /** 8.3 工作看板：总量/审批中/已办结/平均时长/节点效率/状态分布。 */
     @Transactional(readOnly = true)
-    public DashboardViews.BoardStats boardStats() {
-        AuthenticatedUser currentUser = CurrentUser.require();
+    public DashboardViews.Board boardStats() {
+        AuthenticatedUserResponse currentUser = CurrentUser.require();
         Specification<OaDocument> visible = accessPolicy.visibleTo(currentUser);
         long total = documentRepository.count(visible);
         long approving = documentRepository.count(visible
-                .and((root, cq, builder) -> builder.equal(root.get("status"), DocumentStatus.APPROVING)));
+                .and((root, cq, builder) -> builder.equal(root.get("status"), DocumentStatusEnum.APPROVING)));
         long approved = documentRepository.count(visible
-                .and((root, cq, builder) -> builder.equal(root.get("status"), DocumentStatus.APPROVED)));
+                .and((root, cq, builder) -> builder.equal(root.get("status"), DocumentStatusEnum.APPROVED)));
 
         List<OaDocument> approvedDocs = documentRepository.findAll(visible.and(
-                (root, cq, builder) -> builder.equal(root.get("status"), DocumentStatus.APPROVED)));
+                (root, cq, builder) -> builder.equal(root.get("status"), DocumentStatusEnum.APPROVED)));
         double avgHours = approvedDocs.stream()
                 .filter(doc -> doc.getCreatedAt() != null && doc.getUpdatedAt() != null)
                 .mapToLong(doc -> ChronoUnit.MINUTES.between(doc.getCreatedAt(), doc.getUpdatedAt()))
@@ -137,20 +137,20 @@ public class DashboardService {
                 .map(DashboardViews.NodeEfficiency::from).toList();
 
         List<DashboardViews.StatusDistribution> distribution = new ArrayList<>();
-        for (DocumentStatus status : List.of(DocumentStatus.APPROVING, DocumentStatus.APPROVED,
-                DocumentStatus.REJECTED, DocumentStatus.PENDING, DocumentStatus.SUPPLEMENT_REQUIRED)) {
+        for (DocumentStatusEnum status : List.of(DocumentStatusEnum.APPROVING, DocumentStatusEnum.APPROVED,
+                DocumentStatusEnum.REJECTED, DocumentStatusEnum.PENDING, DocumentStatusEnum.SUPPLEMENT_REQUIRED)) {
             distribution.add(new DashboardViews.StatusDistribution(status,
                     documentRepository.count(visible
                             .and((root, cq, builder) -> builder.equal(root.get("status"), status)))));
         }
-        return new DashboardViews.BoardStats(
+        return new DashboardViews.Board(
                 total, approving, approved, DashboardViews.round(avgHours), nodes, distribution);
     }
 
     /** 8.4 近7天流程趋势：每日发起与办结数量。 */
     @Transactional(readOnly = true)
     public List<DashboardViews.TrendPoint> weeklyTrend() {
-        AuthenticatedUser currentUser = CurrentUser.require();
+        AuthenticatedUserResponse currentUser = CurrentUser.require();
         Specification<OaDocument> visible = accessPolicy.visibleTo(currentUser);
         LocalDate today = LocalDate.now(zone);
         List<DashboardViews.TrendPoint> points = new ArrayList<>();
@@ -162,7 +162,7 @@ public class DashboardService {
                     builder.greaterThanOrEqualTo(root.get("createdAt"), start),
                     builder.lessThan(root.get("createdAt"), end))));
             long completed = documentRepository.count(visible.and((root, cq, builder) -> builder.and(
-                    builder.equal(root.get("status"), DocumentStatus.APPROVED),
+                    builder.equal(root.get("status"), DocumentStatusEnum.APPROVED),
                     builder.greaterThanOrEqualTo(root.get("updatedAt"), start),
                     builder.lessThan(root.get("updatedAt"), end))));
             points.add(new DashboardViews.TrendPoint(start, submitted, completed));
@@ -172,12 +172,12 @@ public class DashboardService {
 
     /** 8.5 风险预警：金额达到阈值（risk_flag）的单据列表。 */
     @Transactional(readOnly = true)
-    public List<DashboardViews.RiskItem> riskList() {
-        AuthenticatedUser currentUser = CurrentUser.require();
+    public List<DashboardViews.Risk> riskList() {
+        AuthenticatedUserResponse currentUser = CurrentUser.require();
         Specification<OaDocument> visible = accessPolicy.visibleTo(currentUser)
                 .and((root, cq, builder) -> builder.isTrue(root.get("riskFlag")));
         return documentRepository.findAll(visible).stream()
-                .map(doc -> new DashboardViews.RiskItem(
+                .map(doc -> new DashboardViews.Risk(
                         doc.getId(), doc.getDocCode(), doc.getProjectName(), doc.getBusinessType(),
                         doc.getApplicantName(), doc.getDepartment(), doc.getAmount(),
                         doc.getStatus(), doc.getUpdatedAt()))
@@ -188,7 +188,7 @@ public class DashboardService {
         LocalDateTime start = month.atDay(1).atStartOfDay();
         LocalDateTime end = month.plusMonths(1).atDay(1).atStartOfDay();
         return documentRepository.count(visible.and((root, cq, builder) -> builder.and(
-                builder.equal(root.get("status"), DocumentStatus.APPROVED),
+                builder.equal(root.get("status"), DocumentStatusEnum.APPROVED),
                 builder.greaterThanOrEqualTo(root.get("updatedAt"), start),
                 builder.lessThan(root.get("updatedAt"), end))));
     }

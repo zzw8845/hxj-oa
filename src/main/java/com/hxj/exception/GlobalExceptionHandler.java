@@ -2,7 +2,7 @@ package com.hxj.exception;
 
 import com.hxj.auth.AuthException;
 import com.hxj.common.ApiResponse;
-import com.hxj.common.ErrorCode;
+import com.hxj.common.ErrorCodeEnum;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,6 +18,7 @@ import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
@@ -41,7 +42,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusiness(BusinessException ex) {
-        ErrorCode errorCode = ex.getErrorCode();
+        ErrorCodeEnum errorCode = ex.getErrorCode();
         String message = ex.getMessage();
         log.warn("[business] code={}, message={}", errorCode.getCode(), message);
         return ResponseEntity.ok()
@@ -51,7 +52,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AuthException.class)
     public ResponseEntity<ApiResponse<Void>> handleAuth(AuthException ex, HttpServletResponse response) {
-        ErrorCode errorCode = ex.getErrorCode();
+        ErrorCodeEnum errorCode = ex.getErrorCode();
         String message = ex.getMessage();
         log.warn("[auth] code={}, message={}", errorCode.getCode(), message);
         // AuthException 返回 401
@@ -71,7 +72,7 @@ public class GlobalExceptionHandler {
         log.warn("[validation] {}", detail);
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(ApiResponse.error(ErrorCode.VALIDATION_FAILED, detail));
+                .body(ApiResponse.error(ErrorCodeEnum.VALIDATION_FAILED, detail));
     }
 
     @ExceptionHandler(BindException.class)
@@ -82,7 +83,7 @@ public class GlobalExceptionHandler {
         log.warn("[validation] {}", detail);
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(ApiResponse.error(ErrorCode.VALIDATION_FAILED, detail));
+                .body(ApiResponse.error(ErrorCodeEnum.VALIDATION_FAILED, detail));
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
@@ -91,7 +92,7 @@ public class GlobalExceptionHandler {
         log.warn("[validation] {}", message);
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(ApiResponse.error(ErrorCode.VALIDATION_FAILED, message));
+                .body(ApiResponse.error(ErrorCodeEnum.VALIDATION_FAILED, message));
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
@@ -100,7 +101,7 @@ public class GlobalExceptionHandler {
         log.warn("[validation] {}", message);
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(ApiResponse.error(ErrorCode.ARGUMENT_TYPE_INVALID, message));
+                .body(ApiResponse.error(ErrorCodeEnum.ARGUMENT_TYPE_INVALID, message));
     }
 
     @ExceptionHandler(MissingRequestHeaderException.class)
@@ -109,7 +110,7 @@ public class GlobalExceptionHandler {
         log.warn("[validation] {}", message);
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(ApiResponse.error(ErrorCode.MISSING_REQUEST_HEADER, message));
+                .body(ApiResponse.error(ErrorCodeEnum.MISSING_REQUEST_HEADER, message));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -117,7 +118,22 @@ public class GlobalExceptionHandler {
         log.warn("[request] body 格式错误: {}", ex.getMessage());
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(ApiResponse.error(ErrorCode.REQUEST_BODY_INVALID));
+                .body(ApiResponse.error(ErrorCodeEnum.REQUEST_BODY_INVALID));
+    }
+
+    /**
+     * 缺少 multipart 部分（如上传附件时未带 file）。
+     *
+     * <p>不处理的话会落入 {@link #handleAll} 返回「系统繁忙，请稍后重试」，
+     * 把客户端的调用错误伪装成服务端故障，既误导排查也无法给前端明确提示。
+     */
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingPart(MissingServletRequestPartException ex) {
+        String message = "缺少必要的文件参数: " + ex.getRequestPartName();
+        log.warn("[request] {}", message);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(ApiResponse.error(ErrorCodeEnum.REQUEST_BODY_INVALID, message));
     }
 
     // —— Spring Security ——
@@ -127,7 +143,7 @@ public class GlobalExceptionHandler {
         log.warn("[access] 权限不足");
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(ApiResponse.error(ErrorCode.ACCESS_DENIED));
+                .body(ApiResponse.error(ErrorCodeEnum.ACCESS_DENIED));
     }
 
     // —— 兜底 ——
@@ -137,7 +153,7 @@ public class GlobalExceptionHandler {
         log.warn("[request] 路径不存在: {}", ex.getRequestURL());
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(ApiResponse.error(ErrorCode.RESOURCE_NOT_FOUND));
+                .body(ApiResponse.error(ErrorCodeEnum.RESOURCE_NOT_FOUND));
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
@@ -145,7 +161,7 @@ public class GlobalExceptionHandler {
         log.warn("[request] 方法不支持: {}", ex.getMessage());
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(ApiResponse.error(ErrorCode.METHOD_NOT_ALLOWED));
+                .body(ApiResponse.error(ErrorCodeEnum.METHOD_NOT_ALLOWED));
     }
 
     @ExceptionHandler(Exception.class)
@@ -153,6 +169,6 @@ public class GlobalExceptionHandler {
         log.error("[system] 未捕获异常", ex);
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(ApiResponse.error(ErrorCode.INTERNAL_ERROR));
+                .body(ApiResponse.error(ErrorCodeEnum.INTERNAL_ERROR));
     }
 }

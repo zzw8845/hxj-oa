@@ -1,5 +1,6 @@
 package com.hxj.entity;
 
+import com.hxj.enums.ConditionOperatorEnum;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -37,7 +38,7 @@ public class FlowConditionRule {
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 50)
-    private ConditionOperator operator;
+    private ConditionOperatorEnum operator;
 
     /** 期望值。 */
     @Column(name = "expected_value", nullable = false, length = 200)
@@ -56,7 +57,7 @@ public class FlowConditionRule {
 
     public FlowConditionRule(
             String variableName,
-            ConditionOperator operator,
+            ConditionOperatorEnum operator,
             String expectedValue,
             String targetNodeName) {
         this.variableName = variableName;
@@ -70,8 +71,8 @@ public class FlowConditionRule {
     void setFlowConfig(FlowConfig flowConfig) { this.flowConfig = flowConfig; }
     public String getVariableName() { return variableName; }
     public void setVariableName(String variableName) { this.variableName = variableName; }
-    public ConditionOperator getOperator() { return operator; }
-    public void setOperator(ConditionOperator operator) { this.operator = operator; }
+    public ConditionOperatorEnum getOperator() { return operator; }
+    public void setOperator(ConditionOperatorEnum operator) { this.operator = operator; }
     public String getExpectedValue() { return expectedValue; }
     public void setExpectedValue(String expectedValue) { this.expectedValue = expectedValue; }
     public String getTargetNodeName() { return targetNodeName; }

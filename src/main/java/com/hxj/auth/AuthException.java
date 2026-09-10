@@ -1,6 +1,6 @@
 package com.hxj.auth;
 
-import com.hxj.common.ErrorCode;
+import com.hxj.common.ErrorCodeEnum;
 import lombok.Getter;
 
 /**
@@ -10,24 +10,24 @@ import lombok.Getter;
  *
  * <p>支持两种构造方式：
  * <ul>
- *   <li>{@link #AuthException(ErrorCode)} — 使用 ErrorCode 的默认提示</li>
- *   <li>{@link #AuthException(ErrorCode, String)} — 覆盖默认提示</li>
+ *   <li>{@link #AuthException(ErrorCodeEnum)} — 使用 ErrorCodeEnum 的默认提示</li>
+ *   <li>{@link #AuthException(ErrorCodeEnum, String)} — 覆盖默认提示</li>
  * </ul>
  */
 @Getter
 public class AuthException extends RuntimeException {
 
     /** 业务错误码 */
-    private final ErrorCode errorCode;
+    private final ErrorCodeEnum errorCode;
 
-    /** 使用 ErrorCode 默认提示 */
-    public AuthException(ErrorCode errorCode) {
+    /** 使用 ErrorCodeEnum 默认提示 */
+    public AuthException(ErrorCodeEnum errorCode) {
         super(errorCode.getDefaultMessage());
         this.errorCode = errorCode;
     }
 
     /** 覆盖默认提示 */
-    public AuthException(ErrorCode errorCode, String message) {
+    public AuthException(ErrorCodeEnum errorCode, String message) {
         super(message);
         this.errorCode = errorCode;
     }

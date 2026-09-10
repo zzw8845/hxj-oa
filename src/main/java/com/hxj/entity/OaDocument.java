@@ -1,5 +1,6 @@
 package com.hxj.entity;
 
+import com.hxj.enums.*;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -39,13 +40,13 @@ public class OaDocument {
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "business_type", nullable = false, length = 50)
-    private BusinessType businessType;
+    private BusinessTypeEnum businessType;
 
     /** 单据类型（日常申请单/付款申请单/用印申请单），由业务类型推导。 */
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "doc_type", nullable = false, length = 50)
-    private DocumentType documentType;
+    private DocumentTypeEnum documentType;
 
     /** 对应项目（申请事项）。 */
     @Column(name = "project_name", length = 200)
@@ -64,7 +65,7 @@ public class OaDocument {
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(length = 50)
-    private Company company;
+    private CompanyEnum company;
 
     /** 所属部门。 */
     @Column(length = 100)
@@ -106,7 +107,7 @@ public class OaDocument {
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "seal_type", length = 50)
-    private SealType sealType;
+    private SealTypeEnum sealType;
 
     /** 用印原因。 */
     @Column(name = "seal_reason", columnDefinition = "TEXT")
@@ -121,7 +122,7 @@ public class OaDocument {
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 20)
-    private DocumentStatus status = DocumentStatus.PENDING;
+    private DocumentStatusEnum status = DocumentStatusEnum.PENDING;
 
     /** 当前审批节点。 */
     @Column(name = "current_node", length = 100)
@@ -154,15 +155,15 @@ public class OaDocument {
     public Long getId() { return id; }
     public String getDocCode() { return docCode; }
     public void setDocCode(String docCode) { this.docCode = docCode; }
-    public BusinessType getBusinessType() { return businessType; }
-    public void setBusinessType(BusinessType businessType) {
+    public BusinessTypeEnum getBusinessType() { return businessType; }
+    public void setBusinessType(BusinessTypeEnum businessType) {
         this.businessType = businessType;
         this.documentType = businessType == null ? null : businessType.toDocumentType();
-        if (businessType == BusinessType.SEAL_APPLICATION) {
+        if (businessType == BusinessTypeEnum.SEAL_APPLICATION) {
             this.amount = null;
         }
     }
-    public DocumentType getDocumentType() { return documentType; }
+    public DocumentTypeEnum getDocumentType() { return documentType; }
     public String getProjectName() { return projectName; }
     public void setProjectName(String projectName) { this.projectName = projectName; }
     public String getContractNo() { return contractNo; }
@@ -170,8 +171,8 @@ public class OaDocument {
     public SysUser getApplicant() { return applicant; }
     public void setApplicant(SysUser applicant) { this.applicant = applicant; }
     public String getApplicantName() { return applicant == null ? null : applicant.getName(); }
-    public Company getCompany() { return company; }
-    public void setCompany(Company company) { this.company = company; }
+    public CompanyEnum getCompany() { return company; }
+    public void setCompany(CompanyEnum company) { this.company = company; }
     public String getDepartment() { return department; }
     public void setDepartment(String department) { this.department = department; }
     public BigDecimal getAmount() { return amount; }
@@ -190,14 +191,14 @@ public class OaDocument {
     public void setSealTime(LocalDateTime sealTime) { this.sealTime = sealTime; }
     public String getSealFileName() { return sealFileName; }
     public void setSealFileName(String sealFileName) { this.sealFileName = sealFileName; }
-    public SealType getSealType() { return sealType; }
-    public void setSealType(SealType sealType) { this.sealType = sealType; }
+    public SealTypeEnum getSealType() { return sealType; }
+    public void setSealType(SealTypeEnum sealType) { this.sealType = sealType; }
     public String getSealReason() { return sealReason; }
     public void setSealReason(String sealReason) { this.sealReason = sealReason; }
     public OaDocument getLinkedDocument() { return linkedDocument; }
     public void setLinkedDocument(OaDocument linkedDocument) { this.linkedDocument = linkedDocument; }
-    public DocumentStatus getStatus() { return status; }
-    public void setStatus(DocumentStatus status) { this.status = status; }
+    public DocumentStatusEnum getStatus() { return status; }
+    public void setStatus(DocumentStatusEnum status) { this.status = status; }
     public String getCurrentNode() { return currentNode; }
     public void setCurrentNode(String currentNode) { this.currentNode = currentNode; }
     public String getProcessInstanceId() { return processInstanceId; }

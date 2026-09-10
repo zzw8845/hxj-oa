@@ -52,7 +52,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
             Map<String, Object> claims = jwtService.parseClaims(token);
-            AuthenticatedUser principal = toPrincipal(claims);
+            AuthenticatedUserResponse principal = toPrincipal(claims);
             List<SimpleGrantedAuthority> authorities = principal.permissions().stream()
                     .map(SimpleGrantedAuthority::new)
                     .toList();
@@ -66,10 +66,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
     }
 
-    private AuthenticatedUser toPrincipal(Map<String, Object> claims) {
+    private AuthenticatedUserResponse toPrincipal(Map<String, Object> claims) {
         Object userIdValue = claims.get("userId");
         Long userId = userIdValue instanceof Number number ? number.longValue() : null;
-        return new AuthenticatedUser(
+        return new AuthenticatedUserResponse(
                 userId,
                 stringClaim(claims, "account"),
                 stringClaim(claims, "name"),

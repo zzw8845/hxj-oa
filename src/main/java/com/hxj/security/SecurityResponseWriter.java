@@ -2,7 +2,7 @@ package com.hxj.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hxj.common.ApiResponse;
-import com.hxj.common.ErrorCode;
+import com.hxj.common.ErrorCodeEnum;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,17 +34,17 @@ public class SecurityResponseWriter {
     }
 
     /** 写出 401 响应 */
-    public void writeUnauthorized(HttpServletResponse response, ErrorCode errorCode, String message) throws IOException {
+    public void writeUnauthorized(HttpServletResponse response, ErrorCodeEnum errorCode, String message) throws IOException {
         write(response, HttpStatus.UNAUTHORIZED, errorCode, message);
     }
 
     /** 写出 403 响应 */
-    public void writeForbidden(HttpServletResponse response, ErrorCode errorCode, String message) throws IOException {
+    public void writeForbidden(HttpServletResponse response, ErrorCodeEnum errorCode, String message) throws IOException {
         write(response, HttpStatus.FORBIDDEN, errorCode, message);
     }
 
     /** 写出指定 HTTP 状态的 JSON 响应 */
-    public void write(HttpServletResponse response, HttpStatus httpStatus, ErrorCode errorCode, String message) throws IOException {
+    public void write(HttpServletResponse response, HttpStatus httpStatus, ErrorCodeEnum errorCode, String message) throws IOException {
         log.warn("[security] status={}, code={}, message={}", httpStatus.value(), errorCode.getCode(), message);
         response.setStatus(httpStatus.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);

@@ -1,5 +1,6 @@
 package com.hxj.entity;
 
+import com.hxj.enums.DocumentStatusEnum;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -68,7 +69,7 @@ public class ArchiveLedger {
     }
 
     public static ArchiveLedger from(OaDocument document) {
-        if (document.getStatus() != DocumentStatus.APPROVED) {
+        if (document.getStatus() != DocumentStatusEnum.APPROVED) {
             throw new IllegalArgumentException("仅已通过单据可归档");
         }
         ArchiveLedger ledger = new ArchiveLedger();
