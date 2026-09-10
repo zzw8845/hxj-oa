@@ -5,12 +5,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
 
-/** 岗位字典 Repository。 */
+/** 岗位字典 Repository（全公司统一职种库）。 */
 public interface SysPostRepository extends JpaRepository<SysPost, Long> {
 
     boolean existsByName(String name);
 
     Optional<SysPost> findByName(String name);
-
-    boolean existsByDepartmentId(Long departmentId);
 }

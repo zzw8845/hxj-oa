@@ -64,6 +64,7 @@ public class EmployeeManagementService {
         user.setAccount(request.account());
         user.setPassword(passwordEncoder.encode(request.password()));
         applyDictionary(user, department, post);
+        applyManager(user, request.managerAccount());
         user.setStatus(UserStatusEnum.ACTIVE);
         replaceRoles(user, request.roles());
         return toResponse(userRepository.save(user));
@@ -84,6 +85,7 @@ public class EmployeeManagementService {
         user.setName(request.name());
         user.setJobNo(request.jobNo());
         applyDictionary(user, department, post);
+        applyManager(user, request.managerAccount());
         user.setStatus(request.status());
         if (StringUtils.hasText(request.newPassword())) {
             user.setPassword(passwordEncoder.encode(request.newPassword()));
@@ -119,15 +121,26 @@ public class EmployeeManagementService {
         }
     }
 
-    /** 写入字典外键与名称快照；岗位必须归属于员工所在部门（或为通用岗位）。 */
+    /** 写入字典外键与名称快照。 */
     private void applyDictionary(SysUser user, SysDepartment department, SysPost post) {
-        if (post.getDepartmentId() != null && !post.getDepartmentId().equals(department.getId())) {
-            throw new BusinessException(ErrorCodeEnum.POST_DEPARTMENT_MISMATCH, "岗位不属于该员工所在部门");
-        }
         user.setDepartmentId(department.getId());
         user.setDepartment(department.getName());
         user.setPostId(post.getId());
         user.setPost(post.getName());
+    }
+
+    /** 写入直属主管（汇报线）：主管必须存在且不能是本人；留空表示未设置。 */
+    private void applyManager(SysUser user, String managerAccount) {
+        if (!StringUtils.hasText(managerAccount)) {
+            user.setManagerId(null);
+            return;
+        }
+        if (managerAccount.equals(user.getAccount())) {
+            throw new BusinessException(ErrorCodeEnum.MANAGER_SELF_REFERENCE, "直属主管不能是自己");
+        }
+        SysUser manager = userRepository.findByAccount(managerAccount)
+                .orElseThrow(() -> new BusinessException(ErrorCodeEnum.MANAGER_NOT_FOUND, "直属主管不存在"));
+        user.setManagerId(manager.getId());
     }
 
     /** 角色以名称传递（与 EmployeeResponse.roles 同源），此处解析为实体后按外键关联。 */
@@ -142,10 +155,14 @@ public class EmployeeManagementService {
     }
 
     private EmployeeResponse toResponse(SysUser user) {
+        SysUser manager = user.getManagerId() == null
+                ? null : userRepository.findById(user.getManagerId()).orElse(null);
         return new EmployeeResponse(
                 user.getId(), user.getName(), user.getJobNo(), user.getAccount(),
                 user.getDepartmentId(), user.getDepartment(),
                 user.getPostId(), user.getPost(),
+                user.getManagerId(), manager == null ? null : manager.getAccount(),
+                manager == null ? null : manager.getName(),
                 user.getStatus(),
                 user.getRoles().stream().map(SysRole::getName).sorted().toList());
     }

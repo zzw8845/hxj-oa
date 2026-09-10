@@ -13,6 +13,7 @@ public record UpdateEmployeeRequest(
         @Schema(description = "工号") @NotBlank String jobNo,
         @Schema(description = "部门ID（sys_department 字典）") @NotNull Long departmentId,
         @Schema(description = "岗位ID（sys_post 字典）") @NotNull Long postId,
+        @Schema(description = "直属主管登录账号（汇报线，留空表示未设置）") String managerAccount,
         @Schema(description = "用户状态（枚举）") @NotNull UserStatusEnum status,
         @Schema(description = "新密码；为空表示不修改密码") String newPassword,
         @Schema(description = "分配的角色名称列表，与 EmployeeResponse.roles 同源可原样回写")

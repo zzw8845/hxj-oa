@@ -70,13 +70,13 @@ class PermissionManagementServiceTest {
         roleRepository.save(role);
 
         departmentId = departmentService.create(new SaveDepartmentRequest("业务部", null, 1)).id();
-        postId = postService.create(new SavePostRequest(departmentId, "专员")).id();
+        postId = postService.create(new SavePostRequest("专员")).id();
     }
 
     @Test
     void shouldCreateAndEditEmployeeAccount() {
         EmployeeResponse created = employeeService.create(new CreateEmployeeRequest(
-                "张三", "HXJ100", "zhangsan", "password", departmentId, postId, List.of(role.getName())));
+                "张三", "HXJ100", "zhangsan", "password", departmentId, postId, null, List.of(role.getName())));
 
         SysUser persisted = userRepository.findById(created.id()).orElseThrow();
         assertThat(passwordEncoder.matches("password", persisted.getPassword())).isTrue();
@@ -88,9 +88,9 @@ class PermissionManagementServiceTest {
         assertThat(persisted.hasPermission("VIEW_OWN_FORMS")).isTrue();
 
         Long newDepartmentId = departmentService.create(new SaveDepartmentRequest("财务部", null, 2)).id();
-        Long financePostId = postService.create(new SavePostRequest(newDepartmentId, "财务专员")).id();
+        
         EmployeeResponse updated = employeeService.update(created.id(), new UpdateEmployeeRequest(
-                "张三（离职）", "HXJ100", newDepartmentId, financePostId, UserStatusEnum.RESIGNED,
+                "张三（离职）", "HXJ100", newDepartmentId, postId, null, UserStatusEnum.RESIGNED,
                 null, List.of(role.getName())));
         assertThat(updated.status()).isEqualTo(UserStatusEnum.RESIGNED);
         assertThat(updated.departmentId()).isEqualTo(newDepartmentId);
@@ -100,12 +100,12 @@ class PermissionManagementServiceTest {
     @Test
     void shouldRejectUnknownDepartmentOrPost() {
         assertThatThrownBy(() -> employeeService.create(new CreateEmployeeRequest(
-                "张三", "HXJ100", "zhangsan", "password", 999L, postId, List.of(role.getName()))))
+                "张三", "HXJ100", "zhangsan", "password", 999L, postId, null, List.of(role.getName()))))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("部门不存在");
 
         assertThatThrownBy(() -> employeeService.create(new CreateEmployeeRequest(
-                "张三", "HXJ100", "zhangsan", "password", departmentId, 999L, List.of(role.getName()))))
+                "张三", "HXJ100", "zhangsan", "password", departmentId, 999L, null, List.of(role.getName()))))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("岗位不存在");
     }
@@ -113,7 +113,7 @@ class PermissionManagementServiceTest {
     @Test
     void shouldResetEmployeePassword() {
         EmployeeResponse created = employeeService.create(new CreateEmployeeRequest(
-                "张三", "HXJ100", "zhangsan", "password", departmentId, postId, List.of(role.getName())));
+                "张三", "HXJ100", "zhangsan", "password", departmentId, postId, null, List.of(role.getName())));
 
         employeeService.resetPassword(created.id(), new ResetPasswordRequest("new-pass"));
 
@@ -124,14 +124,14 @@ class PermissionManagementServiceTest {
     @Test
     void shouldRejectIncompleteOrDuplicateEmployeeAccount() {
         assertThatThrownBy(() -> employeeService.create(new CreateEmployeeRequest(
-                "张三", "HXJ100", "", "", departmentId, postId, List.of(role.getName()))))
+                "张三", "HXJ100", "", "", departmentId, postId, null, List.of(role.getName()))))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("请完整填写员工、账号和密码信息");
 
         employeeService.create(new CreateEmployeeRequest(
-                "张三", "HXJ100", "zhangsan", "password", departmentId, postId, List.of(role.getName())));
+                "张三", "HXJ100", "zhangsan", "password", departmentId, postId, null, List.of(role.getName())));
         assertThatThrownBy(() -> employeeService.create(new CreateEmployeeRequest(
-                "李四", "HXJ101", "zhangsan", "password", departmentId, postId, List.of(role.getName()))))
+                "李四", "HXJ101", "zhangsan", "password", departmentId, postId, null, List.of(role.getName()))))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("登录账号已存在");
     }
@@ -166,7 +166,7 @@ class PermissionManagementServiceTest {
                 .hasMessage("部门名称已存在");
         // 有员工的部门禁止删除
         EmployeeResponse employee = employeeService.create(new CreateEmployeeRequest(
-                "张三", "HXJ100", "zhangsan", "password", departmentId, postId, List.of(role.getName())));
+                "张三", "HXJ100", "zhangsan", "password", departmentId, postId, null, List.of(role.getName())));
         assertThatThrownBy(() -> departmentService.delete(departmentId))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("部门下存在员工，无法删除");
@@ -174,7 +174,7 @@ class PermissionManagementServiceTest {
         assertThatThrownBy(() -> postService.delete(postId))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("岗位下存在员工，无法删除");
-        assertThatThrownBy(() -> postService.create(new SavePostRequest(departmentId, "专员")))
+        assertThatThrownBy(() -> postService.create(new SavePostRequest("专员")))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("岗位名称已存在");
 
@@ -184,10 +184,9 @@ class PermissionManagementServiceTest {
 
         // 无引用后可删除
         employeeService.update(employee.id(), new UpdateEmployeeRequest(
-                "张三", "HXJ100", departmentId, postId, UserStatusEnum.RESIGNED,
+                "张三", "HXJ100", departmentId, postId, null, UserStatusEnum.RESIGNED,
                 null, List.of(role.getName())));
         userRepository.delete(userRepository.findById(employee.id()).orElseThrow());
-        postService.delete(postId);
         departmentService.delete(departmentId);
         assertThat(departmentRepository.existsById(departmentId)).isFalse();
     }
@@ -196,7 +195,7 @@ class PermissionManagementServiceTest {
     void shouldGuardRoleDeletion() {
         // 有员工引用的角色禁止删除
         EmployeeResponse employee = employeeService.create(new CreateEmployeeRequest(
-                "张三", "HXJ100", "zhangsan", "password", departmentId, postId, List.of(role.getName())));
+                "张三", "HXJ100", "zhangsan", "password", departmentId, postId, null, List.of(role.getName())));
         assertThatThrownBy(() -> roleService.delete(role.getId()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("角色下存在员工，无法删除");
@@ -205,7 +204,7 @@ class PermissionManagementServiceTest {
         RoleResponse bridgeRole = roleService.create(new SaveRoleRequest(
                 "过渡角色", departmentId, "助理", scope.getCode(), null, List.of(permission.getCode())));
         employeeService.update(employee.id(), new UpdateEmployeeRequest(
-                "张三", "HXJ100", departmentId, postId, UserStatusEnum.RESIGNED,
+                "张三", "HXJ100", departmentId, postId, null, UserStatusEnum.RESIGNED,
                 null, List.of(bridgeRole.name())));
         userRepository.flush();
         FlowConfig flowConfig = new FlowConfig();
@@ -224,6 +223,33 @@ class PermissionManagementServiceTest {
                 "二级部门负责人助理", departmentId, "助理", scope.getCode(), null, List.of(permission.getCode())));
         roleService.delete(freeRole.id());
         assertThat(roleRepository.existsById(freeRole.id())).isFalse();
+    }
+
+    @Test
+    void shouldManageEmployeeManagerLine() {
+        EmployeeResponse manager = employeeService.create(new CreateEmployeeRequest(
+                "王主管", "HXJ200", "wangzhu", "password", departmentId, postId, null, List.of(role.getName())));
+        EmployeeResponse employee = employeeService.create(new CreateEmployeeRequest(
+                "张三", "HXJ201", "zhangsan2", "password", departmentId, postId, "wangzhu", List.of(role.getName())));
+        org.assertj.core.api.Assertions.assertThat(employee.managerAccount()).isEqualTo("wangzhu");
+        org.assertj.core.api.Assertions.assertThat(employee.managerName()).isEqualTo("王主管");
+
+        // 自引用拒绝
+        assertThatThrownBy(() -> employeeService.update(employee.id(), new UpdateEmployeeRequest(
+                "张三", "HXJ201", departmentId, postId, "zhangsan2", UserStatusEnum.ACTIVE, null, List.of(role.getName()))))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("直属主管不能是自己");
+
+        // 主管不存在拒绝
+        assertThatThrownBy(() -> employeeService.create(new CreateEmployeeRequest(
+                "李四", "HXJ202", "lisi", "password", departmentId, postId, "ghost", List.of(role.getName()))))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("直属主管不存在");
+
+        // 清空汇报线
+        EmployeeResponse cleared = employeeService.update(employee.id(), new UpdateEmployeeRequest(
+                "张三", "HXJ201", departmentId, postId, null, UserStatusEnum.ACTIVE, null, List.of(role.getName())));
+        org.assertj.core.api.Assertions.assertThat(cleared.managerId()).isNull();
     }
 
     @Test
@@ -248,7 +274,7 @@ class PermissionManagementServiceTest {
         // 岗位改名同步角色岗位快照
         role.setPost("专员");
         roleRepository.save(role);
-        postService.update(postId, new SavePostRequest(departmentId, "高级专员"));
+        postService.update(postId, new SavePostRequest("高级专员"));
         assertThat(roleRepository.findById(role.getId()).orElseThrow().getPost()).isEqualTo("高级专员");
     }
 
@@ -265,7 +291,7 @@ class PermissionManagementServiceTest {
     @Test
     void shouldFilterEmployeeListByDictionaryAndStatus() {
         employeeService.create(new CreateEmployeeRequest(
-                "张三", "HXJ100", "zhangsan", "password", departmentId, postId, List.of(role.getName())));
+                "张三", "HXJ100", "zhangsan", "password", departmentId, postId, null, List.of(role.getName())));
 
         assertThat(employeeService.list(departmentId, postId, null)).hasSize(1);
         assertThat(employeeService.list(999L, postId, null)).isEmpty();

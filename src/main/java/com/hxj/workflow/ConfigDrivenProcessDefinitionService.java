@@ -165,6 +165,9 @@ public class ConfigDrivenProcessDefinitionService {
         if (node.getName().startsWith("发起人")) {
             // 发起人回环节点（签收/归还/上传归档附件等）：动态指派给单据申请人
             task.setAssignee("${initiator}");
+        } else if ("直属主管".equals(node.getAssigneeRole())) {
+            // 钉钉式汇报线节点：动态指派给申请人提交时确定的直属主管（提交时写入 managerAccount 流程变量）
+            task.setAssignee("${managerAccount}");
         } else if (node.getAssigneeRole() != null && !node.getAssigneeRole().isBlank()) {
             task.setCandidateGroups(splitGroups(node.getAssigneeRole()));
         }

@@ -14,6 +14,7 @@ public record CreateEmployeeRequest(
         @Schema(description = "登录密码（明文传输，建议配合 HTTPS）") @NotBlank String password,
         @Schema(description = "部门ID（sys_department 字典）") @NotNull Long departmentId,
         @Schema(description = "岗位ID（sys_post 字典）") @NotNull Long postId,
+        @Schema(description = "直属主管登录账号（汇报线，可空）") String managerAccount,
         @Schema(description = "分配的角色名称列表，与 EmployeeResponse.roles 同源可原样回写")
         @NotEmpty List<String> roles) {
 

@@ -32,17 +32,14 @@ public class DepartmentManagementService {
     private final SysDepartmentRepository departmentRepository;
     private final SysUserRepository userRepository;
     private final com.hxj.repository.SysRoleRepository roleRepository;
-    private final com.hxj.repository.SysPostRepository postRepository;
 
     public DepartmentManagementService(
             SysDepartmentRepository departmentRepository,
             SysUserRepository userRepository,
-            com.hxj.repository.SysRoleRepository roleRepository,
-            com.hxj.repository.SysPostRepository postRepository) {
+            com.hxj.repository.SysRoleRepository roleRepository) {
         this.departmentRepository = departmentRepository;
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
-        this.postRepository = postRepository;
     }
 
     /** 新建部门并初始化闭包路径。 */
@@ -112,9 +109,6 @@ public class DepartmentManagementService {
         }
         if (roleRepository.existsByDepartmentId(departmentId)) {
             throw new BusinessException(ErrorCodeEnum.DEPARTMENT_HAS_ROLES, "部门被角色引用，无法删除");
-        }
-        if (postRepository.existsByDepartmentId(departmentId)) {
-            throw new BusinessException(ErrorCodeEnum.DEPARTMENT_HAS_POSTS, "部门下存在岗位，无法删除");
         }
         departmentRepository.deleteAllPathsOf(departmentId);
         departmentRepository.delete(department);

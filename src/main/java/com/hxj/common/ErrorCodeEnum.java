@@ -143,6 +143,10 @@ public enum ErrorCodeEnum {
     POST_DEPARTMENT_MISMATCH("岗位不属于该员工所在部门"),
     /** 部门下存在岗位，无法删除 */
     DEPARTMENT_HAS_POSTS("部门下存在岗位，无法删除"),
+    /** 直属主管不存在 */
+    MANAGER_NOT_FOUND("直属主管不存在"),
+    /** 直属主管不能是自己 */
+    MANAGER_SELF_REFERENCE("直属主管不能是自己"),
 
     // —— 流程配置 ——
     /** 流程配置不存在 / 未配置对应审批流程 */

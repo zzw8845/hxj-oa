@@ -410,6 +410,51 @@ class ApprovalActionServiceIntegrationTest {
     }
 
     @Test
+    void shouldAssignManagerLineNodeToApplicantsManager() {
+        // 直属主管节点流程（钉钉式汇报线：assigneeRole=直属主管 → ${managerAccount} 动态指派）
+        FlowConfig managerFlow = new FlowConfig();
+        managerFlow.setType("直属主管审批流程");
+        managerFlow.setCategory(FlowCategoryEnum.DAILY);
+        managerFlow.addNode(new FlowNodeConfig("发起人", FlowNodeTypeEnum.START));
+        FlowNodeConfig managerNode = new FlowNodeConfig("直属主管审批", FlowNodeTypeEnum.APPROVAL);
+        managerNode.setAssigneeRole("直属主管");
+        managerFlow.addNode(managerNode);
+        flowConfigRepository.saveAndFlush(managerFlow);
+
+        sequence++;
+        SysUser applicant = userRepository.findByAccount("manager1").orElseThrow();
+        OaDocument document = new OaDocument();
+        document.setDocCode("BX20260903" + String.format("%03d", sequence));
+        document.setBusinessType(BusinessTypeEnum.DAILY_PAYMENT);
+        document.setProjectName(managerFlow.getType());
+        document.setApplicant(applicant);
+        document.setCompany(CompanyEnum.HAI_XIA_JIN);
+        document.setDepartment(applicant.getDepartment());
+        document.setAmount(new BigDecimal("500"));
+        document.setNeedPostMaterial(false);
+        document.setStatus(DocumentStatusEnum.APPROVING);
+        document.setCurrentNode("直属主管审批");
+        document = documentRepository.saveAndFlush(document);
+        String pid = workflowService.startProcess(managerFlow.getId(), document.getId(),
+                java.util.Map.of("initiator", "manager1", "managerAccount", "gm1"));
+        document.setProcessInstanceId(pid);
+        documentRepository.saveAndFlush(document);
+
+        // 直属主管节点自动指派给申请人的汇报线主管（gm1）
+        assertThat(workflowService.tasksForProcess(pid))
+                .extracting(org.flowable.task.api.Task::getAssignee)
+                .containsExactly("gm1");
+
+        // 主管审批通过后流程完结归档
+        login(gm);
+        ApprovalResultResponse result = actionService.approve(document.getId(),
+                new ApprovalRequest("同意", evidenceId(document), null, null, null, null, null));
+        assertThat(result.status()).isEqualTo(DocumentStatusEnum.APPROVED);
+        assertThat(runtimeService.createProcessInstanceQuery()
+                .processInstanceId(pid).singleResult()).isNull();
+    }
+
+    @Test
     void shouldWithdrawByApplicantBeforeAnyApproval() {
         OaDocument document = submittedDocument();
 

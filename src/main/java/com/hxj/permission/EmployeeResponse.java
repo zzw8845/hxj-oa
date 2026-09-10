@@ -14,6 +14,9 @@ public record EmployeeResponse(
         @Schema(description = "所属部门名称") String department,
         @Schema(description = "岗位ID") Long postId,
         @Schema(description = "岗位名称") String post,
+        @Schema(description = "直属主管ID，未设置为空") Long managerId,
+        @Schema(description = "直属主管登录账号") String managerAccount,
+        @Schema(description = "直属主管姓名") String managerName,
         @Schema(description = "用户状态（枚举）") UserStatusEnum status,
         @Schema(description = "角色名称列表") List<String> roles) {
 

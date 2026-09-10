@@ -77,6 +77,10 @@ public class SysUser {
     @Column(nullable = false, length = 20)
     private UserStatusEnum status = UserStatusEnum.ACTIVE;
 
+    /** 直属主管ID（汇报线，sys_user 自引用；可空表示未设置）。 */
+    @Column(name = "manager_id")
+    private Long managerId;
+
     /** 创建时间。 */
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -127,6 +131,8 @@ public class SysUser {
     }
     public UserStatusEnum getStatus() { return status; }
     public void setStatus(UserStatusEnum status) { this.status = status; }
+    public Long getManagerId() { return managerId; }
+    public void setManagerId(Long managerId) { this.managerId = managerId; }
     public boolean isLoginEnabled() { return status == UserStatusEnum.ACTIVE; }
     public boolean hasPermission(String permissionCode) {
         return roles.stream().anyMatch(role -> role.hasPermission(permissionCode));

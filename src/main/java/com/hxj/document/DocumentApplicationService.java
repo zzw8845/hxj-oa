@@ -328,13 +328,18 @@ public class DocumentApplicationService {
 
     private Map<String, Object> workflowVariables(
             OaDocument document, SubmitDocumentRequest request, SysUser applicant) {
+        // 直属主管账号：审批流「直属主管」节点以 ${managerAccount} 动态指派；未设置汇报线时为空串（任务待管理员指派）
+        String managerAccount = applicant.getManagerId() == null ? ""
+                : userRepository.findById(applicant.getManagerId())
+                        .map(SysUser::getAccount).orElse("");
         return Map.ofEntries(
                 Map.entry("amount", document.getAmount() == null ? BigDecimal.ZERO : document.getAmount()),
                 Map.entry("involvesFunds", request.involvesFunds()),
                 Map.entry("requiresAdminReview", request.requiresAdminReview()),
                 Map.entry("businessMode", request.businessMode() == null ? "" : request.businessMode().name()),
                 // 发起人回环节点（签收/归还/上传归档附件等）以此为 assignee 表达式动态指派
-                Map.entry("initiator", applicant.getAccount()));
+                Map.entry("initiator", applicant.getAccount()),
+                Map.entry("managerAccount", managerAccount));
     }
 
     /** ccUserIds 来自请求 DTO 的不可变列表（紧凑构造器已保证非 null），可直接构造集合。 */
