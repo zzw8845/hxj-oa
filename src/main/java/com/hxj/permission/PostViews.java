@@ -7,9 +7,10 @@ public final class PostViews {
     private PostViews() {
     }
 
-    /** 岗位条目。 */
+    /** 岗位条目（departmentId 为空表示通用岗位）。 */
     public record Post(
             @Schema(description = "岗位ID") Long id,
+            @Schema(description = "归属部门ID，空表示通用岗位") Long departmentId,
             @Schema(description = "岗位名称") String name) {
     }
 }

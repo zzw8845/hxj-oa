@@ -32,14 +32,17 @@ public class DepartmentManagementService {
     private final SysDepartmentRepository departmentRepository;
     private final SysUserRepository userRepository;
     private final com.hxj.repository.SysRoleRepository roleRepository;
+    private final com.hxj.repository.SysPostRepository postRepository;
 
     public DepartmentManagementService(
             SysDepartmentRepository departmentRepository,
             SysUserRepository userRepository,
-            com.hxj.repository.SysRoleRepository roleRepository) {
+            com.hxj.repository.SysRoleRepository roleRepository,
+            com.hxj.repository.SysPostRepository postRepository) {
         this.departmentRepository = departmentRepository;
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
+        this.postRepository = postRepository;
     }
 
     /** 新建部门并初始化闭包路径。 */
@@ -96,7 +99,7 @@ public class DepartmentManagementService {
         return toLeafNode(departmentRepository.save(department));
     }
 
-    /** 删除部门：仅允许无下级、无员工、且未被角色引用的叶部门。 */
+    /** 删除部门：仅允许无下级、无员工、无岗位、且未被角色引用的叶部门。 */
     @Transactional
     public void delete(Long departmentId) {
         SysDepartment department = departmentRepository.findById(departmentId)
@@ -109,6 +112,9 @@ public class DepartmentManagementService {
         }
         if (roleRepository.existsByDepartmentId(departmentId)) {
             throw new BusinessException(ErrorCodeEnum.DEPARTMENT_HAS_ROLES, "部门被角色引用，无法删除");
+        }
+        if (postRepository.existsByDepartmentId(departmentId)) {
+            throw new BusinessException(ErrorCodeEnum.DEPARTMENT_HAS_POSTS, "部门下存在岗位，无法删除");
         }
         departmentRepository.deleteAllPathsOf(departmentId);
         departmentRepository.delete(department);

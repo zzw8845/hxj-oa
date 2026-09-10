@@ -23,6 +23,10 @@ public class SysPost {
     @Column(nullable = false, unique = true, length = 100)
     private String name;
 
+    /** 归属部门ID（sys_department 外键；空表示通用岗位，全公司可见）。 */
+    @Column(name = "department_id")
+    private Long departmentId;
+
     /** 创建时间。 */
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -33,6 +37,8 @@ public class SysPost {
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+    public Long getDepartmentId() { return departmentId; }
+    public void setDepartmentId(Long departmentId) { this.departmentId = departmentId; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     public LocalDateTime getCreatedAt() { return createdAt; }

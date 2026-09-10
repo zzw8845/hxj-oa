@@ -11,4 +11,6 @@ public interface SysPostRepository extends JpaRepository<SysPost, Long> {
     boolean existsByName(String name);
 
     Optional<SysPost> findByName(String name);
+
+    boolean existsByDepartmentId(Long departmentId);
 }

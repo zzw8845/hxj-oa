@@ -1,10 +1,12 @@
 package com.hxj.permission;
 
 import com.hxj.common.ErrorCodeEnum;
+import com.hxj.entity.SysDepartment;
 import com.hxj.entity.SysPost;
 import com.hxj.entity.SysRole;
 import com.hxj.entity.SysUser;
 import com.hxj.exception.BusinessException;
+import com.hxj.repository.SysDepartmentRepository;
 import com.hxj.repository.SysPostRepository;
 import com.hxj.repository.SysRoleRepository;
 import com.hxj.repository.SysUserRepository;
@@ -15,8 +17,8 @@ import java.util.Comparator;
 import java.util.List;
 
 /**
- * 岗位字典管理服务：新增/改名/删除（被员工引用的岗位禁止删除），
- * 改名后同步在职员工的展示快照（历史单据快照不受影响）。
+ * 岗位字典管理服务：岗位归属部门（对齐 role-permission 规范"部门下的岗位"），
+ * 新增/改名/删除；被员工引用的岗位禁止删除；改名后同步员工与角色的展示快照。
  */
 @Service
 public class PostManagementService {
@@ -24,32 +26,38 @@ public class PostManagementService {
     private final SysPostRepository postRepository;
     private final SysUserRepository userRepository;
     private final SysRoleRepository roleRepository;
+    private final SysDepartmentRepository departmentRepository;
 
     public PostManagementService(
             SysPostRepository postRepository,
             SysUserRepository userRepository,
-            SysRoleRepository roleRepository) {
+            SysRoleRepository roleRepository,
+            SysDepartmentRepository departmentRepository) {
         this.postRepository = postRepository;
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
+        this.departmentRepository = departmentRepository;
     }
 
-    /** 新增岗位。 */
+    /** 新增岗位（必须归属部门）。 */
     @Transactional
     public PostViews.Post create(SavePostRequest request) {
+        SysDepartment department = requireDepartment(request.departmentId());
         if (postRepository.existsByName(request.name())) {
             throw new BusinessException(ErrorCodeEnum.POST_NAME_EXISTS, "岗位名称已存在");
         }
         SysPost post = new SysPost();
         post.setName(request.name());
+        post.setDepartmentId(department.getId());
         return toView(postRepository.save(post));
     }
 
-    /** 编辑岗位名称，并同步员工展示快照。 */
+    /** 编辑岗位名称/归属部门，并同步员工展示快照。 */
     @Transactional
     public PostViews.Post update(Long postId, SavePostRequest request) {
         SysPost post = postRepository.findById(postId)
                 .orElseThrow(() -> new BusinessException(ErrorCodeEnum.POST_NOT_FOUND, "岗位不存在"));
+        SysDepartment department = requireDepartment(request.departmentId());
         postRepository.findByName(request.name())
                 .filter(other -> !other.getId().equals(postId))
                 .ifPresent(other -> {
@@ -58,6 +66,7 @@ public class PostManagementService {
         boolean renamed = !post.getName().equals(request.name());
         String oldName = post.getName();
         post.setName(request.name());
+        post.setDepartmentId(department.getId());
         if (renamed) {
             // 同步员工与角色的岗位展示快照（角色的岗位为字符串标签）
             List<SysUser> members = userRepository.findByPostId(postId);
@@ -97,7 +106,12 @@ public class PostManagementService {
                 .orElseThrow(() -> new BusinessException(ErrorCodeEnum.POST_NOT_FOUND, "岗位不存在"));
     }
 
+    private SysDepartment requireDepartment(Long departmentId) {
+        return departmentRepository.findById(departmentId)
+                .orElseThrow(() -> new BusinessException(ErrorCodeEnum.DEPARTMENT_NOT_FOUND, "归属部门不存在"));
+    }
+
     private PostViews.Post toView(SysPost post) {
-        return new PostViews.Post(post.getId(), post.getName());
+        return new PostViews.Post(post.getId(), post.getDepartmentId(), post.getName());
     }
 }

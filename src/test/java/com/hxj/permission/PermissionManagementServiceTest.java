@@ -70,7 +70,7 @@ class PermissionManagementServiceTest {
         roleRepository.save(role);
 
         departmentId = departmentService.create(new SaveDepartmentRequest("业务部", null, 1)).id();
-        postId = postService.create(new SavePostRequest("专员")).id();
+        postId = postService.create(new SavePostRequest(departmentId, "专员")).id();
     }
 
     @Test
@@ -88,8 +88,9 @@ class PermissionManagementServiceTest {
         assertThat(persisted.hasPermission("VIEW_OWN_FORMS")).isTrue();
 
         Long newDepartmentId = departmentService.create(new SaveDepartmentRequest("财务部", null, 2)).id();
+        Long financePostId = postService.create(new SavePostRequest(newDepartmentId, "财务专员")).id();
         EmployeeResponse updated = employeeService.update(created.id(), new UpdateEmployeeRequest(
-                "张三（离职）", "HXJ100", newDepartmentId, postId, UserStatusEnum.RESIGNED,
+                "张三（离职）", "HXJ100", newDepartmentId, financePostId, UserStatusEnum.RESIGNED,
                 null, List.of(role.getName())));
         assertThat(updated.status()).isEqualTo(UserStatusEnum.RESIGNED);
         assertThat(updated.departmentId()).isEqualTo(newDepartmentId);
@@ -173,7 +174,7 @@ class PermissionManagementServiceTest {
         assertThatThrownBy(() -> postService.delete(postId))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("岗位下存在员工，无法删除");
-        assertThatThrownBy(() -> postService.create(new SavePostRequest("专员")))
+        assertThatThrownBy(() -> postService.create(new SavePostRequest(departmentId, "专员")))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("岗位名称已存在");
 
@@ -186,6 +187,7 @@ class PermissionManagementServiceTest {
                 "张三", "HXJ100", departmentId, postId, UserStatusEnum.RESIGNED,
                 null, List.of(role.getName())));
         userRepository.delete(userRepository.findById(employee.id()).orElseThrow());
+        postService.delete(postId);
         departmentService.delete(departmentId);
         assertThat(departmentRepository.existsById(departmentId)).isFalse();
     }
@@ -246,7 +248,7 @@ class PermissionManagementServiceTest {
         // 岗位改名同步角色岗位快照
         role.setPost("专员");
         roleRepository.save(role);
-        postService.update(postId, new SavePostRequest("高级专员"));
+        postService.update(postId, new SavePostRequest(departmentId, "高级专员"));
         assertThat(roleRepository.findById(role.getId()).orElseThrow().getPost()).isEqualTo("高级专员");
     }
 

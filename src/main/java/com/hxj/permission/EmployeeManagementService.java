@@ -119,8 +119,11 @@ public class EmployeeManagementService {
         }
     }
 
-    /** 写入字典外键与名称快照。 */
+    /** 写入字典外键与名称快照；岗位必须归属于员工所在部门（或为通用岗位）。 */
     private void applyDictionary(SysUser user, SysDepartment department, SysPost post) {
+        if (post.getDepartmentId() != null && !post.getDepartmentId().equals(department.getId())) {
+            throw new BusinessException(ErrorCodeEnum.POST_DEPARTMENT_MISMATCH, "岗位不属于该员工所在部门");
+        }
         user.setDepartmentId(department.getId());
         user.setDepartment(department.getName());
         user.setPostId(post.getId());

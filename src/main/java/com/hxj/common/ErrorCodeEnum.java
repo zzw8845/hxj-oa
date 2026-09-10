@@ -139,6 +139,10 @@ public enum ErrorCodeEnum {
     POST_NAME_EXISTS("岗位名称已存在"),
     /** 岗位下存在员工，无法删除 */
     POST_HAS_EMPLOYEES("岗位下存在员工，无法删除"),
+    /** 岗位不属于该员工所在部门 */
+    POST_DEPARTMENT_MISMATCH("岗位不属于该员工所在部门"),
+    /** 部门下存在岗位，无法删除 */
+    DEPARTMENT_HAS_POSTS("部门下存在岗位，无法删除"),
 
     // —— 流程配置 ——
     /** 流程配置不存在 / 未配置对应审批流程 */
