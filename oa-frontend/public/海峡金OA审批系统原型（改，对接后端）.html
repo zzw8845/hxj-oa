@@ -675,7 +675,7 @@ createApp({
             postId: emp.postId, post: emp.post,
             managerAccount: emp.managerAccount || '', managerName: emp.managerName || '',
             status: emp.status,
-            roles: emp.roles || [], relatedDepts: emp.relatedDepartments || [],
+            roles: emp.roles || [], relatedDepts: [emp.department, ...(emp.extraDepartments || [])].filter(Boolean),
             position: (emp.roles || []).join('、') || '普通员工',
             permissions: emp.permissions || []
           });

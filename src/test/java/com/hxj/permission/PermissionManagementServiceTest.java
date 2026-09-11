@@ -392,7 +392,7 @@ class PermissionManagementServiceTest {
     }
 
     @Test
-    void shouldDeriveRelatedDepartmentsFromMemberships() {
+    void shouldKeepMembershipSemanticsForMultiDepartment() {
         // 归属部门 = 主部门 + 兼职部门；角色户口（合规岗归属风控部）不混入
         Long zgc = departmentService.create(new SaveDepartmentRequest("资管中心测试", null, 3)).id();
         Long fg = departmentService.create(new SaveDepartmentRequest("风控部测试", null, 4)).id();
@@ -403,8 +403,8 @@ class PermissionManagementServiceTest {
         EmployeeResponse emp = employeeService.create(new CreateEmployeeRequest(
                 "跨部门员工", "HXJ301", "crossdept", "password", departmentId, postId, null,
                 List.of(role.getName(), zgcRole.name(), fgRole.name()), List.of(zgc)));
-        assertThat(emp.relatedDepartments()).containsExactly("业务部", "资管中心测试");
         assertThat(emp.extraDepartmentIds()).containsExactly(zgc);
+        assertThat(emp.extraDepartments()).containsExactly("资管中心测试");
     }
 
     @Test
@@ -436,7 +436,7 @@ class PermissionManagementServiceTest {
                 List.of(role.getName()), List.of(dept2, dept3)));
         assertThat(emp.departmentId()).isEqualTo(departmentId);
         assertThat(emp.extraDepartmentIds()).containsExactlyInAnyOrder(dept2, dept3);
-        assertThat(emp.relatedDepartments()).contains("业务部", "风控部", "战略部");
+        assertThat(emp.extraDepartments()).containsExactlyInAnyOrder("风控部", "战略部");
 
         // 编辑去掉一个兼职部门
         EmployeeResponse updated = employeeService.update(emp.id(), new UpdateEmployeeRequest(

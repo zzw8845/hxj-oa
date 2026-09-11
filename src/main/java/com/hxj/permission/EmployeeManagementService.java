@@ -201,20 +201,14 @@ public class EmployeeManagementService {
     private EmployeeResponse toResponse(SysUser user) {
         SysUser manager = user.getManagerId() == null
                 ? null : userRepository.findById(user.getManagerId()).orElse(null);
-        // 归属部门 = 主部门 + 兼职部门（真实归属；角色户口不混入，语义见 EmployeeResponse）
+        // 兼职部门 = sys_user_department（真实归属；主部门在 department_id，角色户口不混入）
         java.util.List<com.hxj.entity.SysUserDepartment> memberships = userDepartmentRepository.findByUserId(user.getId());
         java.util.List<Long> extraIds = new java.util.ArrayList<>();
-        java.util.LinkedHashSet<String> related = new java.util.LinkedHashSet<>();
-        if (user.getDepartment() != null) {
-            related.add(user.getDepartment());
-        }
         for (com.hxj.entity.SysUserDepartment membership : memberships) {
             if (!membership.isPrimaryDepartment()) {
                 extraIds.add(membership.getDepartment().getId());
             }
-            related.add(membership.getDepartment().getName());
         }
-        // 注意：角色归属部门不并入——角色户口不是人员归属，两种语义不混合
         java.util.List<String> extraNames = departmentRepository.findAllById(extraIds).stream()
                 .sorted(java.util.Comparator.comparing(com.hxj.entity.SysDepartment::getId))
                 .map(com.hxj.entity.SysDepartment::getName)
@@ -227,7 +221,6 @@ public class EmployeeManagementService {
                 manager == null ? null : manager.getName(),
                 user.getStatus(),
                 user.getRoles().stream().map(SysRole::getName).sorted().toList(),
-                List.copyOf(related),
                 List.copyOf(extraIds),
                 extraNames);
     }
