@@ -475,7 +475,7 @@ createApp({
       }
       if (editingEmployeeId.value && p.status === 'RESIGNED') {
         const pending = await apiCall('get', `/admin/employees/${editingEmployeeId.value}/offboarding/pending-tasks`);
-        if (pending && pending.length) {
+        if (pending) {
           offboardingList.value = pending;
           offboardingTransferTo.value = p.managerAccount || '';
           offboardingEmployeeId = editingEmployeeId.value;

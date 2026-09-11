@@ -6,9 +6,15 @@ import com.hxj.entity.FlowNodeConfig;
 import com.hxj.entity.SysDataScope;
 import com.hxj.entity.SysPermission;
 import com.hxj.entity.SysRole;
+import com.hxj.entity.CcRecord;
+import com.hxj.entity.OaDocument;
 import com.hxj.entity.SysUser;
 import com.hxj.enums.FlowCategoryEnum;
 import com.hxj.enums.FlowNodeTypeEnum;
+import com.hxj.enums.BusinessTypeEnum;
+import com.hxj.enums.CcSourceEnum;
+import com.hxj.enums.DocumentStatusEnum;
+import com.hxj.enums.DocumentTypeEnum;
 import com.hxj.enums.UserStatusEnum;
 import com.hxj.exception.BusinessException;
 import com.hxj.repository.FlowConfigRepository;
@@ -51,6 +57,8 @@ class PermissionManagementServiceTest {
     @Autowired private SysPermissionRepository permissionRepository;
     @Autowired private SysDepartmentRepository departmentRepository;
     @Autowired private FlowConfigRepository flowConfigRepository;
+    @Autowired private org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager entityManager;
+    @Autowired private EmployeeOffboardingService offboardingService;
     @Autowired private PasswordEncoder passwordEncoder;
 
     private SysDataScope scope;
@@ -331,5 +339,75 @@ class PermissionManagementServiceTest {
         assertThat(employeeService.list(null, null, UserStatusEnum.RESIGNED)).isEmpty();
         assertThat(employeeService.list(null, null, UserStatusEnum.ACTIVE)).hasSize(1);
         assertThat(employeeService.list(null, null, null)).hasSize(1);
+    }
+
+    @Test
+    void shouldReassignReportingLineOnResignationAndTransfer() {
+        // 汇报线：陈总监 ← 主管甲 ← 下属乙
+        EmployeeResponse mgr1 = employeeService.create(new CreateEmployeeRequest(
+                "陈总监", "HXJ201", "mgr1", "password", departmentId, postId, null, List.of(role.getName())));
+        EmployeeResponse mgrA = employeeService.create(new CreateEmployeeRequest(
+                "主管甲", "HXJ202", "mgr_a", "password", departmentId, postId, "mgr1", List.of(role.getName())));
+        employeeService.create(new CreateEmployeeRequest(
+                "下属乙", "HXJ203", "sub_b", "password", departmentId, postId, "mgr_a", List.of(role.getName())));
+
+        // 路径一：有下属的管理者转离职 → 更新被守卫拦截，强制先走离职交接
+        assertThatThrownBy(() -> employeeService.update(mgrA.id(), new UpdateEmployeeRequest(
+                "主管甲", "HXJ202", departmentId, postId, "mgr1", UserStatusEnum.RESIGNED,
+                null, List.of(role.getName()))))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("直属下属");
+        // 交接后：下属汇报线改挂交接人
+        EmployeeResponse mgrC = employeeService.create(new CreateEmployeeRequest(
+                "交接丙", "HXJ204", "mgr_c", "password", departmentId, postId, "mgr1", List.of(role.getName())));
+        offboardingService.transferAll(mgrA.id(), "mgr_c", "mgr1");
+        assertThat(userRepository.findByAccount("sub_b").orElseThrow().getManagerId())
+                .isEqualTo(mgrC.id());
+
+        // 路径二：无交接人退回 → 下属汇报线上移给离职者的主管
+        EmployeeResponse mgrD = employeeService.create(new CreateEmployeeRequest(
+                "主管丁", "HXJ205", "mgr_d", "password", departmentId, postId, "mgr1", List.of(role.getName())));
+        employeeService.create(new CreateEmployeeRequest(
+                "下属戊", "HXJ206", "sub_e", "password", departmentId, postId, "mgr_d", List.of(role.getName())));
+        assertThatThrownBy(() -> employeeService.update(mgrD.id(), new UpdateEmployeeRequest(
+                "主管丁", "HXJ205", departmentId, postId, "mgr1", UserStatusEnum.RESIGNED,
+                null, List.of(role.getName()))))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("直属下属");
+        offboardingService.rejectAll(mgrD.id(), "mgr1");
+        assertThat(userRepository.findByAccount("sub_e").orElseThrow().getManagerId())
+                .isEqualTo(mgr1.id());
+    }
+
+    @Test
+    void shouldGuardDepartmentReferencedByCustomScope() {
+        Long dept2 = departmentService.create(new SaveDepartmentRequest("风控部", null, 2)).id();
+        dataScopeRepository.save(new SysDataScope("CUSTOM", "自定义部门集合"));
+        roleService.create(new SaveRoleRequest("风控合规", departmentId, "合规岗", "CUSTOM",
+                List.of(dept2), List.of(permission.getCode())));
+        // CUSTOM 范围的部门集合引用：外键是 CASCADE，必须由守卫拦截，否则角色可见范围静默缩水
+        assertThatThrownBy(() -> departmentService.delete(dept2))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("部门被自定义数据范围引用，无法删除");
+    }
+
+    @Test
+    void shouldGuardRoleReferencedByCcRecord() {
+        // 申请人挂专用角色，避免占用被删角色的成员引用而触发成员守卫
+        RoleResponse applicantRole = roleService.create(new SaveRoleRequest(
+                "申请人专用", departmentId, "专员", "OWN", null, List.of(permission.getCode())));
+        EmployeeResponse applicant = employeeService.create(new CreateEmployeeRequest(
+                "张三", "HXJ100", "zhangsan", "password", departmentId, postId, null, List.of(applicantRole.name())));
+        OaDocument document = new OaDocument();
+        document.setDocCode("BX202601010001");
+        document.setBusinessType(BusinessTypeEnum.DAILY_PAYMENT);
+        document.setApplicant(userRepository.findByAccount("zhangsan").orElseThrow());
+        document.setStatus(DocumentStatusEnum.PENDING);
+        entityManager.persistAndFlush(document);
+        entityManager.persistAndFlush(CcRecord.toRole(document, role, CcSourceEnum.FLOW));
+        // 抄送记录历史直接引用角色 ID（外键无级联），不守卫删除会 500
+        assertThatThrownBy(() -> roleService.delete(role.getId()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("角色被抄送记录引用，无法删除");
     }
 }

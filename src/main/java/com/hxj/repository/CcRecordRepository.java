@@ -9,4 +9,6 @@ public interface CcRecordRepository extends JpaRepository<CcRecord, Long> {
 
     List<CcRecord> findByDocumentIdOrderByCreatedAtAsc(Long documentId);
     boolean existsByDocumentIdAndTargetUserId(Long documentId, Long targetUserId);
+
+    boolean existsByTargetRoleId(Long targetRoleId);
 }

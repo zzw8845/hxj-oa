@@ -28,4 +28,6 @@ public interface SysUserRepository extends JpaRepository<SysUser, Long> {
     List<SysUser> findDistinctByRolesId(Long roleId);
 
     List<SysUser> findByStatus(UserStatusEnum status);
+
+    List<SysUser> findByManagerId(Long managerId);
 }

@@ -27,18 +27,21 @@ public class RoleManagementService {
     private final SysDataScopeRepository dataScopeRepository;
     private final com.hxj.repository.SysDepartmentRepository departmentRepository;
     private final com.hxj.repository.FlowNodeConfigRepository flowNodeConfigRepository;
+    private final com.hxj.repository.CcRecordRepository ccRecordRepository;
 
     public RoleManagementService(
             SysRoleRepository roleRepository,
             SysPermissionRepository permissionRepository,
             SysDataScopeRepository dataScopeRepository,
             com.hxj.repository.SysDepartmentRepository departmentRepository,
-            com.hxj.repository.FlowNodeConfigRepository flowNodeConfigRepository) {
+            com.hxj.repository.FlowNodeConfigRepository flowNodeConfigRepository,
+            com.hxj.repository.CcRecordRepository ccRecordRepository) {
         this.roleRepository = roleRepository;
         this.permissionRepository = permissionRepository;
         this.dataScopeRepository = dataScopeRepository;
         this.departmentRepository = departmentRepository;
         this.flowNodeConfigRepository = flowNodeConfigRepository;
+        this.ccRecordRepository = ccRecordRepository;
     }
 
     @Transactional
@@ -102,6 +105,10 @@ public class RoleManagementService {
                 .anyMatch(assignee -> usesRole(assignee, role.getName()));
         if (flowUsed) {
             throw new BusinessException(ErrorCodeEnum.ROLE_IN_FLOW_USE, "角色被流程节点引用，无法删除");
+        }
+        // 抄送记录历史：历史单据的抄送行直接引用角色 ID（外键无级联），不守卫会 500
+        if (ccRecordRepository.existsByTargetRoleId(roleId)) {
+            throw new BusinessException(ErrorCodeEnum.ROLE_IN_CC_USE, "角色被抄送记录引用，无法删除");
         }
         roleRepository.delete(role);
     }

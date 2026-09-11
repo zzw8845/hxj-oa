@@ -95,6 +95,11 @@ public class EmployeeOffboardingService {
                             ApprovalActionEnum.TRANSFER,
                             "员工「" + leaver.getName() + "」离职，待办转交给「" + transferTo.getName() + "」"));
         }
+        // 汇报线迁移：离职者的直属下属统一改挂交接人，否则下属后续单据的
+        // 「直属主管」节点会路由到已离职者，任务永久无人认领
+        List<SysUser> subordinates = userRepository.findByManagerId(leaver.getId());
+        subordinates.forEach(sub -> sub.setManagerId(transferTo.getId()));
+        userRepository.saveAll(subordinates);
         return tasks.size();
     }
 
@@ -121,7 +126,13 @@ public class EmployeeOffboardingService {
                                 "员工「" + leaver.getName() + "」离职，单据退回提交人重新发起");
                     });
         }
-        return tasks.size();
+                // 汇报线上移：无交接人时，离职者的下属改挂其直属主管（组织降级兜底）
+        List<SysUser> subs = userRepository.findByManagerId(leaver.getId());
+        if (leaver.getManagerId() != null && !subs.isEmpty()) {
+            subs.forEach(sub -> sub.setManagerId(leaver.getManagerId()));
+            userRepository.saveAll(subs);
+        }
+return tasks.size();
     }
 
     private void leaveRecord(OaDocument document, String nodeName, SysUser operator,

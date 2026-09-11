@@ -89,13 +89,15 @@ public class EmployeeManagementService {
         user.setJobNo(request.jobNo());
         applyDictionary(user, department, post);
         applyManager(user, request.managerAccount());
-        // 钉钉式离职交接：转为离职前必须清空在途待办（转交或退回），避免审批任务悬空
+        // 钉钉式离职交接：转为离职前必须清空在途待办并安置直属下属（转交或退回），
+        // 避免审批任务悬空、汇报线指向已离职者
         if (request.status() == UserStatusEnum.RESIGNED
                 && user.getStatus() == UserStatusEnum.ACTIVE) {
             int pending = offboardingService.pendingCount(userId);
-            if (pending > 0) {
+            int subordinates = userRepository.findByManagerId(userId).size();
+            if (pending > 0 || subordinates > 0) {
                 throw new BusinessException(ErrorCodeEnum.EMPLOYEE_PENDING_TASKS,
-                        "该员工还有 " + pending + " 笔在途待办，请先完成转交或退回");
+                        "该员工还有 " + pending + " 笔在途待办、" + subordinates + " 名直属下属，请先完成转交或退回");
             }
         }
         user.setStatus(request.status());

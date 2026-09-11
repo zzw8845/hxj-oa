@@ -110,6 +110,11 @@ public class DepartmentManagementService {
         if (roleRepository.existsByDepartmentId(departmentId)) {
             throw new BusinessException(ErrorCodeEnum.DEPARTMENT_HAS_ROLES, "部门被角色引用，无法删除");
         }
+        // CUSTOM 数据范围的部门集合引用：外键为 CASCADE，不守卫会被静默删除，
+        // 导致对应角色的可见部门范围悄悄缩水
+        if (departmentRepository.countScopeReferences(departmentId) > 0) {
+            throw new BusinessException(ErrorCodeEnum.DEPARTMENT_IN_SCOPE_USE, "部门被自定义数据范围引用，无法删除");
+        }
         departmentRepository.deleteAllPathsOf(departmentId);
         departmentRepository.delete(department);
     }

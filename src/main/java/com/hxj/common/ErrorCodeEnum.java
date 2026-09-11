@@ -109,6 +109,8 @@ public enum ErrorCodeEnum {
     ROLE_HAS_MEMBERS("角色下存在员工，无法删除"),
     /** 角色被流程节点引用，无法删除 */
     ROLE_IN_FLOW_USE("角色被流程节点引用，无法删除"),
+    /** 角色被抄送记录引用，无法删除 */
+    ROLE_IN_CC_USE("角色被抄送记录引用，无法删除"),
     /** 仅申请人本人可撤回单据 */
     DOCUMENT_WITHDRAW_FORBIDDEN("仅申请人本人可撤回单据"),
     /** 审批已开始，无法撤回 */
@@ -131,6 +133,8 @@ public enum ErrorCodeEnum {
     DEPARTMENT_HAS_EMPLOYEES("部门下存在员工，无法删除"),
     /** 部门被角色引用，无法删除 */
     DEPARTMENT_HAS_ROLES("部门被角色引用，无法删除"),
+    /** 部门被自定义数据范围引用，无法删除 */
+    DEPARTMENT_IN_SCOPE_USE("部门被自定义数据范围引用，无法删除"),
     /** 不能将部门移动到自身或其下级部门下 */
     DEPARTMENT_MOVE_CYCLE("不能将部门移动到自身或其下级部门下"),
     /** 岗位不存在 */

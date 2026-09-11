@@ -16,6 +16,10 @@ import java.util.Optional;
  */
 public interface SysDepartmentRepository extends JpaRepository<SysDepartment, Long> {
 
+    /** 该部门被角色自定义数据范围（CUSTOM）引用的次数。 */
+    @Query(value = "SELECT COUNT(*) FROM sys_role_scope_department WHERE department_id = :deptId", nativeQuery = true)
+    long countScopeReferences(@Param("deptId") Long deptId);
+
     boolean existsByName(String name);
 
     Optional<SysDepartment> findByName(String name);
