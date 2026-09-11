@@ -59,6 +59,8 @@ public class FormField {
     private boolean enabled = true;
 
     public Long getId() { return id; }
+    public FormTemplate getTemplate() { return template; }
+    public void setTemplate(FormTemplate template) { this.template = template; }
     public FormField fieldKey(String fieldKey) { this.fieldKey = fieldKey; return this; }
     public String getFieldKey() { return fieldKey; }
     public void setFieldKey(String fieldKey) { this.fieldKey = fieldKey; }

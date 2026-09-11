@@ -73,7 +73,13 @@ public final class FlowConfigItems {
         public record FlowNodePayload(
                 @Schema(description = "节点名称") String name,
                 @Schema(description = "节点类型（枚举）") FlowNodeTypeEnum nodeType,
-                @Schema(description = "处理角色") String assigneeRole) {
+                @Schema(description = "处理角色") String assigneeRole,
+                @Schema(description = "抄送目标（JSON 数组，仅抄送节点）") String ccTargets) {
+
+            /** 兼容旧三参调用（非抄送节点无 ccTargets）。 */
+            public FlowNodePayload(String name, FlowNodeTypeEnum nodeType, String assigneeRole) {
+                this(name, nodeType, assigneeRole, null);
+            }
         }
 
         public record FlowConditionRulePayload(

@@ -4,10 +4,10 @@
 - [x] 1.3 FormTemplate/FormField 实体与仓储，验证 JPA 测试通过
 
 ## 2. 模板管理后端（M1）
-- [ ] 2.1 FormTemplateManagementService：模板 CRUD/字段编辑/版本递增/保留键锁定/field_key 唯一与保留字校验/SELECT options 校验
-- [ ] 2.2 端点：/api/admin/form-templates CRUD（配置权限）+ /api/form-templates/enabled 与 by-type（登录即可）
-- [ ] 2.3 模板与流程绑定：flow_config_id 显式关联，管理端选择
-- [ ] 2.4 测试：CRUD/保留键/版本/唯一性
+- [x] 2.1 FormTemplateManagementService：模板 CRUD/字段编辑/版本递增/保留键锁定/field_key 唯一与保留字校验/SELECT options 校验
+- [x] 2.2 端点：/api/admin/form-templates CRUD（配置权限）+ /api/form-templates/enabled 与 by-type（登录即可）
+- [x] 2.3 模板与流程绑定：flow_config_id 显式关联，管理端选择
+- [x] 2.4 测试：CRUD/保留键/版本/唯一性
 
 ## 3. 提交链路重写（M2）
 - [ ] 3.1 SubmitDocumentRequest v2（projectName/company/needPostMaterial/ccUserIds/templateId/fieldValues）

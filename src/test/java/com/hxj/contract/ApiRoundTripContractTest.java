@@ -196,14 +196,16 @@ class ApiRoundTripContractTest {
      */
     @Test
     void submittedDocumentShouldBeReadBackWithSameFields() throws Exception {
-        createFlowConfig("采购申请-单据闭环");
+        long configId = createFlowConfig("采购申请-单据闭环");
+        long templateId = createTemplate(configId);
 
         ObjectNode submit = mapper.createObjectNode();
-        submit.put("businessType", "DAILY_PAYMENT");
-        submit.put("projectName", "采购申请-单据闭环");
-        submit.put("company", "海峡金");
-        submit.put("amount", 1200);
-        submit.put("reason", "契约测试：验证提交后可原样读回");
+        submit.put("templateId", templateId);
+        ObjectNode values = submit.putObject("fieldValues");
+        values.put("title", "采购申请-单据闭环");
+        values.put("company", "海峡金");
+        values.put("amount", 1200);
+        values.put("reason", "契约测试：验证提交后可原样读回");
         String created = postJson("/api/documents", submit);
         assertSuccess("提交单据", created);
 
@@ -215,6 +217,48 @@ class ApiRoundTripContractTest {
         assertThat(new java.math.BigDecimal(detail.path("amount").asText()))
                 .as("金额应原样读回，实际详情=%s", detail)
                 .isEqualByComparingTo("1200");
+    }
+
+
+    private long createTemplate(long configId) throws Exception {
+        ObjectNode body = mapper.createObjectNode();
+        body.put("businessType", "采购申请-单据闭环");
+        body.put("name", "采购申请-单据闭环");
+        body.put("docPrefix", "CG");
+        body.put("flowConfigId", configId);
+        body.put("category", "DAILY_PAYMENT");
+        ArrayNode fields = body.putArray("fields");
+        ObjectNode title = fields.addObject();
+        title.put("fieldKey", "title");
+        title.put("label", "单据标题");
+        title.put("controlType", "TEXT");
+        title.put("required", true);
+        title.put("reserved", true);
+        title.put("sortOrder", 1);
+        ObjectNode company = fields.addObject();
+        company.put("fieldKey", "company");
+        company.put("label", "所属公司");
+        company.put("controlType", "SELECT");
+        company.put("required", true);
+        company.put("sortOrder", 2);
+        company.putArray("options").add("海峡金");
+        ObjectNode amount = fields.addObject();
+        amount.put("fieldKey", "amount");
+        amount.put("label", "金额");
+        amount.put("controlType", "NUMBER");
+        amount.put("required", true);
+        amount.put("reserved", true);
+        amount.put("sortOrder", 3);
+        ObjectNode reason = fields.addObject();
+        reason.put("fieldKey", "reason");
+        reason.put("label", "事由明细");
+        reason.put("controlType", "TEXTAREA");
+        reason.put("required", true);
+        reason.put("sortOrder", 4);
+
+        String response = postJson("/api/admin/form-templates", body);
+        assertSuccess("创建表单模板", response);
+        return mapper.readTree(response).path("data").path("id").asLong();
     }
 
     private long createFlowConfig(String type) throws Exception {

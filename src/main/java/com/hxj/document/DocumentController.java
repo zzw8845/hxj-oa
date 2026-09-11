@@ -79,9 +79,8 @@ public class DocumentController {
 
     @Operation(summary = "快捷单据目录", description = "按业务类型返回可快捷提交的单据列表")
     @GetMapping("/quick")
-    public ApiResponse<List<QuickDocumentItemResponse>> quickDocuments(
-            @Parameter(description = "业务类型（枚举）") @RequestParam BusinessTypeEnum businessType) {
-         return ApiResponse.success(documentService.quickDocuments(businessType));
+    public ApiResponse<List<QuickDocumentItemResponse>> quickDocuments() {
+         return ApiResponse.success(documentService.quickDocuments());
     }
 
     @Operation(summary = "再次提交", description = "复制历史单据信息生成新编号再次提交")
@@ -123,11 +122,10 @@ public class DocumentController {
         return URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
     }
 
-    @Operation(summary = "必传附件清单", description = "按业务类型与项目名生成必传附件清单")
+    @Operation(summary = "必传附件清单", description = "按表单模板返回必传附件清单")
     @GetMapping("/attachment-requirements")
     public ApiResponse<List<String>> attachmentRequirements(
-            @Parameter(description = "业务类型（枚举）") @RequestParam BusinessTypeEnum businessType,
-            @Parameter(description = "项目名称") @RequestParam String projectName) {
-        return ApiResponse.success(documentService.attachmentRequirements(businessType, projectName));
+            @Parameter(description = "表单模板 ID") @RequestParam Long templateId) {
+        return ApiResponse.success(documentService.attachmentRequirements(templateId));
     }
 }

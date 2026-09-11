@@ -49,7 +49,9 @@ public record DocumentDetailResponse(
         @Schema(description = "抄送记录列表")
         List<Cc> ccRecords,
         @Schema(description = "流程历史（含各节点操作记录）")
-        List<WorkflowHistoryItemResponse> workflowHistory) {
+        List<WorkflowHistoryItemResponse> workflowHistory,
+        @Schema(description = "表单字段（模板定义与值合并，按模板顺序）")
+        List<FormTemplateManagementService.FieldValueView> formFields) {
 
     /**
      * 紧凑构造器：集合组件防御性拷贝为不可变列表，null 归一化为不可变空列表。
@@ -62,6 +64,7 @@ public record DocumentDetailResponse(
         approvals = approvals == null ? List.of() : List.copyOf(approvals);
         ccRecords = ccRecords == null ? List.of() : List.copyOf(ccRecords);
         workflowHistory = workflowHistory == null ? List.of() : List.copyOf(workflowHistory);
+        formFields = formFields == null ? List.of() : List.copyOf(formFields);
     }
 
     /** 关联单据摘要 */

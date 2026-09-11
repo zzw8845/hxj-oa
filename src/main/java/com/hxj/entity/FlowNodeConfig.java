@@ -43,6 +43,9 @@ public class FlowNodeConfig {
     /** 审批角色（指定由哪个角色处理）。 */
     @Column(name = "assignee_role", length = 100)
     private String assigneeRole;
+    /** 抄送节点目标（JSON 数组 [{"type":"ROLE|DEPT|USER","value":"..."}]），仅 CC 节点使用。 */
+    @Column(name = "cc_targets", columnDefinition = "TEXT")
+    private String ccTargets;
 
     /** 节点顺序。 */
     @Column(name = "sort_order", nullable = false)
@@ -65,6 +68,8 @@ public class FlowNodeConfig {
     public void setNodeType(FlowNodeTypeEnum nodeType) { this.nodeType = nodeType; }
     public String getAssigneeRole() { return assigneeRole; }
     public void setAssigneeRole(String assigneeRole) { this.assigneeRole = assigneeRole; }
+    public String getCcTargets() { return ccTargets; }
+    public void setCcTargets(String ccTargets) { this.ccTargets = ccTargets; }
     public int getSortOrder() { return sortOrder; }
     void setSortOrder(int sortOrder) { this.sortOrder = sortOrder; }
 }

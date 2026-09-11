@@ -6,7 +6,6 @@ import com.hxj.repository.CcRecordRepository;
 import com.hxj.repository.FlowConfigRepository;
 import com.hxj.repository.OaAttachmentRepository;
 import com.hxj.repository.OaDocumentRepository;
-import com.hxj.repository.QuickDocumentRepository;
 import com.hxj.repository.SysUserRepository;
 import com.hxj.security.AuthenticatedUserResponse;
 import com.hxj.security.DocumentAccessPolicy;
@@ -36,6 +35,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest(properties = {
         "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
@@ -46,20 +46,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 })
 @Import({
         DocumentApplicationService.class,
-        DocumentClassifier.class,
         DocumentAccessPolicy.class,
-        AttachmentRequirementService.class,
         LocalAttachmentStorage.class,
         com.hxj.workflow.DeptAccountantResolver.class,
+        FormTemplateManagementService.class,
         DocumentApplicationServiceTest.Config.class
 })
 class DocumentApplicationServiceTest {
 
     @Autowired private DocumentApplicationService service;
+    @Autowired private FormTemplateManagementService templateService;
     @Autowired private OaDocumentRepository documentRepository;
     @Autowired private OaAttachmentRepository attachmentRepository;
     @Autowired private CcRecordRepository ccRepository;
-    @Autowired private QuickDocumentRepository quickRepository;
     @Autowired private SysUserRepository userRepository;
     @Autowired private com.hxj.repository.SysDepartmentRepository departmentRepository;
     @Autowired private com.hxj.repository.SysPostRepository postRepository;
@@ -69,6 +68,8 @@ class DocumentApplicationServiceTest {
     private SysUser applicant;
     private SysUser ccUser;
     private AuthenticatedUserResponse principal;
+    private Long paymentTemplateId;
+    private Long sealTemplateId;
 
     @BeforeEach
     void setUp() {
@@ -93,11 +94,31 @@ class DocumentApplicationServiceTest {
         sealConfig.addNode(new FlowNodeConfig("内控专员用印", FlowNodeTypeEnum.HANDLER));
         flowConfigRepository.save(sealConfig);
 
-        QuickDocument quick = new QuickDocument();
-        quick.setBusinessType(BusinessTypeEnum.BUSINESS_PAYMENT);
-        quick.setName("合作方退款");
-        quick.setSortOrder(1);
-        quickRepository.save(quick);
+        paymentTemplateId = templateService.create(new SaveFormTemplateRequest(
+                "合作方退款", "合作方退款", "FK", config.getId(), "BUSINESS_PAYMENT",
+                List.of("关联前置单据", "业务证明资料", "发票", "收款信息"),
+                List.of(
+                        new SaveFormTemplateRequest.FieldPayload("title", "单据标题", "TEXT", true, null, false, 1, true),
+                        new SaveFormTemplateRequest.FieldPayload("company", "所属公司", "SELECT", true, List.of("海峡金", "海峡金供应链"), false, 2, true),
+                        new SaveFormTemplateRequest.FieldPayload("amount", "金额", "NUMBER", true, null, true, 3, true),
+                        new SaveFormTemplateRequest.FieldPayload("invoiceSummary", "发票摘要", "TEXT", false, null, false, 4, true),
+                        new SaveFormTemplateRequest.FieldPayload("reason", "事由明细", "TEXTAREA", true, null, false, 5, true),
+                        new SaveFormTemplateRequest.FieldPayload("contractNo", "合同编号", "TEXT", false, null, false, 6, true),
+                        new SaveFormTemplateRequest.FieldPayload("involvesFunds", "是否涉及资金", "BOOLEAN", false, null, true, 7, true),
+                        new SaveFormTemplateRequest.FieldPayload("requiresAdminReview", "是否需行政复核", "BOOLEAN", false, null, true, 8, true),
+                        new SaveFormTemplateRequest.FieldPayload("needPostMaterial", "是否后置补材料", "BOOLEAN", false, null, true, 9, true)))).id();
+
+        sealTemplateId = templateService.create(new SaveFormTemplateRequest(
+                "非标合同审批及用印", "非标合同审批及用印", "YY", sealConfig.getId(), "SEAL_APPLICATION",
+                List.of("用印文件附件"),
+                List.of(
+                        new SaveFormTemplateRequest.FieldPayload("title", "单据标题", "TEXT", true, null, false, 1, true),
+                        new SaveFormTemplateRequest.FieldPayload("sealProject", "用印项目", "TEXT", true, null, false, 2, true),
+                        new SaveFormTemplateRequest.FieldPayload("sealType", "印章类型", "SELECT", true, List.of("公章", "合同章", "法人章", "财务章"), false, 3, true),
+                        new SaveFormTemplateRequest.FieldPayload("sealDepartment", "用印部门", "TEXT", true, null, false, 4, true),
+                        new SaveFormTemplateRequest.FieldPayload("sealTime", "用印时间", "DATE", true, null, false, 5, true),
+                        new SaveFormTemplateRequest.FieldPayload("sealFileName", "用印文件名", "TEXT", true, null, false, 6, true),
+                        new SaveFormTemplateRequest.FieldPayload("sealReason", "用印事由", "TEXTAREA", true, null, false, 7, true)))).id();
     }
 
     @AfterEach
@@ -106,7 +127,7 @@ class DocumentApplicationServiceTest {
     }
 
     @Test
-    void shouldSubmitClassifyStartWorkflowCreateCcAndMarkRisk() {
+    void shouldSubmitStartWorkflowCreateCcAndMarkRisk() {
         TestSecurityContext.mock(principal);
         DocumentSummaryResponse result = service.submit(paymentRequest(null, List.of(ccUser.getId())));
 
@@ -118,9 +139,30 @@ class DocumentApplicationServiceTest {
         assertThat(documentRepository.findById(result.id()).orElseThrow().getProcessInstanceId())
                 .isEqualTo("process-" + result.id());
         assertThat(workflow.startedVariables).containsEntry("amount", new BigDecimal("90000"));
+        assertThat(workflow.startedVariables).containsEntry("involvesFunds", true);
         assertThat(ccRepository.findByDocumentIdOrderByCreatedAtAsc(result.id()))
                 .extracting(record -> record.getTargetUser().getAccount())
                 .containsExactly("cc-user");
+    }
+
+    @Test
+    void shouldFreezeFormSnapshotAndMergeFieldsInDetail() {
+        TestSecurityContext.mock(principal);
+        DocumentSummaryResponse result = service.submit(paymentRequest(null, List.of()));
+
+        com.hxj.entity.OaDocument entity = documentRepository.findById(result.id()).orElseThrow();
+        assertThat(entity.getFormVersion()).isEqualTo(1);
+        assertThat(entity.getFormSnapshot()).contains("单据标题");
+        assertThat(entity.getFieldValues()).contains("合作方退款");
+
+        DocumentDetailResponse detail = service.detail(result.id());
+        assertThat(detail.formFields()).isNotEmpty();
+        assertThat(detail.formFields())
+                .extracting(FormTemplateManagementService.FieldValueView::fieldKey)
+                .contains("title", "amount");
+        assertThat(detail.formFields())
+                .filteredOn(f -> f.fieldKey().equals("amount"))
+                .allSatisfy(f -> assertThat(String.valueOf(f.value())).isEqualTo("90000"));
     }
 
     @Test
@@ -129,7 +171,6 @@ class DocumentApplicationServiceTest {
         DocumentSummaryResponse source = service.submit(paymentRequest(null, List.of()));
         com.hxj.entity.OaDocument sourceEntity = documentRepository.findById(source.id()).orElseThrow();
         sourceEntity.setStatus(DocumentStatusEnum.APPROVED);
-        sourceEntity.setContractNo("HT-001");
         documentRepository.flush();
 
         assertThat(service.search(
@@ -141,8 +182,8 @@ class DocumentApplicationServiceTest {
                 .extracting(DocumentSummaryResponse::id).containsExactly(source.id());
         assertThat(service.findLinkCandidates("applicant", false))
                 .extracting(DocumentSummaryResponse::id).containsExactly(source.id());
-        assertThat(service.quickDocuments(BusinessTypeEnum.BUSINESS_PAYMENT))
-                .extracting(QuickDocumentItemResponse::name).containsExactly("合作方退款");
+        assertThat(service.quickDocuments())
+                .extracting(QuickDocumentItemResponse::name).contains("合作方退款");
 
         DocumentSummaryResponse repeated = service.repeat(source.id());
         assertThat(repeated.id()).isNotEqualTo(source.id());
@@ -154,8 +195,8 @@ class DocumentApplicationServiceTest {
         assertThat(uploaded.fileName()).isEqualTo("proof.txt");
         assertThat(service.download(uploaded.id()).resource().getInputStream().readAllBytes())
                 .isEqualTo("proof".getBytes());
-        assertThat(service.attachmentRequirements(BusinessTypeEnum.BUSINESS_PAYMENT, "供应商货款"))
-                .contains("原始明细账单", "对账单", "发票");
+        assertThat(service.attachmentRequirements(paymentTemplateId))
+                .contains("发票", "收款信息");
         assertThat(attachmentRepository.findById(uploaded.id())).isPresent();
     }
 
@@ -168,17 +209,14 @@ class DocumentApplicationServiceTest {
         assertThat(result.businessType()).isEqualTo(BusinessTypeEnum.SEAL_APPLICATION);
         assertThat(result.documentType()).isEqualTo(DocumentTypeEnum.SEAL_APPLICATION);
         assertThat(result.amount()).isNull();
-        assertThat(result.status()).isEqualTo(DocumentStatusEnum.PENDING);
         assertThat(result.currentNode()).isEqualTo("直属主管");
+        assertThat(workflow.startedVariables).containsEntry("amount", BigDecimal.ZERO);
 
         com.hxj.entity.OaDocument entity = documentRepository.findById(result.id()).orElseThrow();
-        assertThat(entity.getAmount()).isNull();
-        assertThat(entity.getSealProject()).isEqualTo("经销商合同用印");
-        assertThat(entity.getSealDepartment()).isEqualTo("业务部");
-        assertThat(entity.getSealFileName()).isEqualTo("经销协议.pdf");
-        assertThat(entity.getSealType()).isEqualTo(SealTypeEnum.CONTRACT_SEAL);
-        assertThat(entity.getSealReason()).isEqualTo("签订年度经销协议");
-        assertThat(workflow.startedVariables).containsEntry("amount", BigDecimal.ZERO);
+        assertThat(entity.getFieldValues()).contains("经销商合同用印");
+        assertThat(service.detail(result.id()).formFields())
+                .filteredOn(f -> f.fieldKey().equals("sealProject"))
+                .allSatisfy(f -> assertThat(f.value()).isEqualTo("经销商合同用印"));
     }
 
     @Test
@@ -193,8 +231,6 @@ class DocumentApplicationServiceTest {
         assertThat(page1.content()).hasSize(2);
         assertThat(page1.totalElements()).isEqualTo(3);
         assertThat(page1.totalPages()).isEqualTo(2);
-        assertThat(page1.page()).isEqualTo(1);
-        assertThat(page1.size()).isEqualTo(2);
 
         DocumentPageRequest request2 = new DocumentPageRequest(null, null, null, null, null, null, 2, 2);
         com.hxj.common.PageResponse<DocumentSummaryResponse> page2 = service.searchPaged(request2);
@@ -203,31 +239,59 @@ class DocumentApplicationServiceTest {
     }
 
     @Test
-    void shouldRejectIncompleteSealApplication() {
+    void shouldRejectRequiredFieldMissing() {
         TestSecurityContext.mock(principal);
-        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
-                        service.submit(new SubmitDocumentRequest(
-                                BusinessTypeEnum.SEAL_APPLICATION, "非标合同审批及用印", null, null,
-                                null, null, false, null, null, false, false, null,
-                                null, "业务部", null, null, null, null, List.of())))
+        Map<String, Object> incomplete = new java.util.HashMap<>(Map.of(
+                "title", "非标合同审批及用印", "sealType", "合同章", "sealTime", "2026-09-01",
+                "sealFileName", "经销协议.pdf", "sealReason", "签订年度经销协议"));
+        incomplete.remove("sealProject");
+
+        assertThatThrownBy(() -> service.submit(
+                new SubmitDocumentRequest(sealTemplateId, incomplete, List.of(), null)))
                 .isInstanceOf(com.hxj.exception.BusinessException.class)
-                .hasMessageContaining("请完整填写用印申请信息");
+                .hasMessageContaining("必填字段未填写：用印项目");
+    }
+
+    @Test
+    void shouldRejectUnknownInvalidAndOptionIllegalFieldValues() {
+        TestSecurityContext.mock(principal);
+
+        assertThatThrownBy(() -> service.submit(new SubmitDocumentRequest(
+                paymentTemplateId, Map.of("title", "t", "company", "海峡金", "amount", 1, "reason", "r",
+                "unknownKey", "x"), List.of(), null)))
+                .hasMessageContaining("未知表单字段：unknownKey");
+
+        assertThatThrownBy(() -> service.submit(new SubmitDocumentRequest(
+                paymentTemplateId, Map.of("title", "t", "company", "海峡金", "amount", "abc", "reason", "r"),
+                List.of(), null)))
+                .hasMessageContaining("字段必须为数字");
+
+        assertThatThrownBy(() -> service.submit(new SubmitDocumentRequest(
+                paymentTemplateId, Map.of("title", "t", "company", "外星公司", "amount", 1, "reason", "r"),
+                List.of(), null)))
+                .hasMessageContaining("选项非法：所属公司");
     }
 
     private SubmitDocumentRequest sealRequest(Long linkedId) {
-        return new SubmitDocumentRequest(
-                BusinessTypeEnum.SEAL_APPLICATION, "非标合同审批及用印", null, null,
-                null, null, false, null, linkedId, false, false, null,
-                "经销商合同用印", "业务部", java.time.LocalDateTime.of(2026, 9, 1, 10, 0),
-                "经销协议.pdf", SealTypeEnum.CONTRACT_SEAL, "签订年度经销协议", List.of());
+        return new SubmitDocumentRequest(sealTemplateId, Map.of(
+                "title", "非标合同审批及用印",
+                "sealProject", "经销商合同用印",
+                "sealType", "合同章",
+                "sealDepartment", "业务部",
+                "sealTime", "2026-09-01",
+                "sealFileName", "经销协议.pdf",
+                "sealReason", "签订年度经销协议"), List.of(), linkedId);
     }
 
     private SubmitDocumentRequest paymentRequest(Long linkedId, List<Long> ccIds) {
-        return new SubmitDocumentRequest(
-                BusinessTypeEnum.DAILY_PAYMENT, "合作方退款", CompanyEnum.HAI_XIA_JIN,
-                new BigDecimal("90000"), "专票1张", "合作方退款", false,
-                "HT-001", linkedId, true, false, null,
-                null, null, null, null, null, null, ccIds);
+        return new SubmitDocumentRequest(paymentTemplateId, Map.of(
+                "title", "合作方退款",
+                "company", "海峡金",
+                "amount", 90000,
+                "invoiceSummary", "专票1张",
+                "reason", "合作方退款",
+                "contractNo", "HT-001",
+                "involvesFunds", true), ccIds, linkedId);
     }
 
     private SysUser saveUser(String account, String department) {

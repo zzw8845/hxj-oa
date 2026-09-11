@@ -28,6 +28,8 @@ public class OaAttachment {
     private OaDocument document;
 
     /** 所属节点（上传该文件时所在的流程节点）。 */
+    @Column(name = "field_key", length = 50)
+    private String fieldKey;
     @Column(name = "node_name", length = 100)
     private String nodeName;
 
@@ -82,4 +84,7 @@ public class OaAttachment {
     public SysUser getUploader() { return uploader; }
     public void setUploader(SysUser uploader) { this.uploader = uploader; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+
+    public String getFieldKey() { return fieldKey; }
+    public void setFieldKey(String fieldKey) { this.fieldKey = fieldKey; }
 }

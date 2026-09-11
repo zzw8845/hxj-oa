@@ -25,11 +25,17 @@ public class DocumentCodeGenerator {
 
     public String generate(BusinessTypeEnum businessType) {
         Objects.requireNonNull(businessType, "业务类型不能为空");
+        return generate(businessType.getCodePrefix());
+    }
+
+    /** 表单模板化：单号前缀由模板配置（doc_prefix）。 */
+    public String generate(String codePrefix) {
+        String prefix = codePrefix == null || codePrefix.isBlank() ? "OA" : codePrefix;
         String date = LocalDate.now(clock).format(DATE_FORMATTER);
         long sequence = sequenceAllocator.nextValue(date);
         if (sequence > MAX_DAILY_SEQUENCE) {
             throw new IllegalStateException("当日单据流水号已超过四位上限: " + date);
         }
-        return businessType.getCodePrefix() + date + "%04d".formatted(sequence);
+        return prefix + date + "%04d".formatted(sequence);
     }
 }

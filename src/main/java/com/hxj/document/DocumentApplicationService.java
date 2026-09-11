@@ -20,7 +20,8 @@ import com.hxj.security.AuthenticatedUserResponse;
 import com.hxj.security.CurrentUser;
 import com.hxj.security.DocumentAccessPolicy;
 import com.hxj.service.DocumentCodeGenerator;
-import com.hxj.workflow.WorkflowPort;
+import com.hxj.entity.FormField;
+import com.hxj.entity.FormTemplate;import com.hxj.workflow.WorkflowPort;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.PageImpl;
@@ -49,11 +50,10 @@ public class DocumentApplicationService {
     private final QuickDocumentRepository quickRepository;
     private final SysUserRepository userRepository;
     private final FlowConfigRepository flowConfigRepository;
-    private final DocumentClassifier classifier;
     private final DocumentCodeGenerator codeGenerator;
+    private final FormTemplateManagementService formTemplateService;
     private final WorkflowPort workflowPort;
     private final DocumentAccessPolicy accessPolicy;
-    private final AttachmentRequirementService requirementService;
     private final LocalAttachmentStorage attachmentStorage;
     private final com.hxj.workflow.DeptAccountantResolver deptAccountantResolver;
     private final BigDecimal riskThreshold;
@@ -66,11 +66,10 @@ public class DocumentApplicationService {
             QuickDocumentRepository quickRepository,
             SysUserRepository userRepository,
             FlowConfigRepository flowConfigRepository,
-            DocumentClassifier classifier,
+            FormTemplateManagementService formTemplateService,
             DocumentCodeGenerator codeGenerator,
             WorkflowPort workflowPort,
             DocumentAccessPolicy accessPolicy,
-            AttachmentRequirementService requirementService,
             LocalAttachmentStorage attachmentStorage,
             com.hxj.workflow.DeptAccountantResolver deptAccountantResolver,
             @Value("${app.risk-threshold:80000}") BigDecimal riskThreshold) {
@@ -81,11 +80,10 @@ public class DocumentApplicationService {
         this.quickRepository = quickRepository;
         this.userRepository = userRepository;
         this.flowConfigRepository = flowConfigRepository;
-        this.classifier = classifier;
+        this.formTemplateService = formTemplateService;
         this.codeGenerator = codeGenerator;
         this.workflowPort = workflowPort;
         this.accessPolicy = accessPolicy;
-        this.requirementService = requirementService;
         this.attachmentStorage = attachmentStorage;
         this.deptAccountantResolver = deptAccountantResolver;
         this.riskThreshold = riskThreshold;
@@ -95,16 +93,30 @@ public class DocumentApplicationService {
     public DocumentSummaryResponse submit(SubmitDocumentRequest request) {
         AuthenticatedUserResponse currentUser = CurrentUser.require();
         SysUser applicant = currentUserEntity(currentUser);
-        BusinessTypeEnum businessType = classifier.classify(request.projectName(), request.businessType());
-        validate(request, businessType);
-        FlowConfig flowConfig = flowConfigRepository.findByType(request.projectName())
+        FormTemplate template = formTemplateService.requireEnabled(request.templateId());
+        List<FormField> fields = formTemplateService.fields(template.getId());
+        Map<String, Object> values = formTemplateService.validateFieldValues(fields, request.fieldValues());
+        if (template.getFlowConfigId() == null) {
+            throw new BusinessException(ErrorCodeEnum.FLOW_CONFIG_NOT_FOUND, "模板未绑定审批流程");
+        }
+        FlowConfig flowConfig = flowConfigRepository.findById(template.getFlowConfigId())
                 .orElseThrow(() -> new BusinessException(ErrorCodeEnum.FLOW_CONFIG_NOT_FOUND, "未配置对应审批流程"));
+        BusinessTypeEnum businessType = BusinessTypeEnum.valueOf(template.getCategory());
 
         OaDocument document = new OaDocument();
-        document.setDocCode(codeGenerator.generate(businessType));
-        applyRequest(document, request, businessType);
+        document.setBusinessType(businessType);
+        document.setDocCode(codeGenerator.generate(template.getDocPrefix()));
+        document.setProjectName(template.getName());
         document.setApplicant(applicant);
         document.setDepartment(applicant.getDepartment());
+        BigDecimal amount = decimalValue(values, "amount");
+        document.setAmount(businessType == BusinessTypeEnum.SEAL_APPLICATION ? null : amount);
+        document.setNeedPostMaterial(booleanValue(values, "needPostMaterial"));
+        Object contractNo = values.get("contractNo");
+        if (contractNo != null) {
+            // 合同编号提升列：前置关联单据检索依赖（findLinkCandidates byContract）
+            document.setContractNo(String.valueOf(contractNo));
+        }
         document.setStatus(DocumentStatusEnum.PENDING);
         document.setCurrentNode(flowConfig.firstActionNode() == null
                 ? null : flowConfig.firstActionNode().getName());
@@ -113,11 +125,15 @@ public class DocumentApplicationService {
         if (request.linkedDocumentId() != null) {
             document.setLinkedDocument(approvedDocument(request.linkedDocumentId()));
         }
+        document.setFormTemplateId(template.getId());
+        document.setFormVersion(template.getVersion());
+        document.setFormSnapshot(formTemplateService.snapshotJson(fields));
+        document.setFieldValues(formTemplateService.valuesJson(values));
         documentRepository.saveAndFlush(document);
         createSelfSelectedCc(document, request.ccUserIds());
 
         String processInstanceId = workflowPort.startProcess(
-                flowConfig.getId(), document.getId(), workflowVariables(document, request, applicant));
+                flowConfig.getId(), document.getId(), workflowVariables(values, applicant));
         document.setProcessInstanceId(processInstanceId);
         document.setFlowConfigId(flowConfig.getId());
         return toSummary(document);
@@ -184,7 +200,8 @@ public class DocumentApplicationService {
                 approvals.stream().map(this::approvalItem).toList(),
                 ccRecords.stream().map(this::ccItem).toList(),
                 document.getProcessInstanceId() == null ? List.of()
-                        : workflowPort.history(document.getProcessInstanceId()));
+                        : workflowPort.history(document.getProcessInstanceId()),
+                formTemplateService.mergeFields(document.getFormSnapshot(), document.getFieldValues()));
     }
 
     @Transactional(readOnly = true)
@@ -206,16 +223,12 @@ public class DocumentApplicationService {
     }
 
     @Transactional(readOnly = true)
-    public List<QuickDocumentItemResponse> quickDocuments(BusinessTypeEnum businessType) {
-        // 只返回已配置审批流程的快捷项：未配置流程的项目提交时会被 FLOW_CONFIG_NOT_FOUND 拒绝，
+    public List<QuickDocumentItemResponse> quickDocuments() {
+        // 只返回已绑定审批流程且启用的模板：未绑定流程的模板提交时会被 FLOW_CONFIG_NOT_FOUND 拒绝，
         // 与其让用户点了报错，不如不出现在可发起目录里（目录与流程配置保持自洽）。
-        Set<String> configuredTypes = flowConfigRepository.findAll().stream()
-                .map(FlowConfig::getType)
-                .collect(Collectors.toSet());
-        return quickRepository.findByBusinessTypeOrderBySortOrderAsc(businessType).stream()
-                .filter(item -> configuredTypes.contains(item.getName()))
-                .map(item -> new QuickDocumentItemResponse(
-                        item.getId(), item.getBusinessType(), item.getName(), item.getSortOrder()))
+        return formTemplateService.listEnabled().stream()
+                .map(t -> new QuickDocumentItemResponse(
+                        t.id(), t.businessType(), t.name(), t.sortOrder()))
                 .toList();
     }
 
@@ -257,13 +270,13 @@ public class DocumentApplicationService {
     public DocumentSummaryResponse repeat(Long sourceId) {
         AuthenticatedUserResponse currentUser = CurrentUser.require();
         OaDocument source = visibleDocument(sourceId, currentUser);
-        SubmitDocumentRequest request = new SubmitDocumentRequest(
-                source.getBusinessType(), source.getProjectName(), source.getCompany(), source.getAmount(),
-                source.getInvoiceSummary(), source.getReason(), source.isNeedPostMaterial(),
-                source.getContractNo(), source.getLinkedDocument() == null ? null : source.getLinkedDocument().getId(),
-                false, false, null, source.getSealProject(), source.getSealDepartment(), source.getSealTime(),
-                source.getSealFileName(), source.getSealType(), source.getSealReason(), List.of());
-        return submit(request);
+        if (source.getFormTemplateId() == null) {
+            throw new BusinessException(ErrorCodeEnum.FORM_TEMPLATE_NOT_FOUND, "该单据无表单模板，无法再次提交");
+        }
+        return submit(new SubmitDocumentRequest(
+                source.getFormTemplateId(),
+                formTemplateService.parseValues(source.getFieldValues()),
+                List.of(), null));
     }
 
     @Transactional
@@ -293,44 +306,24 @@ public class DocumentApplicationService {
                 attachment.getFileName(), attachment.getContentType(), attachmentStorage.load(attachment.getFilePath()));
     }
 
-    public List<String> attachmentRequirements(BusinessTypeEnum type, String projectName) {
-        return requirementService.requiredFor(type, projectName);
+    public List<String> attachmentRequirements(Long templateId) {
+        FormTemplate template = formTemplateService.requireEnabled(templateId);
+        return formTemplateService.attachmentRequirements(template);
     }
 
-    private void validate(SubmitDocumentRequest request, BusinessTypeEnum type) {
-        if (type == BusinessTypeEnum.SEAL_APPLICATION) {
-            if (!StringUtils.hasText(request.sealProject()) || !StringUtils.hasText(request.sealDepartment())
-                    || request.sealTime() == null || !StringUtils.hasText(request.sealFileName())
-                    || request.sealType() == null || !StringUtils.hasText(request.sealReason())) {
-                throw new BusinessException(ErrorCodeEnum.SEAL_INFO_INCOMPLETE, "请完整填写用印申请信息");
-            }
-            return;
-        }
-        if (request.company() == null || request.amount() == null || request.amount().signum() < 0
-                || !StringUtils.hasText(request.reason())) {
-            throw new BusinessException(ErrorCodeEnum.PAYMENT_INFO_INCOMPLETE, "请完整填写付款申请信息");
-        }
+
+    private BigDecimal decimalValue(Map<String, Object> values, String key) {
+        Object value = values.get(key);
+        return value == null ? null : new BigDecimal(String.valueOf(value));
     }
 
-    private void applyRequest(OaDocument document, SubmitDocumentRequest request, BusinessTypeEnum type) {
-        document.setBusinessType(type);
-        document.setProjectName(request.projectName());
-        document.setCompany(request.company());
-        document.setAmount(type == BusinessTypeEnum.SEAL_APPLICATION ? null : request.amount());
-        document.setInvoiceSummary(request.invoiceSummary());
-        document.setReason(request.reason());
-        document.setNeedPostMaterial(request.needPostMaterial());
-        document.setContractNo(request.contractNo());
-        document.setSealProject(request.sealProject());
-        document.setSealDepartment(request.sealDepartment());
-        document.setSealTime(request.sealTime());
-        document.setSealFileName(request.sealFileName());
-        document.setSealType(request.sealType());
-        document.setSealReason(request.sealReason());
+    private boolean booleanValue(Map<String, Object> values, String key) {
+        Object value = values.get(key);
+        return Boolean.TRUE.equals(value) || "true".equalsIgnoreCase(String.valueOf(value));
     }
 
     private Map<String, Object> workflowVariables(
-            OaDocument document, SubmitDocumentRequest request, SysUser applicant) {
+            Map<String, Object> fieldValues, SysUser applicant) {
         // 直属主管账号：审批流「直属主管」节点以 ${managerAccount} 动态指派；未设置汇报线时为空串（任务待管理员指派）
         String managerAccount = applicant.getManagerId() == null ? ""
                 : userRepository.findById(applicant.getManagerId())
@@ -338,10 +331,11 @@ public class DocumentApplicationService {
         // 主办会计账号：「会计（按部门）」节点以 ${deptAccountant} 动态指派（核算分工表解析，无映射时为空串）
         String deptAccountant = deptAccountantResolver.resolve(applicant);
         return Map.ofEntries(
-                Map.entry("amount", document.getAmount() == null ? BigDecimal.ZERO : document.getAmount()),
-                Map.entry("involvesFunds", request.involvesFunds()),
-                Map.entry("requiresAdminReview", request.requiresAdminReview()),
-                Map.entry("businessMode", request.businessMode() == null ? "" : request.businessMode().name()),
+                Map.entry("amount", decimalValue(fieldValues, "amount") == null
+                        ? BigDecimal.ZERO : decimalValue(fieldValues, "amount")),
+                Map.entry("involvesFunds", booleanValue(fieldValues, "involvesFunds")),
+                Map.entry("requiresAdminReview", booleanValue(fieldValues, "requiresAdminReview")),
+                Map.entry("businessMode", String.valueOf(fieldValues.getOrDefault("businessMode", ""))),
                 // 发起人回环节点（签收/归还/上传归档附件等）以此为 assignee 表达式动态指派
                 Map.entry("initiator", applicant.getAccount()),
                 Map.entry("managerAccount", managerAccount),

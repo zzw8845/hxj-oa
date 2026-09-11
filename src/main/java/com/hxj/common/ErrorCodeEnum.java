@@ -159,6 +159,8 @@ public enum ErrorCodeEnum {
     // —— 流程配置 ——
     /** 流程配置不存在 / 未配置对应审批流程 */
     FLOW_CONFIG_NOT_FOUND("未配置对应审批流程"),
+    FORM_TEMPLATE_NOT_FOUND("表单模板不存在"),
+    FORM_FIELD_INVALID("表单字段校验失败"),
     FLOW_CONFIG_IN_USE("流程配置已被单据引用，无法删除"),
     /** 同名流程配置已存在 */
     FLOW_CONFIG_EXISTS("同名流程配置已存在"),

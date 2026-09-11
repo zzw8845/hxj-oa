@@ -127,6 +127,7 @@ public class FlowConfigManagementService {
         for (FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload node : request.nodes()) {
             FlowNodeConfig entity = new FlowNodeConfig(node.name(), node.nodeType());
             entity.setAssigneeRole(node.assigneeRole());
+            entity.setCcTargets(node.ccTargets());
             config.addNode(entity);
         }
         for (FlowConfigItems.SaveFlowConfigRequest.FlowConditionRulePayload rule : request.conditionRules()) {

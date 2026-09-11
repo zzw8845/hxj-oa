@@ -41,6 +41,13 @@ public class FormTemplate {
 
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
+    /** 粗分类（DAILY_PAYMENT/BUSINESS_PAYMENT/SEAL_APPLICATION），映射单据类别与单号语义。 */
+    @Column(length = 30)
+    private String category;
+
+    /** 前置/必附材料清单（JSON 字符串数组），替代按项目名关键词猜测。 */
+    @Column(name = "attachment_requirements", columnDefinition = "TEXT")
+    private String attachmentRequirements;
 
     public Long getId() { return id; }
     public String getBusinessType() { return businessType; }
@@ -57,4 +64,9 @@ public class FormTemplate {
     public void setStatus(String status) { this.status = status; }
     public int getSortOrder() { return sortOrder; }
     public void setSortOrder(int sortOrder) { this.sortOrder = sortOrder; }
+
+    public String getCategory() { return category; }
+    public void setCategory(String category) { this.category = category; }
+    public String getAttachmentRequirements() { return attachmentRequirements; }
+    public void setAttachmentRequirements(String attachmentRequirements) { this.attachmentRequirements = attachmentRequirements; }
 }
