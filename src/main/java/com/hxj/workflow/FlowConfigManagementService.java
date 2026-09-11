@@ -156,11 +156,9 @@ public class FlowConfigManagementService {
             }
             // 审批人必须引用真实存在的角色名（多角色用 / 、 分隔），
             // 否则会部署出任何用户都无法命中的候选组，节点任务将无人可审
-            // 动态指派节点不引用 RBAC 角色：发起人回环、直属主管（汇报线）、会计（按部门）（核算分工）
-            boolean dynamicAssignee = node.assigneeRole() != null
-                    && (node.assigneeRole().startsWith("发起人")
-                    || "直属主管".equals(node.assigneeRole())
-                    || "会计（按部门）".equals(node.assigneeRole()));
+            // 仅静态角色节点校验"审批人引用的角色必须存在"；动态指派节点不引用 RBAC 角色
+            boolean dynamicAssignee = !NodeAssigneeRuleEnum
+                    .of(node.name(), node.assigneeRole()).isStaticRole();
             if (node.nodeType() == FlowNodeTypeEnum.APPROVAL && StringUtils.hasText(node.assigneeRole())
                     && !dynamicAssignee) {
                 for (String role : node.assigneeRole().split("[/、]")) {
