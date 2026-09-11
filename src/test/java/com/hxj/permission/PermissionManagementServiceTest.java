@@ -392,15 +392,19 @@ class PermissionManagementServiceTest {
     }
 
     @Test
-    void shouldDeriveRelatedDepartmentsFromRoles() {
-        // 跨部门角色：角色归属资管中心，人坐财务中心 → 关联部门应含两处
+    void shouldDeriveRelatedDepartmentsFromMemberships() {
+        // 归属部门 = 主部门 + 兼职部门；角色户口（合规岗归属风控部）不混入
         Long zgc = departmentService.create(new SaveDepartmentRequest("资管中心测试", null, 3)).id();
+        Long fg = departmentService.create(new SaveDepartmentRequest("风控部测试", null, 4)).id();
         RoleResponse zgcRole = roleService.create(new SaveRoleRequest(
                 "资管出纳", zgc, "出纳", "OWN", null, List.of(permission.getCode())));
+        RoleResponse fgRole = roleService.create(new SaveRoleRequest(
+                "合规岗", fg, "合规岗", "OWN", null, List.of(permission.getCode())));
         EmployeeResponse emp = employeeService.create(new CreateEmployeeRequest(
                 "跨部门员工", "HXJ301", "crossdept", "password", departmentId, postId, null,
-                List.of(role.getName(), zgcRole.name())));
-        assertThat(emp.relatedDepartments()).containsExactlyInAnyOrder("业务部", "资管中心测试");
+                List.of(role.getName(), zgcRole.name(), fgRole.name()), List.of(zgc)));
+        assertThat(emp.relatedDepartments()).containsExactly("业务部", "资管中心测试");
+        assertThat(emp.extraDepartmentIds()).containsExactly(zgc);
     }
 
     @Test

@@ -201,7 +201,7 @@ public class EmployeeManagementService {
     private EmployeeResponse toResponse(SysUser user) {
         SysUser manager = user.getManagerId() == null
                 ? null : userRepository.findById(user.getManagerId()).orElse(null);
-        // 关联部门 = 本人部门 ∪ 各角色归属部门（组织覆盖面，业务语义由服务端统一推导）
+        // 归属部门 = 主部门 + 兼职部门（真实归属；角色户口不混入，语义见 EmployeeResponse）
         java.util.List<com.hxj.entity.SysUserDepartment> memberships = userDepartmentRepository.findByUserId(user.getId());
         java.util.List<Long> extraIds = new java.util.ArrayList<>();
         java.util.LinkedHashSet<String> related = new java.util.LinkedHashSet<>();
@@ -211,14 +211,10 @@ public class EmployeeManagementService {
         for (com.hxj.entity.SysUserDepartment membership : memberships) {
             if (!membership.isPrimaryDepartment()) {
                 extraIds.add(membership.getDepartment().getId());
-                related.add(membership.getDepartment().getName());
             }
+            related.add(membership.getDepartment().getName());
         }
-        user.getRoles().forEach(r -> {
-            if (r.getDepartment() != null) {
-                related.add(r.getDepartment());
-            }
-        });
+        // 注意：角色归属部门不并入——角色户口不是人员归属，两种语义不混合
         java.util.List<String> extraNames = departmentRepository.findAllById(extraIds).stream()
                 .sorted(java.util.Comparator.comparing(com.hxj.entity.SysDepartment::getId))
                 .map(com.hxj.entity.SysDepartment::getName)
