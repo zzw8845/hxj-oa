@@ -18,10 +18,12 @@ public record EmployeeResponse(
         @Schema(description = "直属主管登录账号") String managerAccount,
         @Schema(description = "直属主管姓名") String managerName,
         @Schema(description = "用户状态（枚举）") UserStatusEnum status,
-        @Schema(description = "角色名称列表") List<String> roles) {
+        @Schema(description = "角色名称列表") List<String> roles,
+        @Schema(description = "关联部门列表（本人部门 ∪ 各角色归属部门），服务端推导") List<String> relatedDepartments) {
 
     /** 紧凑构造器：集合组件防御性拷贝为不可变列表，null 归一化为不可变空列表。 */
     public EmployeeResponse {
         roles = roles == null ? List.of() : List.copyOf(roles);
+        relatedDepartments = relatedDepartments == null ? List.of() : List.copyOf(relatedDepartments);
     }
 }

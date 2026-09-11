@@ -171,6 +171,16 @@ public class EmployeeManagementService {
     private EmployeeResponse toResponse(SysUser user) {
         SysUser manager = user.getManagerId() == null
                 ? null : userRepository.findById(user.getManagerId()).orElse(null);
+        // 关联部门 = 本人部门 ∪ 各角色归属部门（组织覆盖面，业务语义由服务端统一推导）
+        java.util.LinkedHashSet<String> related = new java.util.LinkedHashSet<>();
+        if (user.getDepartment() != null) {
+            related.add(user.getDepartment());
+        }
+        user.getRoles().forEach(r -> {
+            if (r.getDepartment() != null) {
+                related.add(r.getDepartment());
+            }
+        });
         return new EmployeeResponse(
                 user.getId(), user.getName(), user.getJobNo(), user.getAccount(),
                 user.getDepartmentId(), user.getDepartment(),
@@ -178,6 +188,7 @@ public class EmployeeManagementService {
                 user.getManagerId(), manager == null ? null : manager.getAccount(),
                 manager == null ? null : manager.getName(),
                 user.getStatus(),
-                user.getRoles().stream().map(SysRole::getName).sorted().toList());
+                user.getRoles().stream().map(SysRole::getName).sorted().toList(),
+                List.copyOf(related));
     }
 }
