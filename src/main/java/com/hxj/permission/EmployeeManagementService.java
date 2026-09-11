@@ -33,6 +33,8 @@ public class EmployeeManagementService {
     private final DepartmentManagementService departmentService;
     private final PostManagementService postService;
     private final EmployeeOffboardingService offboardingService;
+    private final com.hxj.repository.SysDepartmentRepository departmentRepository;
+    private final com.hxj.repository.SysUserDepartmentRepository userDepartmentRepository;
 
     public EmployeeManagementService(
             SysUserRepository userRepository,
@@ -40,13 +42,17 @@ public class EmployeeManagementService {
             PasswordEncoder passwordEncoder,
             DepartmentManagementService departmentService,
             PostManagementService postService,
-            EmployeeOffboardingService offboardingService) {
+            EmployeeOffboardingService offboardingService,
+            com.hxj.repository.SysDepartmentRepository departmentRepository,
+            com.hxj.repository.SysUserDepartmentRepository userDepartmentRepository) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.departmentService = departmentService;
         this.postService = postService;
         this.offboardingService = offboardingService;
+        this.departmentRepository = departmentRepository;
+        this.userDepartmentRepository = userDepartmentRepository;
     }
 
     /** 创建员工账号：解析部门/岗位字典引用，写入外键与快照。 */
@@ -70,7 +76,9 @@ public class EmployeeManagementService {
         applyManager(user, request.managerAccount());
         user.setStatus(UserStatusEnum.ACTIVE);
         replaceRoles(user, request.roles());
-        return toResponse(userRepository.save(user));
+        SysUser saved = userRepository.save(user);
+        syncExtraDepartments(saved, request.extraDepartmentIds());
+        return toResponse(saved);
     }
 
     /** 编辑员工：支持改名/调部门/调岗/在职状态变更/修改密码/调整角色。 */
@@ -105,6 +113,7 @@ public class EmployeeManagementService {
             user.setPassword(passwordEncoder.encode(request.newPassword()));
         }
         replaceRoles(user, request.roles());
+        syncExtraDepartments(user, request.extraDepartmentIds());
         return toResponse(user);
     }
 
@@ -168,19 +177,52 @@ public class EmployeeManagementService {
         roles.forEach(user::addRole);
     }
 
+    /** 同步兼职部门：全删全建（主部门不入本表），部门须真实存在。 */
+    private void syncExtraDepartments(SysUser user, java.util.List<Long> extraDepartmentIds) {
+        userDepartmentRepository.deleteByUserId(user.getId());
+        // 立即落库删除，避免同一事务内先插后删的 flush 顺序触发唯一键冲突
+        userDepartmentRepository.flush();
+        if (extraDepartmentIds == null) {
+            return;
+        }
+        java.util.LinkedHashSet<Long> distinct = new java.util.LinkedHashSet<>(extraDepartmentIds);
+        for (Long deptId : distinct) {
+            if (deptId.equals(user.getDepartmentId())) {
+                continue;
+            }
+            com.hxj.entity.SysUserDepartment rel = new com.hxj.entity.SysUserDepartment();
+            rel.setUser(user);
+            rel.setDepartment(departmentService.requireDepartment(deptId));
+            rel.setPrimaryDepartment(false);
+            userDepartmentRepository.save(rel);
+        }
+    }
+
     private EmployeeResponse toResponse(SysUser user) {
         SysUser manager = user.getManagerId() == null
                 ? null : userRepository.findById(user.getManagerId()).orElse(null);
         // 关联部门 = 本人部门 ∪ 各角色归属部门（组织覆盖面，业务语义由服务端统一推导）
+        java.util.List<com.hxj.entity.SysUserDepartment> memberships = userDepartmentRepository.findByUserId(user.getId());
+        java.util.List<Long> extraIds = new java.util.ArrayList<>();
         java.util.LinkedHashSet<String> related = new java.util.LinkedHashSet<>();
         if (user.getDepartment() != null) {
             related.add(user.getDepartment());
+        }
+        for (com.hxj.entity.SysUserDepartment membership : memberships) {
+            if (!membership.isPrimaryDepartment()) {
+                extraIds.add(membership.getDepartment().getId());
+                related.add(membership.getDepartment().getName());
+            }
         }
         user.getRoles().forEach(r -> {
             if (r.getDepartment() != null) {
                 related.add(r.getDepartment());
             }
         });
+        java.util.List<String> extraNames = departmentRepository.findAllById(extraIds).stream()
+                .sorted(java.util.Comparator.comparing(com.hxj.entity.SysDepartment::getId))
+                .map(com.hxj.entity.SysDepartment::getName)
+                .toList();
         return new EmployeeResponse(
                 user.getId(), user.getName(), user.getJobNo(), user.getAccount(),
                 user.getDepartmentId(), user.getDepartment(),
@@ -189,6 +231,8 @@ public class EmployeeManagementService {
                 manager == null ? null : manager.getName(),
                 user.getStatus(),
                 user.getRoles().stream().map(SysRole::getName).sorted().toList(),
-                List.copyOf(related));
+                List.copyOf(related),
+                List.copyOf(extraIds),
+                extraNames);
     }
 }

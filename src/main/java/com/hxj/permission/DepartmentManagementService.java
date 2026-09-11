@@ -32,14 +32,17 @@ public class DepartmentManagementService {
     private final SysDepartmentRepository departmentRepository;
     private final SysUserRepository userRepository;
     private final com.hxj.repository.SysRoleRepository roleRepository;
+    private final com.hxj.repository.SysUserDepartmentRepository userDepartmentRepository;
 
     public DepartmentManagementService(
             SysDepartmentRepository departmentRepository,
             SysUserRepository userRepository,
-            com.hxj.repository.SysRoleRepository roleRepository) {
+            com.hxj.repository.SysRoleRepository roleRepository,
+            com.hxj.repository.SysUserDepartmentRepository userDepartmentRepository) {
         this.departmentRepository = departmentRepository;
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
+        this.userDepartmentRepository = userDepartmentRepository;
     }
 
     /** 新建部门并初始化闭包路径。 */
@@ -114,6 +117,10 @@ public class DepartmentManagementService {
         // 导致对应角色的可见部门范围悄悄缩水
         if (departmentRepository.countScopeReferences(departmentId) > 0) {
             throw new BusinessException(ErrorCodeEnum.DEPARTMENT_IN_SCOPE_USE, "部门被自定义数据范围引用，无法删除");
+        }
+        // 兼职部门引用：有员工以该部门为兼职部门时禁止删除
+        if (userDepartmentRepository.existsByDepartmentId(departmentId)) {
+            throw new BusinessException(ErrorCodeEnum.DEPARTMENT_HAS_SECONDARY, "部门有兼职员工，无法删除");
         }
         departmentRepository.deleteAllPathsOf(departmentId);
         departmentRepository.delete(department);

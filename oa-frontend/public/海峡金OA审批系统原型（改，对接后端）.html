@@ -457,6 +457,7 @@ createApp({
           name: row.name, jobNo: row.jobNo, account: row.account, password: '',
           departmentId: row.departmentId, postId: row.postId,
           managerAccount: row.managerAccount || '',
+          extraDepartmentIds: (row.extraDepartmentIds || []).slice(),
           roles: (row.roles || []).slice(), status: row.status || 'ACTIVE'
         });
       } else {
@@ -487,6 +488,7 @@ createApp({
         const payload = {
           name: p.name, jobNo: p.jobNo, account: p.account,
           departmentId: p.departmentId, postId: p.postId,
+          extraDepartmentIds: p.extraDepartmentIds || [],
           managerAccount: p.managerAccount || '',
           status: editingEmployeeId.value ? p.status : 'ACTIVE',
           roles: p.roles.filter(Boolean)
@@ -673,7 +675,7 @@ createApp({
             postId: emp.postId, post: emp.post,
             managerAccount: emp.managerAccount || '', managerName: emp.managerName || '',
             status: emp.status,
-            roles: emp.roles || [],
+            roles: emp.roles || [], relatedDepts: emp.relatedDepartments || [],
             position: (emp.roles || []).join('、') || '普通员工',
             permissions: emp.permissions || []
           });

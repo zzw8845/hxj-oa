@@ -135,6 +135,8 @@ public enum ErrorCodeEnum {
     DEPARTMENT_HAS_ROLES("部门被角色引用，无法删除"),
     /** 部门被自定义数据范围引用，无法删除 */
     DEPARTMENT_IN_SCOPE_USE("部门被自定义数据范围引用，无法删除"),
+    /** 部门有兼职员工，无法删除 */
+    DEPARTMENT_HAS_SECONDARY("部门有兼职员工，无法删除"),
     /** 不能将部门移动到自身或其下级部门下 */
     DEPARTMENT_MOVE_CYCLE("不能将部门移动到自身或其下级部门下"),
     /** 岗位不存在 */

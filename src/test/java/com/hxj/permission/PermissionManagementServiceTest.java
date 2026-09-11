@@ -422,4 +422,27 @@ class PermissionManagementServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("角色被抄送记录引用，无法删除");
     }
+
+    @Test
+    void shouldSupportSecondaryDepartments() {
+        Long dept2 = departmentService.create(new SaveDepartmentRequest("风控部", null, 2)).id();
+        Long dept3 = departmentService.create(new SaveDepartmentRequest("战略部", null, 3)).id();
+        EmployeeResponse emp = employeeService.create(new CreateEmployeeRequest(
+                "兼职工", "HXJ301", "jianzhi", "password", departmentId, postId, null,
+                List.of(role.getName()), List.of(dept2, dept3)));
+        assertThat(emp.departmentId()).isEqualTo(departmentId);
+        assertThat(emp.extraDepartmentIds()).containsExactlyInAnyOrder(dept2, dept3);
+        assertThat(emp.relatedDepartments()).contains("业务部", "风控部", "战略部");
+
+        // 编辑去掉一个兼职部门
+        EmployeeResponse updated = employeeService.update(emp.id(), new UpdateEmployeeRequest(
+                "兼职工", "HXJ301", departmentId, postId, null, UserStatusEnum.ACTIVE,
+                null, List.of(role.getName()), List.of(dept3)));
+        assertThat(updated.extraDepartmentIds()).containsExactly(dept3);
+
+        // 兼职部门删除守卫：战略部仍被兼职工引用
+        assertThatThrownBy(() -> departmentService.delete(dept3))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("部门有兼职员工，无法删除");
+    }
 }

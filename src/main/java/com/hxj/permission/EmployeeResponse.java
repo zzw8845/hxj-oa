@@ -19,11 +19,15 @@ public record EmployeeResponse(
         @Schema(description = "直属主管姓名") String managerName,
         @Schema(description = "用户状态（枚举）") UserStatusEnum status,
         @Schema(description = "角色名称列表") List<String> roles,
-        @Schema(description = "关联部门列表（本人部门 ∪ 各角色归属部门），服务端推导") List<String> relatedDepartments) {
+        @Schema(description = "关联部门列表（本人部门 ∪ 兼职部门 ∪ 角色归属部门），服务端推导") List<String> relatedDepartments,
+        @Schema(description = "兼职部门ID列表") List<Long> extraDepartmentIds,
+        @Schema(description = "兼职部门名称列表") List<String> extraDepartments) {
 
     /** 紧凑构造器：集合组件防御性拷贝为不可变列表，null 归一化为不可变空列表。 */
     public EmployeeResponse {
         roles = roles == null ? List.of() : List.copyOf(roles);
         relatedDepartments = relatedDepartments == null ? List.of() : List.copyOf(relatedDepartments);
+        extraDepartmentIds = extraDepartmentIds == null ? List.of() : List.copyOf(extraDepartmentIds);
+        extraDepartments = extraDepartments == null ? List.of() : List.copyOf(extraDepartments);
     }
 }
