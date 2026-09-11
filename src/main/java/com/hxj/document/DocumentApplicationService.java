@@ -55,6 +55,7 @@ public class DocumentApplicationService {
     private final DocumentAccessPolicy accessPolicy;
     private final AttachmentRequirementService requirementService;
     private final LocalAttachmentStorage attachmentStorage;
+    private final com.hxj.workflow.DeptAccountantResolver deptAccountantResolver;
     private final BigDecimal riskThreshold;
 
     public DocumentApplicationService(
@@ -71,6 +72,7 @@ public class DocumentApplicationService {
             DocumentAccessPolicy accessPolicy,
             AttachmentRequirementService requirementService,
             LocalAttachmentStorage attachmentStorage,
+            com.hxj.workflow.DeptAccountantResolver deptAccountantResolver,
             @Value("${app.risk-threshold:80000}") BigDecimal riskThreshold) {
         this.documentRepository = documentRepository;
         this.attachmentRepository = attachmentRepository;
@@ -85,6 +87,7 @@ public class DocumentApplicationService {
         this.accessPolicy = accessPolicy;
         this.requirementService = requirementService;
         this.attachmentStorage = attachmentStorage;
+        this.deptAccountantResolver = deptAccountantResolver;
         this.riskThreshold = riskThreshold;
     }
 
@@ -332,6 +335,8 @@ public class DocumentApplicationService {
         String managerAccount = applicant.getManagerId() == null ? ""
                 : userRepository.findById(applicant.getManagerId())
                         .map(SysUser::getAccount).orElse("");
+        // 主办会计账号：「会计（按部门）」节点以 ${deptAccountant} 动态指派（核算分工表解析，无映射时为空串）
+        String deptAccountant = deptAccountantResolver.resolve(applicant);
         return Map.ofEntries(
                 Map.entry("amount", document.getAmount() == null ? BigDecimal.ZERO : document.getAmount()),
                 Map.entry("involvesFunds", request.involvesFunds()),
@@ -339,7 +344,8 @@ public class DocumentApplicationService {
                 Map.entry("businessMode", request.businessMode() == null ? "" : request.businessMode().name()),
                 // 发起人回环节点（签收/归还/上传归档附件等）以此为 assignee 表达式动态指派
                 Map.entry("initiator", applicant.getAccount()),
-                Map.entry("managerAccount", managerAccount));
+                Map.entry("managerAccount", managerAccount),
+                Map.entry("deptAccountant", deptAccountant));
     }
 
     /** ccUserIds 来自请求 DTO 的不可变列表（紧凑构造器已保证非 null），可直接构造集合。 */

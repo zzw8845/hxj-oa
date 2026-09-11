@@ -50,6 +50,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         DocumentAccessPolicy.class,
         AttachmentRequirementService.class,
         LocalAttachmentStorage.class,
+        com.hxj.workflow.DeptAccountantResolver.class,
         DocumentApplicationServiceTest.Config.class
 })
 class DocumentApplicationServiceTest {

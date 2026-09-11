@@ -28,18 +28,34 @@ public class PermissionManagementController {
     private final DepartmentManagementService departmentService;
     private final PostManagementService postService;
     private final EmployeeOffboardingService offboardingService;
+    private final ServiceDeptManagementService serviceDeptService;
 
     public PermissionManagementController(
             EmployeeManagementService employeeService,
             RoleManagementService roleService,
             DepartmentManagementService departmentService,
             PostManagementService postService,
-            EmployeeOffboardingService offboardingService) {
+            EmployeeOffboardingService offboardingService,
+            ServiceDeptManagementService serviceDeptService) {
         this.employeeService = employeeService;
         this.roleService = roleService;
         this.departmentService = departmentService;
         this.postService = postService;
         this.offboardingService = offboardingService;
+        this.serviceDeptService = serviceDeptService;
+    }
+
+    @Operation(summary = "查询员工职能服务分工", description = "列出该员工服务哪些部门的单据（核算会计按部门分工）")
+    @GetMapping("/employees/{id}/service-depts")
+    public ApiResponse<List<ServiceDeptManagementService.ServiceDeptView>> serviceDepts(@PathVariable Long id) {
+        return ApiResponse.success(serviceDeptService.list(id));
+    }
+
+    @Operation(summary = "设置员工职能服务分工", description = "整体替换该员工的服务部门集合")
+    @PutMapping("/employees/{id}/service-depts")
+    public ApiResponse<List<ServiceDeptManagementService.ServiceDeptView>> updateServiceDepts(
+            @PathVariable Long id, @RequestBody SaveServiceDeptsRequest request) {
+        return ApiResponse.success(serviceDeptService.update(id, request.departmentIds()));
     }
 
     @Operation(summary = "创建员工账号", description = "创建员工账号，账号密码必填，部门/岗位传字典ID")

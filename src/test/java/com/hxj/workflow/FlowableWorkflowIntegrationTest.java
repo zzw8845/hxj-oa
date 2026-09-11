@@ -120,4 +120,31 @@ class FlowableWorkflowIntegrationTest {
                 .includeIdentityLinks()
                 .singleResult();
     }
+
+    @Test
+    void shouldRouteDeptAccountantNodeToResolvedVariableAndStayUnassignedWhenAbsent() {
+        flowConfigRepository.deleteAll();
+        FlowConfig cfg = new FlowConfig();
+        cfg.setType("费用报销");
+        cfg.setCategory(FlowCategoryEnum.DAILY);
+        cfg.addNode(new FlowNodeConfig("发起人", FlowNodeTypeEnum.START));
+        FlowNodeConfig accountant = new FlowNodeConfig("会计（按部门）", FlowNodeTypeEnum.APPROVAL);
+        accountant.setAssigneeRole("会计（按部门）");
+        cfg.addNode(accountant);
+        flowConfigRepository.saveAndFlush(cfg);
+
+        definitionService.deploy(cfg.getId());
+
+        // 有核算分工解析结果：动态指派给 ${deptAccountant}
+        String withMapping = workflowService.startProcess(
+                cfg.getId(), 2001L, Map.of("deptAccountant", "wengtingting"));
+        assertThat(singleTask(withMapping).getAssignee()).isEqualTo("wengtingting");
+
+        runtimeService.deleteProcessInstance(withMapping, "cleanup");
+
+        // 无分工映射：生产路径总是写入空串变量 → 任务保持未指派，待管理员人工指派
+        String withoutMapping = workflowService.startProcess(cfg.getId(), 2002L, Map.of("deptAccountant", ""));
+        String unassigned = singleTask(withoutMapping).getAssignee();
+        assertThat(unassigned == null || unassigned.isBlank()).isTrue();
+    }
 }

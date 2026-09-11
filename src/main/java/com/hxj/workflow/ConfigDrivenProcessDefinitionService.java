@@ -168,6 +168,10 @@ public class ConfigDrivenProcessDefinitionService {
         } else if ("直属主管".equals(node.getAssigneeRole())) {
             // 钉钉式汇报线节点：动态指派给申请人提交时确定的直属主管（提交时写入 managerAccount 流程变量）
             task.setAssignee("${managerAccount}");
+        } else if ("会计（按部门）".equals(node.getAssigneeRole())) {
+            // 按发起人部门路由：提交时解析核算分工（服务部门=申请人部门且挂「核算会计」角色的成员），
+            // 写入 deptAccountant 流程变量；无分工映射时为空串（任务待管理员指派）
+            task.setAssignee("${deptAccountant}");
         } else if (node.getAssigneeRole() != null && !node.getAssigneeRole().isBlank()) {
             task.setCandidateGroups(splitGroups(node.getAssigneeRole()));
         }

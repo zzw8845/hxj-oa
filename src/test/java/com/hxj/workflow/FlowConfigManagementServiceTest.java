@@ -21,6 +21,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** 5.11/5.12 流程配置管理：CRUD、修改后重新部署、可视化链条数据。 */
@@ -170,6 +171,20 @@ class FlowConfigManagementServiceTest {
         assertThatThrownBy(() -> managementService.create(invalid))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("角色不存在");
+    }
+
+    @Test
+    void shouldAcceptDynamicAssigneeNodesWithoutRoleExistence() {
+        FlowConfigItems.SaveFlowConfigRequest valid = new FlowConfigItems.SaveFlowConfigRequest(
+                "费用报销", FlowCategoryEnum.DAILY,
+                List.of(
+                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload("发起人", FlowNodeTypeEnum.START, null),
+                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload(
+                                "直属主管", FlowNodeTypeEnum.APPROVAL, "直属主管"),
+                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload(
+                                "会计（按部门）", FlowNodeTypeEnum.APPROVAL, "会计（按部门）")),
+                List.of());
+        assertThatCode(() -> managementService.create(valid)).doesNotThrowAnyException();
     }
 
     @Test
