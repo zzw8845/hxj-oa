@@ -72,6 +72,8 @@ class PermissionManagementServiceTest {
         roleRepository.save(role);
 
         departmentId = departmentService.create(new SaveDepartmentRequest("业务部", null, 1)).id();
+        role.setDepartmentId(departmentId);
+        roleRepository.save(role);
         postId = postService.create(new SavePostRequest("专员")).id();
     }
 
@@ -175,9 +177,10 @@ class PermissionManagementServiceTest {
         assertThat(updated.permissions()).containsExactly("DEPARTMENT_HEAD_APPROVAL");
 
         List<DepartmentRoleNodeResponse> tree = roleService.departmentTree();
-        assertThat(tree).extracting(DepartmentRoleNodeResponse::department).contains("业务部");
         DepartmentRoleNodeResponse businessDepartment = tree.stream()
-                .filter(node -> node.department().equals("业务部")).findFirst().orElseThrow();
+                .filter(node -> node.name().equals("业务部")).findFirst().orElseThrow();
+        assertThat(businessDepartment.id()).isEqualTo(departmentId);
+        assertThat(businessDepartment.parentId()).isNull();
         assertThat(businessDepartment.roles()).extracting(RoleTreeNodeResponse::name)
                 .contains("普通员工", "部门经理");
     }
@@ -211,6 +214,11 @@ class PermissionManagementServiceTest {
                 "张三", "HXJ100", departmentId, postId, null, UserStatusEnum.RESIGNED,
                 null, List.of(role.getName())));
         userRepository.delete(userRepository.findById(employee.id()).orElseThrow());
+        // 有角色引用的部门禁止删除（角色挂在部门上的守卫）
+        assertThatThrownBy(() -> departmentService.delete(departmentId))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("部门被角色引用，无法删除");
+        roleRepository.delete(role);
         departmentService.delete(departmentId);
         assertThat(departmentRepository.existsById(departmentId)).isFalse();
     }

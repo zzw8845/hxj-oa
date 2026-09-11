@@ -136,20 +136,53 @@ public class RoleManagementService {
                 .toList();
     }
 
+    /**
+     * 部门角色架构：真树形结构——部门取自闭包表字典（支持任意层级），
+     * 角色按归属部门（departmentId）挂载到对应节点；未归属部门的角色归入"未分配"虚拟节点。
+     */
     @Transactional(readOnly = true)
     public List<DepartmentRoleNodeResponse> departmentTree() {
-        Map<String, List<SysRole>> grouped = roleRepository.findAll().stream()
-                .collect(Collectors.groupingBy(
-                        role -> role.getDepartment() == null ? "未分配" : role.getDepartment()));
-        return grouped.entrySet().stream()
-                .sorted(Map.Entry.comparingByKey())
-                .map(entry -> new DepartmentRoleNodeResponse(
-                        entry.getKey(),
-                        entry.getValue().stream()
-                                .sorted(Comparator.comparing(SysRole::getName))
-                                .map(this::toTreeNode)
-                                .toList()))
+        List<com.hxj.entity.SysDepartment> all = departmentRepository.findAllByOrderBySortOrderAscIdAsc();
+        Map<Long, List<SysRole>> rolesByDept = roleRepository.findAll().stream()
+                .filter(role -> role.getDepartmentId() != null)
+                .collect(Collectors.groupingBy(SysRole::getDepartmentId));
+        Map<Long, List<com.hxj.entity.SysDepartment>> childrenByParent = new java.util.LinkedHashMap<>();
+        List<com.hxj.entity.SysDepartment> roots = new java.util.ArrayList<>();
+        for (com.hxj.entity.SysDepartment dept : all) {
+            if (dept.getParentId() == null) {
+                roots.add(dept);
+            } else {
+                childrenByParent.computeIfAbsent(dept.getParentId(), key -> new java.util.ArrayList<>()).add(dept);
+            }
+        }
+        List<DepartmentRoleNodeResponse> tree = new java.util.ArrayList<>(roots.stream()
+                .map(root -> buildDepartmentNode(root, childrenByParent, rolesByDept))
+                .toList());
+        List<SysRole> unassigned = roleRepository.findAll().stream()
+                .filter(role -> role.getDepartmentId() == null)
+                .sorted(Comparator.comparing(SysRole::getName))
                 .toList();
+        if (!unassigned.isEmpty()) {
+            tree.add(new DepartmentRoleNodeResponse(null, "未分配", null, null,
+                    unassigned.stream().map(this::toTreeNode).toList(), List.of()));
+        }
+        return tree;
+    }
+
+    /** 递归构建部门节点：角色列表按名称排序，子节点保持仓库排序（sort_order 升序、id 升序）。 */
+    private DepartmentRoleNodeResponse buildDepartmentNode(com.hxj.entity.SysDepartment dept,
+            Map<Long, List<com.hxj.entity.SysDepartment>> childrenByParent,
+            Map<Long, List<SysRole>> rolesByDept) {
+        List<DepartmentRoleNodeResponse> children = childrenByParent
+                .getOrDefault(dept.getId(), List.of()).stream()
+                .map(child -> buildDepartmentNode(child, childrenByParent, rolesByDept))
+                .toList();
+        List<RoleTreeNodeResponse> roles = rolesByDept.getOrDefault(dept.getId(), List.of()).stream()
+                .sorted(Comparator.comparing(SysRole::getName))
+                .map(this::toTreeNode)
+                .toList();
+        return new DepartmentRoleNodeResponse(dept.getId(), dept.getName(), dept.getParentId(),
+                dept.getSortOrder(), roles, children);
     }
 
     private void apply(SysRole role, SaveRoleRequest request) {
