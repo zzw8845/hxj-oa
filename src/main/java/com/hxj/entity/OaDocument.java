@@ -112,6 +112,15 @@ public class OaDocument {
     /** 用印原因。 */
     @Column(name = "seal_reason", columnDefinition = "TEXT")
     private String sealReason;
+    // ---- 表单模板化（V27）：提交时冻结的模板与字段值 ----
+    @Column(name = "form_template_id")
+    private Long formTemplateId;
+    @Column(name = "form_version")
+    private Integer formVersion;
+    @Column(name = "form_snapshot", columnDefinition = "TEXT")
+    private String formSnapshot;
+    @Column(name = "field_values", columnDefinition = "TEXT")
+    private String fieldValues;
 
     /** 前置关联单据（如续签、变更时关联原单据）。 */
     @ManyToOne(fetch = FetchType.LAZY)
@@ -218,4 +227,13 @@ public class OaDocument {
     }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+
+    public Long getFormTemplateId() { return formTemplateId; }
+    public void setFormTemplateId(Long formTemplateId) { this.formTemplateId = formTemplateId; }
+    public Integer getFormVersion() { return formVersion; }
+    public void setFormVersion(Integer formVersion) { this.formVersion = formVersion; }
+    public String getFormSnapshot() { return formSnapshot; }
+    public void setFormSnapshot(String formSnapshot) { this.formSnapshot = formSnapshot; }
+    public String getFieldValues() { return fieldValues; }
+    public void setFieldValues(String fieldValues) { this.fieldValues = fieldValues; }
 }
