@@ -44,6 +44,13 @@ public class FormTemplateController {
         return ApiResponse.success(templateService.list());
     }
 
+    @Operation(summary = "模板详情（管理）", description = "编辑回填用，含字段清单")
+    @GetMapping("/api/admin/form-templates/{id}")
+    @PreAuthorize("hasAuthority('CONFIGURE_FLOW_PERMISSION')")
+    public ApiResponse<FormTemplateManagementService.TemplateView> getAdmin(@PathVariable Long id) {
+        return ApiResponse.success(templateService.get(id));
+    }
+
     @Operation(summary = "创建模板", description = "字段清单整体提交；保留键（提升字段）由系统校验")
     @PostMapping("/api/admin/form-templates")
     @PreAuthorize("hasAuthority('CONFIGURE_FLOW_PERMISSION')")
