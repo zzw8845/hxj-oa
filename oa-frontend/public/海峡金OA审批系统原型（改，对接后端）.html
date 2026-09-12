@@ -330,11 +330,15 @@ createApp({
     const stampQuick = ref([]);
     async function loadQuickDocuments() {
       try {
-        const fetchNames = async bt => (await apiCall('get', `/documents/quick?businessType=${bt}`) || []).map(q => q.name);
+        const list = await apiCall('get', '/documents/quick') || [];
+        const byCategory = bt => list.filter(t => t.category === bt);
+        // 模板映射：快捷提交时按名称取 templateId（表单模板化 v2）
+        window.__formTemplates = Object.fromEntries(list.map(t => [t.name, t]));
+        const fetchNames = async bt => byCategory(bt).map(t => t.name);
         dailyQuick.value = await fetchNames('DAILY_PAYMENT');
-        businessQuick.value = await apiCall('get', '/documents/quick?businessType=BUSINESS_PAYMENT') || [];
+        businessQuick.value = await byCategory('BUSINESS_PAYMENT') || [];
         businessQuick.value = businessQuick.value.map(q => q.name);
-        stampQuick.value = (await apiCall('get', '/documents/quick?businessType=SEAL_APPLICATION') || []).map(q => q.name);
+        stampQuick.value = (await byCategory('SEAL_APPLICATION') || []).map(q => q.name);
       } catch (e) { console.error('快捷单据加载失败:', e); }
     }
 
@@ -343,6 +347,7 @@ createApp({
     const supplementForm = reactive({ mode: '付款前', role: '提交人', materials: '' });
     const signForm = reactive({ person: '', reason: '' });
     const attachmentRules = ref([]), rejectTargets = ref(['提交人']);
+    const submitFieldDefs = ref([]);
     const linkCandidates = reactive([]);
     const detailData = ref(null), flowTimeline = ref([]);
     const homeTrend = ref([]), homeBoard = ref(null);
@@ -814,7 +819,7 @@ createApp({
       return ['关联前置单据', '业务证明资料', '发票', '收款信息'];
     }
 
-    function openSubmit(type, data) {
+    async function openSubmit(type, data) {
       Object.assign(submitForm, {
         code: '', type, applicant: userName.value,
         company: data?.company || '海峡金', department: data?.department || '',
@@ -825,14 +830,28 @@ createApp({
         sealReason: '', sealDepartment: data?.department || '',
         sealTime: '', fileName: '', sealType: '公章'
       });
+      submitForm.templateId = data?.templateId || null;
       linkedDocument.value = null;
       clearSubmitFiles();
-      attachmentRules.value = type.includes('用印') ? ['用印文件附件'] : attachmentList(submitForm.title, type);
+      // 表单模板字段：自定义字段（非保留键）经原生控件注入；保留键由既有表单承接
+      submitFieldDefs.value = [];
+      window.__cfv = {}; window.__cfvRaw = {};
+      let reqs = null;
+      try {
+        if (submitForm.templateId) {
+          const tv = await apiCall('get', `/form-templates/${submitForm.templateId}`);
+          submitFieldDefs.value = (tv.fields || []).filter(f => f.enabled);
+          reqs = tv.attachmentRequirements || null;
+        }
+      } catch (e) { console.error('模板字段加载失败:', e); }
+      attachmentRules.value = reqs || (type.includes('用印') ? ['用印文件附件'] : attachmentList(submitForm.title, type));
       submitVisible.value = true;
+      setTimeout(injectCustomFieldItems, 60);
     }
 
     function quickSubmit(title, type) {
-      openSubmit(type, { title, reason: `申请提交${title}，相关资料将按制度要求上传。` });
+      const tpl = (window.__formTemplates || {})[title];
+      openSubmit(type, { title, reason: `申请提交${title}，相关资料将按制度要求上传。`, templateId: tpl ? tpl.id : null });
     }
 
     async function submitRequest() {
@@ -912,6 +931,7 @@ createApp({
       try {
         detailData.value = await apiCall('get', `/documents/${d.numericId}`);
       } catch (e) { detailData.value = null; }
+      try {         const ff = (detailData.value.formFields || []).filter(f => !['title','company','amount','invoiceSummary','reason','contractNo','needPostMaterial'].includes(f.fieldKey) && f.value !== null && f.value !== '');         document.querySelectorAll('[data-form-fields]').forEach(el => el.remove());         if (ff.length) {           const desc = document.querySelector('.el-drawer .desc');           if (desc) {             const block = document.createElement('div');             block.setAttribute('data-form-fields', '1');             block.style.cssText = 'padding:8px 12px';             block.innerHTML = '<b style="font-size:12px;color:#909399">表单扩展字段</b><div style="margin-top:4px">' + ff.map(f => `<span style="margin-right:14px"><small style="color:#909399">${f.label}：</small>${typeof f.value === 'object' ? JSON.stringify(f.value) : f.value}</span>`).join('') + '</div>';             desc.appendChild(block);           }         }       } catch (e) { /* 渲染失败不影响详情 */ }
       try {
         const records = await apiCall('get', `/documents/${d.numericId}/actions/history`);
         flowTimeline.value = records
