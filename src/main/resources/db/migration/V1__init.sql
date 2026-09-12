@@ -1246,6 +1246,15 @@ UPDATE flow_node_config SET flow_config_id = 1;
 UPDATE flow_condition_rule SET flow_config_id = 1;
 UPDATE form_template SET flow_config_id = 1 WHERE flow_config_id IS NOT NULL;
 
+-- ============ 「部门负责人」成员瘦身 ============
+-- 王强/刘婷/张龙/吴荷珍/黄政哲的具体角色（公司领导/出纳主管/交付主管/财务经理/运营服务主管）
+-- 均为 ALL 范围且含同等基础权限，持有本角色功能零增益且成员名单误导（角色名声称负责人却不指向具体部门）。
+-- 保留 10 人：9 名纯负责人 + 刘佳慧（其具体角色均为 OWN，本角色是其部门视野唯一来源）。
+DELETE ur FROM sys_user_role ur
+JOIN sys_role r ON r.id = ur.role_id AND r.name = '部门负责人'
+JOIN sys_user u ON u.id = ur.user_id
+WHERE u.account IN ('wangqiang', 'liuting', 'zhanglong', 'wuhezhen', 'huangzhengzhe');
+
 -- ============ 汇报线重建（规则：成员→部门主管负责人→中心负责人→执行总经理） ============
 UPDATE sys_user SET manager_id = NULL;
 UPDATE sys_user u JOIN sys_user m ON m.account = 'lianli' SET u.manager_id = m.id WHERE u.account = 'wangqiang';
