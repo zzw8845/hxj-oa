@@ -14,7 +14,6 @@ import com.hxj.repository.CcRecordRepository;
 import com.hxj.repository.FlowConfigRepository;
 import com.hxj.repository.OaAttachmentRepository;
 import com.hxj.repository.OaDocumentRepository;
-import com.hxj.repository.QuickDocumentRepository;
 import com.hxj.repository.SysUserRepository;
 import com.hxj.security.AuthenticatedUserResponse;
 import com.hxj.security.CurrentUser;
@@ -47,7 +46,6 @@ public class DocumentApplicationService {
     private final OaAttachmentRepository attachmentRepository;
     private final ApprovalRecordRepository approvalRepository;
     private final CcRecordRepository ccRepository;
-    private final QuickDocumentRepository quickRepository;
     private final SysUserRepository userRepository;
     private final FlowConfigRepository flowConfigRepository;
     private final DocumentCodeGenerator codeGenerator;
@@ -63,7 +61,6 @@ public class DocumentApplicationService {
             OaAttachmentRepository attachmentRepository,
             ApprovalRecordRepository approvalRepository,
             CcRecordRepository ccRepository,
-            QuickDocumentRepository quickRepository,
             SysUserRepository userRepository,
             FlowConfigRepository flowConfigRepository,
             FormTemplateManagementService formTemplateService,
@@ -77,7 +74,6 @@ public class DocumentApplicationService {
         this.attachmentRepository = attachmentRepository;
         this.approvalRepository = approvalRepository;
         this.ccRepository = ccRepository;
-        this.quickRepository = quickRepository;
         this.userRepository = userRepository;
         this.flowConfigRepository = flowConfigRepository;
         this.formTemplateService = formTemplateService;
