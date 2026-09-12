@@ -1,10 +1,14 @@
 -- =====================================================================
 -- V1 基线：海峡金 OA 全量 schema + 干净种子数据（压平重建，2026-09-12）
--- 取代原 V1~V32 迁移链。设计决策：
---   * 角色：17 个具体角色 + 「部门负责人」（承接原型两条泛化负责人条目，不挂部门）+ 兜底「普通员工」 = 19 个
---   * 兼职：仅真实任职 3 条（翁婷婷→财务中心、汪洋/姚志豪→财务部）；总经办不接受兼职挂靠
---   * 汇报线：按规则重建（成员→部门主管→中心负责人→王强），不再使用 V6 推断数据
+-- 设计决策：
+--   * 角色 18 个 = 17 具体角色（见《原型数据清单》表 1）+ 兜底「普通员工」；
+--     原型两条泛化负责人条目（"各一级中心/各二级部门"占位）不落库——
+--     其混淆根源见《权限模型设计说明》V30~V33 裁决记录，待组织明确后定义正式角色
+--   * 兼职仅真实任职 3 条（翁婷婷→财务中心、汪洋/姚志豪→财务部）
+--   * 汇报线按规则重建（成员→部门主管→中心负责人→王强），弃用 V6 推断数据
 --   * 事务数据（单据/审批/附件/抄送）不入基线；Flowable 引擎表由引擎自建
+--   * 9 名纯负责人（舒飞/卢乙芬/王海亮/苗福鑫/翁建发/陈成辉/郭静宇/李林华/王莹）
+--     暂无角色（能登录无权限），待组织架构明确后定义正式角色再补
 -- =====================================================================
 
 SET NAMES utf8mb4;
@@ -147,7 +151,7 @@ CREATE TABLE `flow_condition_rule` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_flow_condition_order` (`flow_config_id`,`sort_order`),
   CONSTRAINT `fk_flow_condition_config` FOREIGN KEY (`flow_config_id`) REFERENCES `flow_config` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=38 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='流程条件分支规则表';
+) ENGINE=InnoDB AUTO_INCREMENT=39 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='流程条件分支规则表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -187,7 +191,7 @@ CREATE TABLE `flow_node_config` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_flow_node_order` (`flow_config_id`,`sort_order`),
   CONSTRAINT `fk_flow_node_config` FOREIGN KEY (`flow_config_id`) REFERENCES `flow_config` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=293 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='流程节点配置表';
+) ENGINE=InnoDB AUTO_INCREMENT=300 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='流程节点配置表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -200,11 +204,11 @@ DROP TABLE IF EXISTS `form_field`;
 CREATE TABLE `form_field` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `template_id` bigint NOT NULL,
-  `field_key` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `label` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `control_type` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `field_key` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `label` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `control_type` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `required` tinyint(1) NOT NULL DEFAULT '0',
-  `options` text COLLATE utf8mb4_unicode_ci,
+  `options` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `reserved` tinyint(1) NOT NULL DEFAULT '0',
   `sort_order` int NOT NULL DEFAULT '0',
   `enabled` tinyint(1) NOT NULL DEFAULT '1',
@@ -223,15 +227,15 @@ DROP TABLE IF EXISTS `form_template`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `form_template` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `business_type` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `doc_prefix` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `business_type` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `doc_prefix` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `flow_config_id` bigint DEFAULT NULL,
   `version` int NOT NULL DEFAULT '1',
-  `status` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'ENABLED',
+  `status` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'ENABLED',
   `sort_order` int NOT NULL DEFAULT '0',
-  `category` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `attachment_requirements` text COLLATE utf8mb4_unicode_ci,
+  `category` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `attachment_requirements` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_form_template_business_type` (`business_type`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -567,7 +571,7 @@ CREATE TABLE `sys_user_service_dept` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-12 15:11:51
+-- Dump completed on 2026-09-12 15:53:44
 
 
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
@@ -606,7 +610,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-12 15:13:57
+-- Dump completed on 2026-09-12 15:53:45
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -643,7 +647,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-12 15:13:57
+-- Dump completed on 2026-09-12 15:53:45
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -680,7 +684,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-12 15:13:57
+-- Dump completed on 2026-09-12 15:53:45
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -717,7 +721,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-12 15:13:57
+-- Dump completed on 2026-09-12 15:53:45
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -754,7 +758,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-12 15:13:57
+-- Dump completed on 2026-09-12 15:53:45
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -778,7 +782,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `sys_role` WRITE;
 /*!40000 ALTER TABLE `sys_role` DISABLE KEYS */;
-INSERT INTO `sys_role` (`id`, `name`, `department`, `department_id`, `post`, `data_scope_id`, `data_scope`, `permissions`, `members`, `created_at`, `updated_at`) VALUES (20,'超级管理员','总经办',16,'系统管理岗',20,NULL,NULL,NULL,'2026-09-10 10:18:42','2026-09-10 13:35:31'),(22,'部门负责人','总经办',NULL,'部门负责人',23,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-12 14:35:34'),(24,'交付主管','交付部',30,'交付主管',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(25,'会计主管&内控','财务中心',20,'会计主管/内控',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(26,'公司领导','总经办',16,'公司领导',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(27,'内控专员','内控部',23,'内控专员',21,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(28,'内控主管','内控部',23,'内控主管',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(29,'出纳','资管中心',31,'出纳',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(30,'出纳主管','资管中心',31,'出纳主管',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(31,'商务专员','运营服务部',28,'商务专员',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(32,'执行总经理','总经办',16,'执行总经理',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(33,'核算会计','财务部',22,'会计',24,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-11 15:39:06'),(34,'法务','法务部',24,'法务',21,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(35,'法务主管','法务部',24,'法务主管',22,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-12 14:36:38'),(36,'行政专员','行政部',26,'行政专员',21,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(37,'行政主管','行政部',26,'行政主管',21,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(38,'财务经理','财务部',22,'财务经理',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(39,'运营服务主管','运营服务部',28,'运营服务主管',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(40,'普通员工',NULL,NULL,'普通员工',21,NULL,NULL,NULL,'2026-09-11 15:47:20','2026-09-11 15:47:20');
+INSERT INTO `sys_role` (`id`, `name`, `department`, `department_id`, `post`, `data_scope_id`, `data_scope`, `permissions`, `members`, `created_at`, `updated_at`) VALUES (20,'超级管理员','总经办',16,'系统管理岗',20,NULL,NULL,NULL,'2026-09-10 10:18:42','2026-09-10 13:35:31'),(24,'交付主管','交付部',30,'交付主管',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(25,'会计主管&内控','财务中心',20,'会计主管/内控',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(26,'公司领导','总经办',16,'公司领导',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(27,'内控专员','内控部',23,'内控专员',21,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(28,'内控主管','内控部',23,'内控主管',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(29,'出纳','资管中心',31,'出纳',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(30,'出纳主管','资管中心',31,'出纳主管',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(31,'商务专员','运营服务部',28,'商务专员',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(32,'执行总经理','总经办',16,'执行总经理',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(33,'核算会计','财务部',22,'会计',24,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-11 15:39:06'),(34,'法务','法务部',24,'法务',21,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(35,'法务主管','法务部',24,'法务主管',22,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-12 14:36:38'),(36,'行政专员','行政部',26,'行政专员',21,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(37,'行政主管','行政部',26,'行政主管',21,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(38,'财务经理','财务部',22,'财务经理',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(39,'运营服务主管','运营服务部',28,'运营服务主管',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(40,'普通员工',NULL,NULL,'普通员工',21,NULL,NULL,NULL,'2026-09-11 15:47:20','2026-09-11 15:47:20');
 /*!40000 ALTER TABLE `sys_role` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -791,7 +795,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-12 15:13:57
+-- Dump completed on 2026-09-12 15:53:45
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -815,7 +819,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `sys_role_permission` WRITE;
 /*!40000 ALTER TABLE `sys_role_permission` DISABLE KEYS */;
-INSERT INTO `sys_role_permission` (`role_id`, `permission_id`) VALUES (20,1),(22,1),(24,1),(25,1),(26,1),(27,1),(28,1),(29,1),(30,1),(31,1),(32,1),(33,1),(34,1),(35,1),(36,1),(37,1),(38,1),(39,1),(40,1),(20,4),(22,4),(24,4),(25,4),(26,4),(27,4),(28,4),(29,4),(30,4),(31,4),(32,4),(33,4),(34,4),(35,4),(36,4),(37,4),(38,4),(39,4),(40,4),(20,9),(20,11);
+INSERT INTO `sys_role_permission` (`role_id`, `permission_id`) VALUES (20,1),(24,1),(25,1),(26,1),(27,1),(28,1),(29,1),(30,1),(31,1),(32,1),(33,1),(34,1),(35,1),(36,1),(37,1),(38,1),(39,1),(40,1),(20,4),(24,4),(25,4),(26,4),(27,4),(28,4),(29,4),(30,4),(31,4),(32,4),(33,4),(34,4),(35,4),(36,4),(37,4),(38,4),(39,4),(40,4),(20,9),(20,11);
 /*!40000 ALTER TABLE `sys_role_permission` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -828,7 +832,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-12 15:13:57
+-- Dump completed on 2026-09-12 15:53:45
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -865,7 +869,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-12 15:13:57
+-- Dump completed on 2026-09-12 15:53:45
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -889,7 +893,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `form_template` WRITE;
 /*!40000 ALTER TABLE `form_template` DISABLE KEYS */;
-INSERT INTO `form_template` (`id`, `business_type`, `name`, `doc_prefix`, `flow_config_id`, `version`, `status`, `sort_order`, `category`, `attachment_requirements`) VALUES (1,'通用审批单','通用审批单','SP',24,2,'ENABLED',0,'DAILY_PAYMENT','[\"关联前置单据\",\"业务证明资料\",\"发票\",\"收款信息\"]');
+INSERT INTO `form_template` (`id`, `business_type`, `name`, `doc_prefix`, `flow_config_id`, `version`, `status`, `sort_order`, `category`, `attachment_requirements`) VALUES (1,'通用审批单','通用审批单','SP',1,2,'ENABLED',0,'DAILY_PAYMENT','[\"关联前置单据\",\"业务证明资料\",\"发票\",\"收款信息\"]');
 /*!40000 ALTER TABLE `form_template` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -902,7 +906,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-12 15:13:57
+-- Dump completed on 2026-09-12 15:53:45
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -939,7 +943,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-12 15:13:57
+-- Dump completed on 2026-09-12 15:53:45
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -963,7 +967,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `flow_config` WRITE;
 /*!40000 ALTER TABLE `flow_config` DISABLE KEYS */;
-INSERT INTO `flow_config` (`id`, `type`, `category`, `nodes`, `created_at`, `updated_at`) VALUES (24,'费用报销','DAILY',NULL,'2026-09-12 11:37:53','2026-09-12 11:37:53');
+INSERT INTO `flow_config` (`id`, `type`, `category`, `nodes`, `created_at`, `updated_at`) VALUES (1,'费用报销','DAILY',NULL,'2026-09-12 11:37:53','2026-09-12 15:45:36');
 /*!40000 ALTER TABLE `flow_config` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -976,7 +980,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-12 15:13:57
+-- Dump completed on 2026-09-12 15:53:45
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -1000,7 +1004,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `flow_node_config` WRITE;
 /*!40000 ALTER TABLE `flow_node_config` DISABLE KEYS */;
-INSERT INTO `flow_node_config` (`id`, `flow_config_id`, `name`, `node_type`, `assignee_role`, `sort_order`, `cc_targets`) VALUES (286,24,'发起人','START',NULL,0,NULL),(287,24,'直属主管','APPROVAL','直属主管',1,NULL),(288,24,'会计（按部门）','APPROVAL','会计（按部门）',2,NULL),(289,24,'会计主管&内控','APPROVAL','会计主管&内控',3,NULL),(290,24,'公司领导（大额）','APPROVAL','公司领导',4,NULL),(291,24,'出纳','APPROVAL','出纳',5,NULL),(292,24,'抄送相关负责人','CC',NULL,6,'[{\"type\": \"ROLE\", \"value\": \"会计主管&内控\"}, {\"type\": \"ROLE\", \"value\": \"出纳\"}]');
+INSERT INTO `flow_node_config` (`id`, `flow_config_id`, `name`, `node_type`, `assignee_role`, `sort_order`, `cc_targets`) VALUES (293,1,'发起人','START',NULL,0,NULL),(294,1,'直属主管','APPROVAL','直属主管',1,NULL),(295,1,'会计（按部门）','APPROVAL','会计（按部门）',2,NULL),(296,1,'会计主管&内控','APPROVAL','会计主管&内控',3,NULL),(297,1,'公司领导（大额）','APPROVAL','公司领导',4,NULL),(298,1,'出纳','APPROVAL','出纳',5,NULL),(299,1,'抄送相关负责人','CC',NULL,6,'[{\"type\":\"ROLE\",\"value\":\"会计主管&内控\"},{\"type\":\"ROLE\",\"value\":\"出纳\"}]');
 /*!40000 ALTER TABLE `flow_node_config` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -1013,7 +1017,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-12 15:13:57
+-- Dump completed on 2026-09-12 15:53:45
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -1037,7 +1041,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `flow_condition_rule` WRITE;
 /*!40000 ALTER TABLE `flow_condition_rule` DISABLE KEYS */;
-INSERT INTO `flow_condition_rule` (`id`, `flow_config_id`, `variable_name`, `operator`, `expected_value`, `target_node_name`, `sort_order`) VALUES (37,24,'amount','GREATER_THAN_OR_EQUAL','20000','公司领导（大额）',0);
+INSERT INTO `flow_condition_rule` (`id`, `flow_config_id`, `variable_name`, `operator`, `expected_value`, `target_node_name`, `sort_order`) VALUES (38,1,'amount','GREATER_THAN_OR_EQUAL','20000','公司领导（大额）',0);
 /*!40000 ALTER TABLE `flow_condition_rule` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -1050,7 +1054,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-12 15:13:57
+-- Dump completed on 2026-09-12 15:53:45
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -1087,7 +1091,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-12 15:13:57
+-- Dump completed on 2026-09-12 15:53:45
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -1124,7 +1128,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-12 15:13:57
+-- Dump completed on 2026-09-12 15:53:45
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -1161,7 +1165,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-12 15:13:58
+-- Dump completed on 2026-09-12 15:53:45
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -1186,7 +1190,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `sys_user` WRITE;
 /*!40000 ALTER TABLE `sys_user` DISABLE KEYS */;
-INSERT INTO `sys_user` (`id`, `name`, `job_no`, `account`, `password`, `department`, `department_id`, `post`, `post_id`, `status`, `manager_id`, `created_at`, `updated_at`) VALUES (42,'超级管理员','HXJ000','admin','$2y$10$eWcufB2byZqOZspjH6UaO.4PKvivPpotPILxGL1LscJspy4a5t0VW','总经办',16,'系统管理岗',22,'ACTIVE',NULL,'2026-09-10 10:18:42','2026-09-10 14:44:37'),(44,'林安然','HXJ001','linanran','$2a$10$GNjz64rBH0.wWKzY1YBWN.BS19WmRKzIW8D34cWxmCjrJ49I2pUTW','总经办',16,'系统管理员',50,'ACTIVE',NULL,'2026-09-10 16:48:50','2026-09-10 16:48:50'),(45,'连力','HXJ002','lianli','$2a$10$.vW4ukt3wGxubcKasIAiAe3Xwchbc3RzsKQLC0I.bLFgwszb4REyW','总经办',16,'公司领导',30,'ACTIVE',NULL,'2026-09-10 16:48:50','2026-09-10 16:48:50'),(46,'王强','HXJ003','wangqiang','$2a$10$SHfmYgLsXWS3x14jzcGpn.Fe0Tnft7IRWmqpv6sCv8w3JKH2LH0KC','总经办',16,'公司领导',30,'ACTIVE',45,'2026-09-10 16:48:50','2026-09-10 16:48:50'),(47,'舒飞','HXJ004','shufei','$2a$10$bi1A.G6plMFdwrKAGlpjzew4DwgFAJaWfRkeeoP/F8LmgTJZQ3K8m','业务支持中心',27,'中心负责人',32,'ACTIVE',46,'2026-09-10 16:48:50','2026-09-10 16:48:50'),(48,'卢乙芬','HXJ005','luyifen','$2a$10$DGhQOQg7mkM4eE43ixv5c.bDgRJAhvl7cPmr7g/zWLL4Qr/CUlcuq','人力行政中心',25,'中心负责人',32,'ACTIVE',46,'2026-09-10 16:48:50','2026-09-10 16:48:50'),(49,'刘婷','HXJ006','liuting','$2a$10$AP7j2D5p6y0/chZeArWei.mJqVVUzRSSE12ikNnAXka.pIu.Z7zFa','资管中心',31,'出纳主管',48,'ACTIVE',46,'2026-09-10 16:48:50','2026-09-10 16:48:50'),(50,'王海亮','HXJ007','wanghailiang','$2a$10$yD7RcTXEeMUPc.JRJ.8cee3VADlRMbIuI3P7cqqbOxb5KZcnFYwW2','供应链中心',29,'中心负责人',32,'ACTIVE',46,'2026-09-10 16:50:55','2026-09-10 16:50:55'),(51,'张龙','HXJ008','zhanglong','$2a$10$Oww4x4g9zIKupEQBWpR/6e6wGrdCFMRwshln70/rBKe.Xk7ZSustW','交付部',30,'交付主管',46,'ACTIVE',46,'2026-09-10 16:50:55','2026-09-10 16:50:55'),(52,'刘佳慧','HXJ009','liujiahui','$2a$10$PHOrkVF16mgFvhAnLDF9C.bnyUm5QFzzFJjSFhld07G29EQj0GtiC','行政部',26,'行政主管',43,'ACTIVE',54,'2026-09-10 16:53:09','2026-09-10 16:53:13'),(53,'陈成辉','HXJ010','chenchenghui','$2a$10$SeJBhMc6hqTow5Zqfmmx7.OiJdfEFAJX2aKLK1vMW7OR/DlpKFIT2','财务部',22,'部门负责人',34,'ACTIVE',46,'2026-09-10 16:53:10','2026-09-10 16:53:13'),(54,'郭静宇','HXJ011','guojingyu','$2a$10$ZnM6Rn8D8i9ebiBFuWaEJu1zEeVQiYswZN49Bb8HqdlfVl.SKTLM6','行政部',26,'部门负责人',34,'ACTIVE',48,'2026-09-10 16:53:10','2026-09-10 16:53:13'),(55,'吴荷珍','HXJ012','wuhezhen','$2a$10$wpGeuWUZMbZCMBv61lTpcub6M2bA9FePtm5.Q41vXul9onCWSqXou','财务部',22,'财务经理',47,'ACTIVE',53,'2026-09-10 16:53:10','2026-09-10 16:53:13'),(56,'王莹','HXJ013','wangying','$2a$10$LNIjPo42uDJIIDtdRLkXfO6sYJ9LgB8Id1dAFWHbkgF0RXE9lz.lu','运营服务部',28,'部门负责人',34,'ACTIVE',47,'2026-09-10 16:53:10','2026-09-10 16:53:13'),(57,'黄政哲','HXJ014','huangzhengzhe','$2a$10$nvF4IzEsyrecTtGwLY7/YOeMuKjnrqvlccC72vay6.keJ4YUjTZb2','运营服务部',28,'运营服务主管',45,'ACTIVE',56,'2026-09-10 16:53:10','2026-09-10 16:53:13'),(58,'李林华','HXJ015','lilinhua','$2a$10$7NlZW0o9M9laZgU8r40v4e1eLUD9PzZ8FfmsUAWFOEDOHHS8JwuPC','交付部',30,'部门负责人',34,'ACTIVE',50,'2026-09-10 16:53:10','2026-09-10 16:53:13'),(59,'苗福鑫','HXJ016','miaofuxin','$2a$10$ool/3vo8Sxg85qFErCG3YOhfD96Q993whH731NhBCf6lsTRP.w4H6','内控部',23,'部门负责人',34,'ACTIVE',46,'2026-09-10 16:53:10','2026-09-10 16:53:13'),(60,'翁建发','HXJ017','wengjianfa','$2a$10$n7ke0IUGYfeVbte40GyTLuxueKGm9QI2UMilNe8Vc0k0BGLnRh1BC','法务部',24,'部门负责人',34,'ACTIVE',46,'2026-09-10 16:53:10','2026-09-10 16:53:13'),(61,'汪洋','HXJ018','wangyang','$2a$10$Nara0EGzEEJi0eHp5sEqMe1mdlXcN6yjzQAL3QdulVTBvBdNS4vLS','财务中心',20,'会计主管/内控',36,'ACTIVE',46,'2026-09-10 16:53:10','2026-09-10 16:53:13'),(62,'姚志豪','HXJ019','yaozhihao','$2a$10$nEEO/OJ9PNyQM6TDbjTrPepwk58q6WOulStmXW542IoU546Q7lavi','财务中心',20,'会计主管/内控',36,'ACTIVE',46,'2026-09-10 16:53:11','2026-09-10 16:53:13'),(63,'翁婷婷','HXJ020','wengtingting','$2a$10$0AGRtjcHmlmbZQ3Z5jTq5.RX1ej76KF/mXTZXHl2hqy7yySuSvPce','财务中心',31,'会计主管/内控',49,'ACTIVE',46,'2026-09-10 16:53:11','2026-09-11 13:46:02'),(64,'冯训漪','HXJ021','fengxunyi','$2a$10$wefnmlxdt1mndiNnDLhZSeQqWZIQLb4WA00Bd9SKZ5fkA3EPVFbiG','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:11','2026-09-10 16:53:13'),(65,'朱昀怡','HXJ022','zhuyunyi','$2a$10$BQFg7uyij8qPEyrWXtjjDee4tKcTc9F3G9GvmV4tH2hjUq8i9tJ7O','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:11','2026-09-10 16:53:13'),(66,'施惠君','HXJ023','shihuijun','$2a$10$uqw6b8lB/YYvsL31iy18eeSJr2iWCO.DYAret1WjtClkynQnbh0fq','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:11','2026-09-10 16:53:13'),(67,'蔡赐绵','HXJ024','caicimian','$2a$10$Bqe3VTfGMl8G5aU3VBHKw.4YMmaQUGkLC3mi4aKA.b7I6/29wJO6S','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:11','2026-09-10 16:53:13'),(68,'李小妹','HXJ025','lixiaomei','$2a$10$jBg.wxxKyyp5Mjv4AtA/YeE61507czkIPn96sKT2GTRah//46QBSW','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:11','2026-09-10 16:53:13'),(69,'石瀚文','HXJ026','shihanwen','$2a$10$.ZXxZX0jXatDLq0Z0vj/PeqxoBLKZpVKsTM8nake8hJAm794rUBQi','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:11','2026-09-10 16:53:13'),(70,'张欣怡','HXJ027','zhangxinyi','$2a$10$FSg4/kjJ2Illb8uNSm60GedPWyWahsC/0Amo/8qxHT.eLb/TKE9wy','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:12','2026-09-10 16:53:13'),(71,'温超群','HXJ028','wenchaoqun','$2a$10$vGd8DOw3SeirttciNEpfH.unDAZtLhFzVcUEybMdcAhyaBvHyXcQS','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:12','2026-09-10 16:53:13'),(72,'孙倩倩','HXJ029','sunqianqian','$2a$10$RD3H0MCaHTG9SRWCzIzPoO9ZVi8oweRudXi2duCZZ.ufH24OLewKS','内控部',23,'内控主管',38,'ACTIVE',59,'2026-09-10 16:53:12','2026-09-10 16:53:13'),(73,'郑宁静','HXJ030','zhengningjing','$2a$10$SOw/ZFwXzfK7iS8teVYWfe06k4eVNvUoUpuSFOOZ0F9jWbGwdoQ2S','内控部',23,'内控专员',39,'ACTIVE',72,'2026-09-10 16:53:12','2026-09-10 16:53:13'),(74,'唐菁蔚','HXJ031','tangjingwei','$2a$10$n/7DYhCtWOXmBw.o2oG6L.ULy/N5WkZ.evzhlXPAJWkQUbua3lpLS','法务部',24,'法务',40,'ACTIVE',75,'2026-09-10 16:53:12','2026-09-10 16:53:13'),(75,'陈楠','HXJ032','chennan','$2a$10$KacDozfbOhMn5kmscBFmCu9pFkCaCmLgGbtYL9BioXuvrsj6StaBa','法务部',24,'法务主管',41,'ACTIVE',60,'2026-09-10 16:53:12','2026-09-10 16:53:13'),(76,'朱铭骏','HXJ033','zhumingjun','$2a$10$ZsRipWdrw20upluSMr6mn.H9yjHax3XHvVzd.bjLUepD91BrIs00K','行政部',26,'行政专员',42,'ACTIVE',52,'2026-09-10 16:53:12','2026-09-10 16:53:13'),(77,'刘颖宁','HXJ034','liuyingning','$2a$10$r7JnrFXt6XcuiSRynMiMwOTLzfmJJi7U5Lit4xuOwoRgoS6/GP9ne','运营服务部',28,'商务专员',44,'ACTIVE',57,'2026-09-10 16:53:12','2026-09-10 16:53:13'),(78,'杨淑欢','HXJ035','yangshuhuan','$2a$10$nc99of3Avthj92dKwUrlJuY0mKQC/VjpB7U6.dXbFE90jgM8YiOKW','运营服务部',28,'商务专员',44,'ACTIVE',57,'2026-09-10 16:53:12','2026-09-10 16:53:13'),(79,'龚蓉','HXJ036','gongrong','$2a$10$C9PPgQC4sw4gyxHIP4NKmeT17UlpdkL32GhmIdokq7a.oMwckK4vm','运营服务部',28,'商务专员',44,'ACTIVE',57,'2026-09-10 16:53:12','2026-09-10 16:53:13'),(80,'林丽婷','HXJ037','linliting','$2a$10$BWizc02WlGfxGNLqiNxRkuw1cWatbQwHTSBuApDDhA/0UqPR9Jh3.','资管中心',31,'出纳',49,'ACTIVE',49,'2026-09-10 16:53:12','2026-09-10 16:53:13'),(81,'陈伟璇','HXJ038','chenweixuan','$2a$10$q9Nobgi3SnC0JVPVudwbUeSX5ff98XIHoVeK7JXwRu3/9bJUiAyHi','资管中心',31,'出纳',49,'ACTIVE',49,'2026-09-10 16:53:13','2026-09-10 16:53:13'),(82,'沈盼静','HXJ039','shenpanjing','$2a$10$YWRCHM/zc78z8jp50FTdSuVer/zEORkNtVhq0koaHMyA4qYY1.ncy','资管中心',31,'出纳',49,'ACTIVE',49,'2026-09-10 16:53:13','2026-09-10 16:53:13'),(83,'李展仪','HXJ040','lizhanyi','$2a$10$RY5FzoU3bRKVu9wghgOnielLLvmU8kyKQVhWM95XnXiNPlQC2Yl6e','资管中心',31,'出纳',49,'ACTIVE',49,'2026-09-10 16:53:13','2026-09-10 16:53:13');
+INSERT INTO `sys_user` (`id`, `name`, `job_no`, `account`, `password`, `department`, `department_id`, `post`, `post_id`, `status`, `manager_id`, `created_at`, `updated_at`) VALUES (42,'超级管理员','HXJ000','admin','$2y$10$eWcufB2byZqOZspjH6UaO.4PKvivPpotPILxGL1LscJspy4a5t0VW','总经办',16,'系统管理岗',22,'ACTIVE',NULL,'2026-09-10 10:18:42','2026-09-10 14:44:37'),(44,'林安然','HXJ001','linanran','$2a$10$GNjz64rBH0.wWKzY1YBWN.BS19WmRKzIW8D34cWxmCjrJ49I2pUTW','总经办',16,'系统管理员',50,'ACTIVE',NULL,'2026-09-10 16:48:50','2026-09-10 16:48:50'),(45,'连力','HXJ002','lianli','$2a$10$.vW4ukt3wGxubcKasIAiAe3Xwchbc3RzsKQLC0I.bLFgwszb4REyW','总经办',16,'公司领导',30,'ACTIVE',NULL,'2026-09-10 16:48:50','2026-09-10 16:48:50'),(46,'王强','HXJ003','wangqiang','$2a$10$SHfmYgLsXWS3x14jzcGpn.Fe0Tnft7IRWmqpv6sCv8w3JKH2LH0KC','总经办',16,'公司领导',30,'ACTIVE',45,'2026-09-10 16:48:50','2026-09-12 15:45:36'),(47,'舒飞','HXJ004','shufei','$2a$10$bi1A.G6plMFdwrKAGlpjzew4DwgFAJaWfRkeeoP/F8LmgTJZQ3K8m','业务支持中心',27,'中心负责人',32,'ACTIVE',46,'2026-09-10 16:48:50','2026-09-12 15:45:36'),(48,'卢乙芬','HXJ005','luyifen','$2a$10$DGhQOQg7mkM4eE43ixv5c.bDgRJAhvl7cPmr7g/zWLL4Qr/CUlcuq','人力行政中心',25,'中心负责人',32,'ACTIVE',46,'2026-09-10 16:48:50','2026-09-12 15:45:36'),(49,'刘婷','HXJ006','liuting','$2a$10$AP7j2D5p6y0/chZeArWei.mJqVVUzRSSE12ikNnAXka.pIu.Z7zFa','资管中心',31,'出纳主管',48,'ACTIVE',46,'2026-09-10 16:48:50','2026-09-12 15:45:36'),(50,'王海亮','HXJ007','wanghailiang','$2a$10$yD7RcTXEeMUPc.JRJ.8cee3VADlRMbIuI3P7cqqbOxb5KZcnFYwW2','供应链中心',29,'中心负责人',32,'ACTIVE',46,'2026-09-10 16:50:55','2026-09-12 15:45:36'),(51,'张龙','HXJ008','zhanglong','$2a$10$Oww4x4g9zIKupEQBWpR/6e6wGrdCFMRwshln70/rBKe.Xk7ZSustW','交付部',30,'交付主管',46,'ACTIVE',50,'2026-09-10 16:50:55','2026-09-12 15:45:36'),(52,'刘佳慧','HXJ009','liujiahui','$2a$10$PHOrkVF16mgFvhAnLDF9C.bnyUm5QFzzFJjSFhld07G29EQj0GtiC','行政部',26,'行政主管',43,'ACTIVE',48,'2026-09-10 16:53:09','2026-09-12 15:45:36'),(53,'陈成辉','HXJ010','chenchenghui','$2a$10$SeJBhMc6hqTow5Zqfmmx7.OiJdfEFAJX2aKLK1vMW7OR/DlpKFIT2','财务部',22,'部门负责人',34,'ACTIVE',46,'2026-09-10 16:53:10','2026-09-12 15:45:36'),(54,'郭静宇','HXJ011','guojingyu','$2a$10$ZnM6Rn8D8i9ebiBFuWaEJu1zEeVQiYswZN49Bb8HqdlfVl.SKTLM6','行政部',26,'部门负责人',34,'ACTIVE',48,'2026-09-10 16:53:10','2026-09-12 15:45:36'),(55,'吴荷珍','HXJ012','wuhezhen','$2a$10$wpGeuWUZMbZCMBv61lTpcub6M2bA9FePtm5.Q41vXul9onCWSqXou','财务部',22,'财务经理',47,'ACTIVE',46,'2026-09-10 16:53:10','2026-09-12 15:45:36'),(56,'王莹','HXJ013','wangying','$2a$10$LNIjPo42uDJIIDtdRLkXfO6sYJ9LgB8Id1dAFWHbkgF0RXE9lz.lu','运营服务部',28,'部门负责人',34,'ACTIVE',47,'2026-09-10 16:53:10','2026-09-12 15:45:36'),(57,'黄政哲','HXJ014','huangzhengzhe','$2a$10$nvF4IzEsyrecTtGwLY7/YOeMuKjnrqvlccC72vay6.keJ4YUjTZb2','运营服务部',28,'运营服务主管',45,'ACTIVE',47,'2026-09-10 16:53:10','2026-09-12 15:45:36'),(58,'李林华','HXJ015','lilinhua','$2a$10$7NlZW0o9M9laZgU8r40v4e1eLUD9PzZ8FfmsUAWFOEDOHHS8JwuPC','交付部',30,'部门负责人',34,'ACTIVE',51,'2026-09-10 16:53:10','2026-09-12 15:45:36'),(59,'苗福鑫','HXJ016','miaofuxin','$2a$10$ool/3vo8Sxg85qFErCG3YOhfD96Q993whH731NhBCf6lsTRP.w4H6','内控部',23,'部门负责人',34,'ACTIVE',46,'2026-09-10 16:53:10','2026-09-12 15:45:36'),(60,'翁建发','HXJ017','wengjianfa','$2a$10$n7ke0IUGYfeVbte40GyTLuxueKGm9QI2UMilNe8Vc0k0BGLnRh1BC','法务部',24,'部门负责人',34,'ACTIVE',46,'2026-09-10 16:53:10','2026-09-12 15:45:36'),(61,'汪洋','HXJ018','wangyang','$2a$10$Nara0EGzEEJi0eHp5sEqMe1mdlXcN6yjzQAL3QdulVTBvBdNS4vLS','财务中心',20,'会计主管/内控',36,'ACTIVE',46,'2026-09-10 16:53:10','2026-09-12 15:45:36'),(62,'姚志豪','HXJ019','yaozhihao','$2a$10$nEEO/OJ9PNyQM6TDbjTrPepwk58q6WOulStmXW542IoU546Q7lavi','财务中心',20,'会计主管/内控',36,'ACTIVE',46,'2026-09-10 16:53:11','2026-09-12 15:45:36'),(63,'翁婷婷','HXJ020','wengtingting','$2a$10$0AGRtjcHmlmbZQ3Z5jTq5.RX1ej76KF/mXTZXHl2hqy7yySuSvPce','财务中心',31,'会计主管/内控',49,'ACTIVE',49,'2026-09-10 16:53:11','2026-09-12 15:45:36'),(64,'冯训漪','HXJ021','fengxunyi','$2a$10$wefnmlxdt1mndiNnDLhZSeQqWZIQLb4WA00Bd9SKZ5fkA3EPVFbiG','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:11','2026-09-12 15:45:36'),(65,'朱昀怡','HXJ022','zhuyunyi','$2a$10$BQFg7uyij8qPEyrWXtjjDee4tKcTc9F3G9GvmV4tH2hjUq8i9tJ7O','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:11','2026-09-12 15:45:36'),(66,'施惠君','HXJ023','shihuijun','$2a$10$uqw6b8lB/YYvsL31iy18eeSJr2iWCO.DYAret1WjtClkynQnbh0fq','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:11','2026-09-12 15:45:36'),(67,'蔡赐绵','HXJ024','caicimian','$2a$10$Bqe3VTfGMl8G5aU3VBHKw.4YMmaQUGkLC3mi4aKA.b7I6/29wJO6S','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:11','2026-09-12 15:45:36'),(68,'李小妹','HXJ025','lixiaomei','$2a$10$jBg.wxxKyyp5Mjv4AtA/YeE61507czkIPn96sKT2GTRah//46QBSW','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:11','2026-09-12 15:45:36'),(69,'石瀚文','HXJ026','shihanwen','$2a$10$.ZXxZX0jXatDLq0Z0vj/PeqxoBLKZpVKsTM8nake8hJAm794rUBQi','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:11','2026-09-12 15:45:36'),(70,'张欣怡','HXJ027','zhangxinyi','$2a$10$FSg4/kjJ2Illb8uNSm60GedPWyWahsC/0Amo/8qxHT.eLb/TKE9wy','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(71,'温超群','HXJ028','wenchaoqun','$2a$10$vGd8DOw3SeirttciNEpfH.unDAZtLhFzVcUEybMdcAhyaBvHyXcQS','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(72,'孙倩倩','HXJ029','sunqianqian','$2a$10$RD3H0MCaHTG9SRWCzIzPoO9ZVi8oweRudXi2duCZZ.ufH24OLewKS','内控部',23,'内控主管',38,'ACTIVE',59,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(73,'郑宁静','HXJ030','zhengningjing','$2a$10$SOw/ZFwXzfK7iS8teVYWfe06k4eVNvUoUpuSFOOZ0F9jWbGwdoQ2S','内控部',23,'内控专员',39,'ACTIVE',59,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(74,'唐菁蔚','HXJ031','tangjingwei','$2a$10$n/7DYhCtWOXmBw.o2oG6L.ULy/N5WkZ.evzhlXPAJWkQUbua3lpLS','法务部',24,'法务',40,'ACTIVE',60,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(75,'陈楠','HXJ032','chennan','$2a$10$KacDozfbOhMn5kmscBFmCu9pFkCaCmLgGbtYL9BioXuvrsj6StaBa','法务部',24,'法务主管',41,'ACTIVE',60,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(76,'朱铭骏','HXJ033','zhumingjun','$2a$10$ZsRipWdrw20upluSMr6mn.H9yjHax3XHvVzd.bjLUepD91BrIs00K','行政部',26,'行政专员',42,'ACTIVE',52,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(77,'刘颖宁','HXJ034','liuyingning','$2a$10$r7JnrFXt6XcuiSRynMiMwOTLzfmJJi7U5Lit4xuOwoRgoS6/GP9ne','运营服务部',28,'商务专员',44,'ACTIVE',57,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(78,'杨淑欢','HXJ035','yangshuhuan','$2a$10$nc99of3Avthj92dKwUrlJuY0mKQC/VjpB7U6.dXbFE90jgM8YiOKW','运营服务部',28,'商务专员',44,'ACTIVE',57,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(79,'龚蓉','HXJ036','gongrong','$2a$10$C9PPgQC4sw4gyxHIP4NKmeT17UlpdkL32GhmIdokq7a.oMwckK4vm','运营服务部',28,'商务专员',44,'ACTIVE',57,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(80,'林丽婷','HXJ037','linliting','$2a$10$BWizc02WlGfxGNLqiNxRkuw1cWatbQwHTSBuApDDhA/0UqPR9Jh3.','资管中心',31,'出纳',49,'ACTIVE',49,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(81,'陈伟璇','HXJ038','chenweixuan','$2a$10$q9Nobgi3SnC0JVPVudwbUeSX5ff98XIHoVeK7JXwRu3/9bJUiAyHi','资管中心',31,'出纳',49,'ACTIVE',49,'2026-09-10 16:53:13','2026-09-12 15:45:36'),(82,'沈盼静','HXJ039','shenpanjing','$2a$10$YWRCHM/zc78z8jp50FTdSuVer/zEORkNtVhq0koaHMyA4qYY1.ncy','资管中心',31,'出纳',49,'ACTIVE',49,'2026-09-10 16:53:13','2026-09-12 15:45:36'),(83,'李展仪','HXJ040','lizhanyi','$2a$10$RY5FzoU3bRKVu9wghgOnielLLvmU8kyKQVhWM95XnXiNPlQC2Yl6e','资管中心',31,'出纳',49,'ACTIVE',49,'2026-09-10 16:53:13','2026-09-12 15:45:36');
 /*!40000 ALTER TABLE `sys_user` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -1199,7 +1203,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-12 15:13:58
+-- Dump completed on 2026-09-12 15:53:45
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -1224,7 +1228,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `sys_user_role` WRITE;
 /*!40000 ALTER TABLE `sys_user_role` DISABLE KEYS */;
-INSERT INTO `sys_user_role` (`user_id`, `role_id`) VALUES (42,20),(44,20),(46,22),(47,22),(48,22),(49,22),(50,22),(51,22),(52,22),(53,22),(54,22),(55,22),(56,22),(57,22),(58,22),(59,22),(60,22),(51,24),(61,25),(62,25),(63,25),(45,26),(46,26),(73,27),(72,28),(63,29),(80,29),(81,29),(82,29),(83,29),(49,30),(77,31),(78,31),(79,31),(46,32),(61,33),(62,33),(64,33),(65,33),(66,33),(67,33),(68,33),(69,33),(70,33),(71,33),(74,34),(75,35),(52,36),(76,36),(52,37),(55,38),(57,39);
+INSERT INTO `sys_user_role` (`user_id`, `role_id`) VALUES (42,20),(44,20),(51,24),(61,25),(62,25),(63,25),(45,26),(46,26),(73,27),(72,28),(63,29),(80,29),(81,29),(82,29),(83,29),(49,30),(77,31),(78,31),(79,31),(46,32),(61,33),(62,33),(64,33),(65,33),(66,33),(67,33),(68,33),(69,33),(70,33),(71,33),(74,34),(75,35),(52,36),(76,36),(52,37),(55,38),(57,39);
 /*!40000 ALTER TABLE `sys_user_role` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -1237,63 +1241,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-12 15:13:58
+-- Dump completed on 2026-09-12 15:53:45
 
-
--- ============ 流程配置 id 归一（基线仅一条流程） ============
-UPDATE flow_config SET id = 1;
-UPDATE flow_node_config SET flow_config_id = 1;
-UPDATE flow_condition_rule SET flow_config_id = 1;
-UPDATE form_template SET flow_config_id = 1 WHERE flow_config_id IS NOT NULL;
-
--- ============ 「部门负责人」成员瘦身 ============
--- 王强/刘婷/张龙/吴荷珍/黄政哲的具体角色（公司领导/出纳主管/交付主管/财务经理/运营服务主管）
--- 均为 ALL 范围且含同等基础权限，持有本角色功能零增益且成员名单误导（角色名声称负责人却不指向具体部门）。
--- 保留 10 人：9 名纯负责人 + 刘佳慧（其具体角色均为 OWN，本角色是其部门视野唯一来源）。
-DELETE ur FROM sys_user_role ur
-JOIN sys_role r ON r.id = ur.role_id AND r.name = '部门负责人'
-JOIN sys_user u ON u.id = ur.user_id
-WHERE u.account IN ('wangqiang', 'liuting', 'zhanglong', 'wuhezhen', 'huangzhengzhe');
-
--- ============ 汇报线重建（规则：成员→部门主管负责人→中心负责人→执行总经理） ============
-UPDATE sys_user SET manager_id = NULL;
-UPDATE sys_user u JOIN sys_user m ON m.account = 'lianli' SET u.manager_id = m.id WHERE u.account = 'wangqiang';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'wangqiang' SET u.manager_id = m.id WHERE u.account = 'shufei';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'wangqiang' SET u.manager_id = m.id WHERE u.account = 'luyifen';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'wangqiang' SET u.manager_id = m.id WHERE u.account = 'liuting';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'wangqiang' SET u.manager_id = m.id WHERE u.account = 'wanghailiang';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'wangqiang' SET u.manager_id = m.id WHERE u.account = 'miaofuxin';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'wangqiang' SET u.manager_id = m.id WHERE u.account = 'wengjianfa';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'wangqiang' SET u.manager_id = m.id WHERE u.account = 'chenchenghui';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'wangqiang' SET u.manager_id = m.id WHERE u.account = 'wuhezhen';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'wangqiang' SET u.manager_id = m.id WHERE u.account = 'wangyang';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'wangqiang' SET u.manager_id = m.id WHERE u.account = 'yaozhihao';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'wanghailiang' SET u.manager_id = m.id WHERE u.account = 'zhanglong';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'zhanglong' SET u.manager_id = m.id WHERE u.account = 'lilinhua';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'shufei' SET u.manager_id = m.id WHERE u.account = 'huangzhengzhe';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'shufei' SET u.manager_id = m.id WHERE u.account = 'wangying';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'luyifen' SET u.manager_id = m.id WHERE u.account = 'liujiahui';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'luyifen' SET u.manager_id = m.id WHERE u.account = 'guojingyu';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'liujiahui' SET u.manager_id = m.id WHERE u.account = 'zhumingjun';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'huangzhengzhe' SET u.manager_id = m.id WHERE u.account = 'liuyingning';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'huangzhengzhe' SET u.manager_id = m.id WHERE u.account = 'yangshuhuan';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'huangzhengzhe' SET u.manager_id = m.id WHERE u.account = 'gongrong';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'wuhezhen' SET u.manager_id = m.id WHERE u.account = 'fengxunyi';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'wuhezhen' SET u.manager_id = m.id WHERE u.account = 'zhuyunyi';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'wuhezhen' SET u.manager_id = m.id WHERE u.account = 'shihuijun';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'wuhezhen' SET u.manager_id = m.id WHERE u.account = 'caicimian';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'wuhezhen' SET u.manager_id = m.id WHERE u.account = 'lixiaomei';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'wuhezhen' SET u.manager_id = m.id WHERE u.account = 'shihanwen';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'wuhezhen' SET u.manager_id = m.id WHERE u.account = 'zhangxinyi';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'wuhezhen' SET u.manager_id = m.id WHERE u.account = 'wenchaoqun';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'miaofuxin' SET u.manager_id = m.id WHERE u.account = 'sunqianqian';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'miaofuxin' SET u.manager_id = m.id WHERE u.account = 'zhengningjing';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'wengjianfa' SET u.manager_id = m.id WHERE u.account = 'tangjingwei';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'wengjianfa' SET u.manager_id = m.id WHERE u.account = 'chennan';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'liuting' SET u.manager_id = m.id WHERE u.account = 'linliting';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'liuting' SET u.manager_id = m.id WHERE u.account = 'chenweixuan';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'liuting' SET u.manager_id = m.id WHERE u.account = 'shenpanjing';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'liuting' SET u.manager_id = m.id WHERE u.account = 'lizhanyi';
-UPDATE sys_user u JOIN sys_user m ON m.account = 'liuting' SET u.manager_id = m.id WHERE u.account = 'wengtingting';
 
 SET FOREIGN_KEY_CHECKS = 1;
