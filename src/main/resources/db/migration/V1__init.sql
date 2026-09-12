@@ -3,12 +3,14 @@
 -- 设计决策：
 --   * 角色 18 个 = 17 具体角色（见《原型数据清单》表 1）+ 兜底「普通员工」；
 --     原型两条泛化负责人条目（"各一级中心/各二级部门"占位）不落库，
---     其混淆根源见《权限模型设计说明》V30~V33 裁决记录
+--     混淆根源见《权限模型设计说明》V30~V34 裁决记录
 --   * 用户 32 = admin + 31 名有具体职能角色的人员；9 名纯负责人
 --     （舒飞/卢乙芬/王海亮/苗福鑫/翁建发/陈成辉/郭静宇/李林华/王莹）
 --     因原型仅有泛化身份、无具体职能角色，不入库——记录见《原型数据清单》表 2，
 --     待组织架构明确后连同正式角色一并创建
---   * 兼职仅真实任职 3 条；汇报线仅保留有效实线（成员→职能主管）
+--   * 「兼职部门」字段整体移除（V34）：功能被角色 CUSTOM 数据范围覆盖，
+--     且内容为角色归属的第三份抄写——裁决记录见《权限模型设计说明》
+--   * 汇报线按规则重建（成员→职能主管→中心负责人→王强），弃用 V6 推断数据
 --   * 事务数据不入基线；Flowable 引擎表由引擎自建
 -- =====================================================================
 
@@ -152,7 +154,7 @@ CREATE TABLE `flow_condition_rule` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_flow_condition_order` (`flow_config_id`,`sort_order`),
   CONSTRAINT `fk_flow_condition_config` FOREIGN KEY (`flow_config_id`) REFERENCES `flow_config` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=40 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='流程条件分支规则表';
+) ENGINE=InnoDB AUTO_INCREMENT=42 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='流程条件分支规则表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -192,7 +194,7 @@ CREATE TABLE `flow_node_config` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_flow_node_order` (`flow_config_id`,`sort_order`),
   CONSTRAINT `fk_flow_node_config` FOREIGN KEY (`flow_config_id`) REFERENCES `flow_config` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=307 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='流程节点配置表';
+) ENGINE=InnoDB AUTO_INCREMENT=321 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='流程节点配置表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -508,26 +510,6 @@ CREATE TABLE `sys_user` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `sys_user_department`
---
-
-DROP TABLE IF EXISTS `sys_user_department`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `sys_user_department` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `user_id` bigint NOT NULL,
-  `department_id` bigint NOT NULL,
-  `primary_department` tinyint(1) NOT NULL DEFAULT '0',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_user_department` (`user_id`,`department_id`),
-  KEY `fk_usd_department` (`department_id`),
-  CONSTRAINT `fk_usd_department` FOREIGN KEY (`department_id`) REFERENCES `sys_department` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_usd_user` FOREIGN KEY (`user_id`) REFERENCES `sys_user` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=99 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='员工兼职部门关联（主部门在 sys_user.department_id）';
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
 -- Table structure for table `sys_user_role`
 --
 
@@ -572,7 +554,7 @@ CREATE TABLE `sys_user_service_dept` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-12 16:06:21
+-- Dump completed on 2026-09-12 18:21:11
 
 
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
@@ -601,33 +583,6 @@ LOCK TABLES `sys_data_scope` WRITE;
 INSERT INTO `sys_data_scope` (`id`, `code`, `name`, `description`, `created_at`) VALUES (20,'ALL','全部单据','可查看全部单据','2026-09-10 09:12:48'),(21,'OWN','仅本人单据','仅可查看本人提交的单据','2026-09-10 09:12:48'),(22,'DEPT','本部门','可查看本部门提交的单据','2026-09-10 09:12:48'),(23,'DEPT_AND_CHILD','本部门及以下','可查看本部门及其下级部门提交的单据','2026-09-10 09:12:48'),(24,'CUSTOM','自定义部门集合','可查看指定部门集合提交的单据','2026-09-10 09:12:48');
 /*!40000 ALTER TABLE `sys_data_scope` ENABLE KEYS */;
 UNLOCK TABLES;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
-
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
--- Dump completed on 2026-09-12 16:06:22
--- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
---
--- Host: localhost    Database: oa
--- ------------------------------------------------------
--- Server version	8.0.46
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!50503 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
 -- Dumping data for table `sys_department`
@@ -638,33 +593,6 @@ LOCK TABLES `sys_department` WRITE;
 INSERT INTO `sys_department` (`id`, `name`, `parent_id`, `sort_order`, `created_at`, `updated_at`) VALUES (16,'总经办',NULL,1,'2026-09-10 10:18:42','2026-09-10 10:18:42'),(20,'财务中心',NULL,2,'2026-09-10 10:44:09','2026-09-10 10:44:17'),(22,'财务部',20,0,'2026-09-10 10:44:28','2026-09-10 10:44:28'),(23,'内控部',16,0,'2026-09-10 10:44:49','2026-09-10 10:44:49'),(24,'法务部',16,0,'2026-09-10 10:44:59','2026-09-10 10:44:59'),(25,'人力行政中心',NULL,3,'2026-09-10 10:45:18','2026-09-10 10:45:18'),(26,'行政部',25,0,'2026-09-10 10:45:31','2026-09-10 10:45:31'),(27,'业务支持中心',NULL,4,'2026-09-10 10:45:45','2026-09-10 10:45:57'),(28,'运营服务部',27,0,'2026-09-10 11:05:55','2026-09-10 11:05:55'),(29,'供应链中心',NULL,5,'2026-09-10 11:06:27','2026-09-10 11:06:27'),(30,'交付部',29,0,'2026-09-10 11:06:42','2026-09-10 11:06:42'),(31,'资管中心',NULL,6,'2026-09-10 11:06:53','2026-09-10 11:07:14');
 /*!40000 ALTER TABLE `sys_department` ENABLE KEYS */;
 UNLOCK TABLES;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
-
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
--- Dump completed on 2026-09-12 16:06:22
--- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
---
--- Host: localhost    Database: oa
--- ------------------------------------------------------
--- Server version	8.0.46
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!50503 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
 -- Dumping data for table `sys_department_closure`
@@ -675,33 +603,6 @@ LOCK TABLES `sys_department_closure` WRITE;
 INSERT INTO `sys_department_closure` (`ancestor_id`, `descendant_id`, `depth`) VALUES (16,16,0),(16,23,1),(16,24,1),(20,20,0),(20,22,1),(22,22,0),(23,23,0),(24,24,0),(25,25,0),(25,26,1),(26,26,0),(27,27,0),(27,28,1),(28,28,0),(29,29,0),(29,30,1),(30,30,0),(31,31,0);
 /*!40000 ALTER TABLE `sys_department_closure` ENABLE KEYS */;
 UNLOCK TABLES;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
-
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
--- Dump completed on 2026-09-12 16:06:22
--- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
---
--- Host: localhost    Database: oa
--- ------------------------------------------------------
--- Server version	8.0.46
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!50503 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
 -- Dumping data for table `sys_post`
@@ -712,33 +613,6 @@ LOCK TABLES `sys_post` WRITE;
 INSERT INTO `sys_post` (`id`, `name`, `created_at`, `updated_at`) VALUES (22,'系统管理岗','2026-09-10 10:18:42','2026-09-10 13:35:30'),(28,'业务经理','2026-09-10 13:35:14','2026-09-10 13:35:14'),(29,'核算岗','2026-09-10 13:35:34','2026-09-10 13:35:34'),(30,'公司领导','2026-09-10 13:54:27','2026-09-10 13:54:27'),(31,'执行总经理','2026-09-10 13:54:37','2026-09-10 13:54:37'),(32,'中心负责人','2026-09-10 13:54:43','2026-09-10 13:54:43'),(34,'部门负责人','2026-09-10 13:54:52','2026-09-10 13:54:52'),(36,'会计主管/内控','2026-09-10 16:20:38','2026-09-10 16:22:01'),(37,'会计','2026-09-10 16:20:48','2026-09-10 16:20:48'),(38,'内控主管','2026-09-10 16:20:59','2026-09-10 16:20:59'),(39,'内控专员','2026-09-10 16:21:13','2026-09-10 16:21:13'),(40,'法务','2026-09-10 16:22:18','2026-09-10 16:22:18'),(41,'法务主管','2026-09-10 16:22:28','2026-09-10 16:22:28'),(42,'行政专员','2026-09-10 16:22:34','2026-09-10 16:22:34'),(43,'行政主管','2026-09-10 16:22:40','2026-09-10 16:22:40'),(44,'商务专员','2026-09-10 16:22:52','2026-09-10 16:22:52'),(45,'运营服务主管','2026-09-10 16:23:14','2026-09-10 16:23:14'),(46,'交付主管','2026-09-10 16:23:22','2026-09-10 16:23:22'),(47,'财务经理','2026-09-10 16:23:28','2026-09-10 16:23:28'),(48,'出纳主管','2026-09-10 16:23:33','2026-09-10 16:23:33'),(49,'出纳','2026-09-10 16:23:39','2026-09-10 16:23:39'),(50,'系统管理员','2026-09-10 16:48:00','2026-09-10 16:48:00');
 /*!40000 ALTER TABLE `sys_post` ENABLE KEYS */;
 UNLOCK TABLES;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
-
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
--- Dump completed on 2026-09-12 16:06:22
--- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
---
--- Host: localhost    Database: oa
--- ------------------------------------------------------
--- Server version	8.0.46
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!50503 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
 -- Dumping data for table `sys_permission`
@@ -749,33 +623,6 @@ LOCK TABLES `sys_permission` WRITE;
 INSERT INTO `sys_permission` (`id`, `code`, `name`, `description`, `created_at`) VALUES (1,'VIEW_OWN_FORMS','可访问单据','查看本人提交的表单','2026-09-02 16:41:02'),(4,'SUBMIT_ALL_FORMS','可提交单据','提交全部业务类型表单','2026-09-02 16:41:02'),(9,'APPROVE_ALL_NODES','超级审批（代审任意节点）','超级管理员审批任意节点','2026-09-02 16:41:02'),(11,'CONFIGURE_FLOW_PERMISSION','配置流程与权限','维护流程、角色和权限','2026-09-02 16:41:02');
 /*!40000 ALTER TABLE `sys_permission` ENABLE KEYS */;
 UNLOCK TABLES;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
-
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
--- Dump completed on 2026-09-12 16:06:22
--- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
---
--- Host: localhost    Database: oa
--- ------------------------------------------------------
--- Server version	8.0.46
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!50503 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
 -- Dumping data for table `sys_role`
@@ -783,36 +630,9 @@ UNLOCK TABLES;
 
 LOCK TABLES `sys_role` WRITE;
 /*!40000 ALTER TABLE `sys_role` DISABLE KEYS */;
-INSERT INTO `sys_role` (`id`, `name`, `department`, `department_id`, `post`, `data_scope_id`, `data_scope`, `permissions`, `members`, `created_at`, `updated_at`) VALUES (20,'超级管理员','总经办',16,'系统管理岗',20,NULL,NULL,NULL,'2026-09-10 10:18:42','2026-09-10 13:35:31'),(24,'交付主管','交付部',30,'交付主管',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(25,'会计主管&内控','财务中心',20,'会计主管/内控',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(26,'公司领导','总经办',16,'公司领导',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(27,'内控专员','内控部',23,'内控专员',21,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(28,'内控主管','内控部',23,'内控主管',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(29,'出纳','资管中心',31,'出纳',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(30,'出纳主管','资管中心',31,'出纳主管',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(31,'商务专员','运营服务部',28,'商务专员',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(32,'执行总经理','总经办',16,'执行总经理',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(33,'核算会计','财务部',22,'会计',24,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-11 15:39:06'),(34,'法务','法务部',24,'法务',21,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(35,'法务主管','法务部',24,'法务主管',22,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-12 14:36:38'),(36,'行政专员','行政部',26,'行政专员',21,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(37,'行政主管','行政部',26,'行政主管',21,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(38,'财务经理','财务部',22,'财务经理',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(39,'运营服务主管','运营服务部',28,'运营服务主管',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(40,'普通员工',NULL,NULL,'普通员工',21,NULL,NULL,NULL,'2026-09-11 15:47:20','2026-09-11 15:47:20');
+INSERT INTO `sys_role` (`id`, `name`, `department`, `department_id`, `post`, `data_scope_id`, `data_scope`, `permissions`, `members`, `created_at`, `updated_at`) VALUES (20,'超级管理员','财务部',22,'系统管理岗',20,NULL,NULL,NULL,'2026-09-10 10:18:42','2026-09-12 17:30:05'),(24,'交付主管','交付部',30,'交付主管',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(25,'会计主管&内控','财务中心',20,'会计主管/内控',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(26,'公司领导','总经办',16,'公司领导',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(27,'内控专员','内控部',23,'内控专员',21,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(28,'内控主管','内控部',23,'内控主管',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(29,'出纳','资管中心',31,'出纳',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(30,'出纳主管','资管中心',31,'出纳主管',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(31,'商务专员','运营服务部',28,'商务专员',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(32,'执行总经理','总经办',16,'执行总经理',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-12 17:30:50'),(33,'核算会计','财务部',22,'会计',24,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-11 15:39:06'),(34,'法务','法务部',24,'法务',21,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(35,'法务主管','法务部',24,'法务主管',22,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-12 14:36:38'),(36,'行政专员','行政部',26,'行政专员',21,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(37,'行政主管','行政部',26,'行政主管',21,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(38,'财务经理','财务部',22,'财务经理',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(39,'运营服务主管','运营服务部',28,'运营服务主管',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(40,'普通员工',NULL,NULL,'普通员工',21,NULL,NULL,NULL,'2026-09-11 15:47:20','2026-09-11 15:47:20');
 /*!40000 ALTER TABLE `sys_role` ENABLE KEYS */;
 UNLOCK TABLES;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
-
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
--- Dump completed on 2026-09-12 16:06:22
--- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
---
--- Host: localhost    Database: oa
--- ------------------------------------------------------
--- Server version	8.0.46
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!50503 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
 -- Dumping data for table `sys_role_permission`
@@ -823,33 +643,6 @@ LOCK TABLES `sys_role_permission` WRITE;
 INSERT INTO `sys_role_permission` (`role_id`, `permission_id`) VALUES (20,1),(24,1),(25,1),(26,1),(27,1),(28,1),(29,1),(30,1),(31,1),(32,1),(33,1),(34,1),(35,1),(36,1),(37,1),(38,1),(39,1),(40,1),(20,4),(24,4),(25,4),(26,4),(27,4),(28,4),(29,4),(30,4),(31,4),(32,4),(33,4),(34,4),(35,4),(36,4),(37,4),(38,4),(39,4),(40,4),(20,9),(20,11);
 /*!40000 ALTER TABLE `sys_role_permission` ENABLE KEYS */;
 UNLOCK TABLES;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
-
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
--- Dump completed on 2026-09-12 16:06:22
--- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
---
--- Host: localhost    Database: oa
--- ------------------------------------------------------
--- Server version	8.0.46
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!50503 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
 -- Dumping data for table `sys_role_scope_department`
@@ -860,33 +653,6 @@ LOCK TABLES `sys_role_scope_department` WRITE;
 INSERT INTO `sys_role_scope_department` (`role_id`, `department_id`) VALUES (33,16),(33,27),(33,28),(33,29),(33,30),(33,31);
 /*!40000 ALTER TABLE `sys_role_scope_department` ENABLE KEYS */;
 UNLOCK TABLES;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
-
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
--- Dump completed on 2026-09-12 16:06:22
--- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
---
--- Host: localhost    Database: oa
--- ------------------------------------------------------
--- Server version	8.0.46
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!50503 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
 -- Dumping data for table `form_template`
@@ -897,33 +663,6 @@ LOCK TABLES `form_template` WRITE;
 INSERT INTO `form_template` (`id`, `business_type`, `name`, `doc_prefix`, `flow_config_id`, `version`, `status`, `sort_order`, `category`, `attachment_requirements`) VALUES (1,'通用审批单','通用审批单','SP',1,2,'ENABLED',0,'DAILY_PAYMENT','[\"关联前置单据\",\"业务证明资料\",\"发票\",\"收款信息\"]');
 /*!40000 ALTER TABLE `form_template` ENABLE KEYS */;
 UNLOCK TABLES;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
-
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
--- Dump completed on 2026-09-12 16:06:22
--- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
---
--- Host: localhost    Database: oa
--- ------------------------------------------------------
--- Server version	8.0.46
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!50503 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
 -- Dumping data for table `form_field`
@@ -934,33 +673,6 @@ LOCK TABLES `form_field` WRITE;
 INSERT INTO `form_field` (`id`, `template_id`, `field_key`, `label`, `control_type`, `required`, `options`, `reserved`, `sort_order`, `enabled`) VALUES (40,1,'title','单据标题','TEXT',1,'[]',1,1,1),(41,1,'company','所属公司','SELECT',1,'[\"海峡金\",\"海峡金供应链\"]',0,2,1),(42,1,'amount','金额','NUMBER',1,'[]',1,3,1),(43,1,'invoiceSummary','发票摘要','TEXT',0,'[]',0,4,1),(44,1,'reason','事由明细','TEXTAREA',1,'[]',0,5,1),(45,1,'contractNo','合同编号','TEXT',0,'[]',0,6,1),(46,1,'involvesFunds','是否涉及资金','BOOLEAN',0,'[]',1,7,1),(47,1,'requiresAdminReview','是否需行政复核','BOOLEAN',0,'[]',1,8,1),(48,1,'businessMode','业务模式','SELECT',0,'[\"标准\",\"非标\"]',1,9,1),(49,1,'needPostMaterial','是否后置补材料','BOOLEAN',0,'[]',1,10,1),(50,1,'sealProject','用印项目','TEXT',0,'[]',0,11,1),(51,1,'sealType','印章类型','SELECT',0,'[\"公章\",\"合同章\",\"法人章\",\"财务章\"]',0,12,1),(52,1,'sealDepartment','用印部门','TEXT',0,'[]',0,13,1),(53,1,'sealTime','用印时间','DATE',0,'[]',0,14,1),(54,1,'sealFileName','用印文件名','TEXT',0,'[]',0,15,1),(55,1,'sealReason','用印事由','TEXTAREA',0,'[]',0,16,1);
 /*!40000 ALTER TABLE `form_field` ENABLE KEYS */;
 UNLOCK TABLES;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
-
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
--- Dump completed on 2026-09-12 16:06:22
--- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
---
--- Host: localhost    Database: oa
--- ------------------------------------------------------
--- Server version	8.0.46
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!50503 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
 -- Dumping data for table `flow_config`
@@ -971,33 +683,6 @@ LOCK TABLES `flow_config` WRITE;
 INSERT INTO `flow_config` (`id`, `type`, `category`, `nodes`, `created_at`, `updated_at`) VALUES (1,'费用报销','DAILY',NULL,'2026-09-12 11:37:53','2026-09-12 15:45:36');
 /*!40000 ALTER TABLE `flow_config` ENABLE KEYS */;
 UNLOCK TABLES;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
-
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
--- Dump completed on 2026-09-12 16:06:22
--- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
---
--- Host: localhost    Database: oa
--- ------------------------------------------------------
--- Server version	8.0.46
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!50503 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
 -- Dumping data for table `flow_node_config`
@@ -1005,36 +690,9 @@ UNLOCK TABLES;
 
 LOCK TABLES `flow_node_config` WRITE;
 /*!40000 ALTER TABLE `flow_node_config` DISABLE KEYS */;
-INSERT INTO `flow_node_config` (`id`, `flow_config_id`, `name`, `node_type`, `assignee_role`, `sort_order`, `cc_targets`) VALUES (300,1,'发起人','START',NULL,0,NULL),(301,1,'直属主管','APPROVAL','直属主管',1,NULL),(302,1,'会计（按部门）','APPROVAL','会计（按部门）',2,NULL),(303,1,'会计主管&内控','APPROVAL','会计主管&内控',3,NULL),(304,1,'公司领导（大额）','APPROVAL','公司领导',4,NULL),(305,1,'出纳','APPROVAL','出纳',5,NULL),(306,1,'抄送相关负责人','CC',NULL,6,'[{\"type\":\"ROLE\",\"value\":\"会计主管&内控\"},{\"type\":\"ROLE\",\"value\":\"出纳\"}]');
+INSERT INTO `flow_node_config` (`id`, `flow_config_id`, `name`, `node_type`, `assignee_role`, `sort_order`, `cc_targets`) VALUES (314,1,'发起人','START',NULL,0,NULL),(315,1,'直属主管','APPROVAL','直属主管',1,NULL),(316,1,'会计（按部门）','APPROVAL','会计（按部门）',2,NULL),(317,1,'会计主管&内控','APPROVAL','会计主管&内控',3,NULL),(318,1,'公司领导（大额）','APPROVAL','公司领导',4,NULL),(319,1,'出纳','APPROVAL','出纳',5,NULL),(320,1,'抄送相关负责人','CC',NULL,6,'[{\"type\":\"ROLE\",\"value\":\"会计主管&内控\"},{\"type\":\"ROLE\",\"value\":\"出纳\"}]');
 /*!40000 ALTER TABLE `flow_node_config` ENABLE KEYS */;
 UNLOCK TABLES;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
-
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
--- Dump completed on 2026-09-12 16:06:22
--- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
---
--- Host: localhost    Database: oa
--- ------------------------------------------------------
--- Server version	8.0.46
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!50503 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
 -- Dumping data for table `flow_condition_rule`
@@ -1042,36 +700,9 @@ UNLOCK TABLES;
 
 LOCK TABLES `flow_condition_rule` WRITE;
 /*!40000 ALTER TABLE `flow_condition_rule` DISABLE KEYS */;
-INSERT INTO `flow_condition_rule` (`id`, `flow_config_id`, `variable_name`, `operator`, `expected_value`, `target_node_name`, `sort_order`) VALUES (39,1,'amount','GREATER_THAN_OR_EQUAL','20000','公司领导（大额）',0);
+INSERT INTO `flow_condition_rule` (`id`, `flow_config_id`, `variable_name`, `operator`, `expected_value`, `target_node_name`, `sort_order`) VALUES (41,1,'amount','GREATER_THAN_OR_EQUAL','20000','公司领导（大额）',0);
 /*!40000 ALTER TABLE `flow_condition_rule` ENABLE KEYS */;
 UNLOCK TABLES;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
-
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
--- Dump completed on 2026-09-12 16:06:22
--- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
---
--- Host: localhost    Database: oa
--- ------------------------------------------------------
--- Server version	8.0.46
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!50503 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
 -- Dumping data for table `sys_user_service_dept`
@@ -1082,33 +713,6 @@ LOCK TABLES `sys_user_service_dept` WRITE;
 INSERT INTO `sys_user_service_dept` (`id`, `user_id`, `department_id`) VALUES (2,64,22);
 /*!40000 ALTER TABLE `sys_user_service_dept` ENABLE KEYS */;
 UNLOCK TABLES;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
-
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
--- Dump completed on 2026-09-12 16:06:22
--- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
---
--- Host: localhost    Database: oa
--- ------------------------------------------------------
--- Server version	8.0.46
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!50503 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
 -- Dumping data for table `doc_seq`
@@ -1129,44 +733,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-12 16:06:22
--- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
---
--- Host: localhost    Database: oa
--- ------------------------------------------------------
--- Server version	8.0.46
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!50503 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
-
---
--- Dumping data for table `sys_user_department`
---
-
-LOCK TABLES `sys_user_department` WRITE;
-/*!40000 ALTER TABLE `sys_user_department` DISABLE KEYS */;
-INSERT INTO `sys_user_department` (`id`, `user_id`, `department_id`, `primary_department`) VALUES (86,62,22,0),(89,61,22,0),(92,63,20,0);
-/*!40000 ALTER TABLE `sys_user_department` ENABLE KEYS */;
-UNLOCK TABLES;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
-
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
--- Dump completed on 2026-09-12 16:06:22
+-- Dump completed on 2026-09-12 18:26:38
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -1191,7 +758,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `sys_user` WRITE;
 /*!40000 ALTER TABLE `sys_user` DISABLE KEYS */;
-INSERT INTO `sys_user` (`id`, `name`, `job_no`, `account`, `password`, `department`, `department_id`, `post`, `post_id`, `status`, `manager_id`, `created_at`, `updated_at`) VALUES (42,'超级管理员','HXJ000','admin','$2y$10$eWcufB2byZqOZspjH6UaO.4PKvivPpotPILxGL1LscJspy4a5t0VW','总经办',16,'系统管理岗',22,'ACTIVE',NULL,'2026-09-10 10:18:42','2026-09-10 14:44:37'),(44,'林安然','HXJ001','linanran','$2a$10$GNjz64rBH0.wWKzY1YBWN.BS19WmRKzIW8D34cWxmCjrJ49I2pUTW','总经办',16,'系统管理员',50,'ACTIVE',NULL,'2026-09-10 16:48:50','2026-09-10 16:48:50'),(45,'连力','HXJ002','lianli','$2a$10$.vW4ukt3wGxubcKasIAiAe3Xwchbc3RzsKQLC0I.bLFgwszb4REyW','总经办',16,'公司领导',30,'ACTIVE',NULL,'2026-09-10 16:48:50','2026-09-10 16:48:50'),(46,'王强','HXJ003','wangqiang','$2a$10$SHfmYgLsXWS3x14jzcGpn.Fe0Tnft7IRWmqpv6sCv8w3JKH2LH0KC','总经办',16,'公司领导',30,'ACTIVE',45,'2026-09-10 16:48:50','2026-09-12 15:45:36'),(49,'刘婷','HXJ006','liuting','$2a$10$AP7j2D5p6y0/chZeArWei.mJqVVUzRSSE12ikNnAXka.pIu.Z7zFa','资管中心',31,'出纳主管',48,'ACTIVE',46,'2026-09-10 16:48:50','2026-09-12 15:45:36'),(51,'张龙','HXJ008','zhanglong','$2a$10$Oww4x4g9zIKupEQBWpR/6e6wGrdCFMRwshln70/rBKe.Xk7ZSustW','交付部',30,'交付主管',46,'ACTIVE',NULL,'2026-09-10 16:50:55','2026-09-12 16:05:51'),(52,'刘佳慧','HXJ009','liujiahui','$2a$10$PHOrkVF16mgFvhAnLDF9C.bnyUm5QFzzFJjSFhld07G29EQj0GtiC','行政部',26,'行政主管',43,'ACTIVE',NULL,'2026-09-10 16:53:09','2026-09-12 16:05:51'),(55,'吴荷珍','HXJ012','wuhezhen','$2a$10$wpGeuWUZMbZCMBv61lTpcub6M2bA9FePtm5.Q41vXul9onCWSqXou','财务部',22,'财务经理',47,'ACTIVE',46,'2026-09-10 16:53:10','2026-09-12 15:45:36'),(57,'黄政哲','HXJ014','huangzhengzhe','$2a$10$nvF4IzEsyrecTtGwLY7/YOeMuKjnrqvlccC72vay6.keJ4YUjTZb2','运营服务部',28,'运营服务主管',45,'ACTIVE',NULL,'2026-09-10 16:53:10','2026-09-12 16:05:51'),(61,'汪洋','HXJ018','wangyang','$2a$10$Nara0EGzEEJi0eHp5sEqMe1mdlXcN6yjzQAL3QdulVTBvBdNS4vLS','财务中心',20,'会计主管/内控',36,'ACTIVE',46,'2026-09-10 16:53:10','2026-09-12 15:45:36'),(62,'姚志豪','HXJ019','yaozhihao','$2a$10$nEEO/OJ9PNyQM6TDbjTrPepwk58q6WOulStmXW542IoU546Q7lavi','财务中心',20,'会计主管/内控',36,'ACTIVE',46,'2026-09-10 16:53:11','2026-09-12 15:45:36'),(63,'翁婷婷','HXJ020','wengtingting','$2a$10$0AGRtjcHmlmbZQ3Z5jTq5.RX1ej76KF/mXTZXHl2hqy7yySuSvPce','财务中心',31,'会计主管/内控',49,'ACTIVE',49,'2026-09-10 16:53:11','2026-09-12 15:45:36'),(64,'冯训漪','HXJ021','fengxunyi','$2a$10$wefnmlxdt1mndiNnDLhZSeQqWZIQLb4WA00Bd9SKZ5fkA3EPVFbiG','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:11','2026-09-12 15:45:36'),(65,'朱昀怡','HXJ022','zhuyunyi','$2a$10$BQFg7uyij8qPEyrWXtjjDee4tKcTc9F3G9GvmV4tH2hjUq8i9tJ7O','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:11','2026-09-12 15:45:36'),(66,'施惠君','HXJ023','shihuijun','$2a$10$uqw6b8lB/YYvsL31iy18eeSJr2iWCO.DYAret1WjtClkynQnbh0fq','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:11','2026-09-12 15:45:36'),(67,'蔡赐绵','HXJ024','caicimian','$2a$10$Bqe3VTfGMl8G5aU3VBHKw.4YMmaQUGkLC3mi4aKA.b7I6/29wJO6S','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:11','2026-09-12 15:45:36'),(68,'李小妹','HXJ025','lixiaomei','$2a$10$jBg.wxxKyyp5Mjv4AtA/YeE61507czkIPn96sKT2GTRah//46QBSW','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:11','2026-09-12 15:45:36'),(69,'石瀚文','HXJ026','shihanwen','$2a$10$.ZXxZX0jXatDLq0Z0vj/PeqxoBLKZpVKsTM8nake8hJAm794rUBQi','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:11','2026-09-12 15:45:36'),(70,'张欣怡','HXJ027','zhangxinyi','$2a$10$FSg4/kjJ2Illb8uNSm60GedPWyWahsC/0Amo/8qxHT.eLb/TKE9wy','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(71,'温超群','HXJ028','wenchaoqun','$2a$10$vGd8DOw3SeirttciNEpfH.unDAZtLhFzVcUEybMdcAhyaBvHyXcQS','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(72,'孙倩倩','HXJ029','sunqianqian','$2a$10$RD3H0MCaHTG9SRWCzIzPoO9ZVi8oweRudXi2duCZZ.ufH24OLewKS','内控部',23,'内控主管',38,'ACTIVE',NULL,'2026-09-10 16:53:12','2026-09-12 16:05:51'),(73,'郑宁静','HXJ030','zhengningjing','$2a$10$SOw/ZFwXzfK7iS8teVYWfe06k4eVNvUoUpuSFOOZ0F9jWbGwdoQ2S','内控部',23,'内控专员',39,'ACTIVE',NULL,'2026-09-10 16:53:12','2026-09-12 16:05:51'),(74,'唐菁蔚','HXJ031','tangjingwei','$2a$10$n/7DYhCtWOXmBw.o2oG6L.ULy/N5WkZ.evzhlXPAJWkQUbua3lpLS','法务部',24,'法务',40,'ACTIVE',NULL,'2026-09-10 16:53:12','2026-09-12 16:05:51'),(75,'陈楠','HXJ032','chennan','$2a$10$KacDozfbOhMn5kmscBFmCu9pFkCaCmLgGbtYL9BioXuvrsj6StaBa','法务部',24,'法务主管',41,'ACTIVE',NULL,'2026-09-10 16:53:12','2026-09-12 16:05:51'),(76,'朱铭骏','HXJ033','zhumingjun','$2a$10$ZsRipWdrw20upluSMr6mn.H9yjHax3XHvVzd.bjLUepD91BrIs00K','行政部',26,'行政专员',42,'ACTIVE',52,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(77,'刘颖宁','HXJ034','liuyingning','$2a$10$r7JnrFXt6XcuiSRynMiMwOTLzfmJJi7U5Lit4xuOwoRgoS6/GP9ne','运营服务部',28,'商务专员',44,'ACTIVE',57,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(78,'杨淑欢','HXJ035','yangshuhuan','$2a$10$nc99of3Avthj92dKwUrlJuY0mKQC/VjpB7U6.dXbFE90jgM8YiOKW','运营服务部',28,'商务专员',44,'ACTIVE',57,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(79,'龚蓉','HXJ036','gongrong','$2a$10$C9PPgQC4sw4gyxHIP4NKmeT17UlpdkL32GhmIdokq7a.oMwckK4vm','运营服务部',28,'商务专员',44,'ACTIVE',57,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(80,'林丽婷','HXJ037','linliting','$2a$10$BWizc02WlGfxGNLqiNxRkuw1cWatbQwHTSBuApDDhA/0UqPR9Jh3.','资管中心',31,'出纳',49,'ACTIVE',49,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(81,'陈伟璇','HXJ038','chenweixuan','$2a$10$q9Nobgi3SnC0JVPVudwbUeSX5ff98XIHoVeK7JXwRu3/9bJUiAyHi','资管中心',31,'出纳',49,'ACTIVE',49,'2026-09-10 16:53:13','2026-09-12 15:45:36'),(82,'沈盼静','HXJ039','shenpanjing','$2a$10$YWRCHM/zc78z8jp50FTdSuVer/zEORkNtVhq0koaHMyA4qYY1.ncy','资管中心',31,'出纳',49,'ACTIVE',49,'2026-09-10 16:53:13','2026-09-12 15:45:36'),(83,'李展仪','HXJ040','lizhanyi','$2a$10$RY5FzoU3bRKVu9wghgOnielLLvmU8kyKQVhWM95XnXiNPlQC2Yl6e','资管中心',31,'出纳',49,'ACTIVE',49,'2026-09-10 16:53:13','2026-09-12 15:45:36');
+INSERT INTO `sys_user` (`id`, `name`, `job_no`, `account`, `password`, `department`, `department_id`, `post`, `post_id`, `status`, `manager_id`, `created_at`, `updated_at`) VALUES (42,'超级管理员','HXJ000','admin','$2y$10$eWcufB2byZqOZspjH6UaO.4PKvivPpotPILxGL1LscJspy4a5t0VW','总经办',16,'系统管理岗',22,'ACTIVE',NULL,'2026-09-10 10:18:42','2026-09-10 14:44:37'),(44,'林安然','HXJ001','linanran','$2a$10$GNjz64rBH0.wWKzY1YBWN.BS19WmRKzIW8D34cWxmCjrJ49I2pUTW','总经办',16,'系统管理员',50,'ACTIVE',NULL,'2026-09-10 16:48:50','2026-09-10 16:48:50'),(45,'连力','HXJ002','lianli','$2a$10$.vW4ukt3wGxubcKasIAiAe3Xwchbc3RzsKQLC0I.bLFgwszb4REyW','总经办',16,'公司领导',30,'ACTIVE',NULL,'2026-09-10 16:48:50','2026-09-10 16:48:50'),(46,'王强','HXJ003','wangqiang','$2a$10$SHfmYgLsXWS3x14jzcGpn.Fe0Tnft7IRWmqpv6sCv8w3JKH2LH0KC','总经办',16,'公司领导',30,'ACTIVE',45,'2026-09-10 16:48:50','2026-09-12 15:45:36'),(49,'刘婷','HXJ006','liuting','$2a$10$AP7j2D5p6y0/chZeArWei.mJqVVUzRSSE12ikNnAXka.pIu.Z7zFa','资管中心',31,'出纳主管',48,'ACTIVE',46,'2026-09-10 16:48:50','2026-09-12 15:45:36'),(51,'张龙','HXJ008','zhanglong','$2a$10$Oww4x4g9zIKupEQBWpR/6e6wGrdCFMRwshln70/rBKe.Xk7ZSustW','交付部',30,'交付主管',46,'ACTIVE',NULL,'2026-09-10 16:50:55','2026-09-12 16:05:51'),(52,'刘佳慧','HXJ009','liujiahui','$2a$10$PHOrkVF16mgFvhAnLDF9C.bnyUm5QFzzFJjSFhld07G29EQj0GtiC','行政部',26,'行政主管',43,'ACTIVE',NULL,'2026-09-10 16:53:09','2026-09-12 16:05:51'),(55,'吴荷珍','HXJ012','wuhezhen','$2a$10$wpGeuWUZMbZCMBv61lTpcub6M2bA9FePtm5.Q41vXul9onCWSqXou','财务部',22,'财务经理',47,'ACTIVE',46,'2026-09-10 16:53:10','2026-09-12 15:45:36'),(57,'黄政哲','HXJ014','huangzhengzhe','$2a$10$nvF4IzEsyrecTtGwLY7/YOeMuKjnrqvlccC72vay6.keJ4YUjTZb2','运营服务部',28,'运营服务主管',45,'ACTIVE',NULL,'2026-09-10 16:53:10','2026-09-12 16:05:51'),(61,'汪洋','HXJ018','wangyang','$2a$10$Nara0EGzEEJi0eHp5sEqMe1mdlXcN6yjzQAL3QdulVTBvBdNS4vLS','财务中心',20,'会计主管/内控',36,'ACTIVE',46,'2026-09-10 16:53:10','2026-09-12 15:45:36'),(62,'姚志豪','HXJ019','yaozhihao','$2a$10$nEEO/OJ9PNyQM6TDbjTrPepwk58q6WOulStmXW542IoU546Q7lavi','财务中心',20,'会计主管/内控',36,'ACTIVE',46,'2026-09-10 16:53:11','2026-09-12 15:45:36'),(63,'翁婷婷','HXJ020','wengtingting','$2a$10$0AGRtjcHmlmbZQ3Z5jTq5.RX1ej76KF/mXTZXHl2hqy7yySuSvPce','资管中心',31,'出纳',49,'ACTIVE',49,'2026-09-10 16:53:11','2026-09-12 16:11:01'),(64,'冯训漪','HXJ021','fengxunyi','$2a$10$wefnmlxdt1mndiNnDLhZSeQqWZIQLb4WA00Bd9SKZ5fkA3EPVFbiG','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:11','2026-09-12 15:45:36'),(65,'朱昀怡','HXJ022','zhuyunyi','$2a$10$BQFg7uyij8qPEyrWXtjjDee4tKcTc9F3G9GvmV4tH2hjUq8i9tJ7O','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:11','2026-09-12 15:45:36'),(66,'施惠君','HXJ023','shihuijun','$2a$10$uqw6b8lB/YYvsL31iy18eeSJr2iWCO.DYAret1WjtClkynQnbh0fq','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:11','2026-09-12 15:45:36'),(67,'蔡赐绵','HXJ024','caicimian','$2a$10$Bqe3VTfGMl8G5aU3VBHKw.4YMmaQUGkLC3mi4aKA.b7I6/29wJO6S','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:11','2026-09-12 15:45:36'),(68,'李小妹','HXJ025','lixiaomei','$2a$10$jBg.wxxKyyp5Mjv4AtA/YeE61507czkIPn96sKT2GTRah//46QBSW','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:11','2026-09-12 15:45:36'),(69,'石瀚文','HXJ026','shihanwen','$2a$10$.ZXxZX0jXatDLq0Z0vj/PeqxoBLKZpVKsTM8nake8hJAm794rUBQi','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:11','2026-09-12 15:45:36'),(70,'张欣怡','HXJ027','zhangxinyi','$2a$10$FSg4/kjJ2Illb8uNSm60GedPWyWahsC/0Amo/8qxHT.eLb/TKE9wy','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(71,'温超群','HXJ028','wenchaoqun','$2a$10$vGd8DOw3SeirttciNEpfH.unDAZtLhFzVcUEybMdcAhyaBvHyXcQS','财务部',22,'会计',37,'ACTIVE',55,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(72,'孙倩倩','HXJ029','sunqianqian','$2a$10$RD3H0MCaHTG9SRWCzIzPoO9ZVi8oweRudXi2duCZZ.ufH24OLewKS','内控部',23,'内控主管',38,'ACTIVE',NULL,'2026-09-10 16:53:12','2026-09-12 16:05:51'),(73,'郑宁静','HXJ030','zhengningjing','$2a$10$SOw/ZFwXzfK7iS8teVYWfe06k4eVNvUoUpuSFOOZ0F9jWbGwdoQ2S','内控部',23,'内控专员',39,'ACTIVE',NULL,'2026-09-10 16:53:12','2026-09-12 16:05:51'),(74,'唐菁蔚','HXJ031','tangjingwei','$2a$10$n/7DYhCtWOXmBw.o2oG6L.ULy/N5WkZ.evzhlXPAJWkQUbua3lpLS','法务部',24,'法务',40,'ACTIVE',NULL,'2026-09-10 16:53:12','2026-09-12 16:05:51'),(75,'陈楠','HXJ032','chennan','$2a$10$KacDozfbOhMn5kmscBFmCu9pFkCaCmLgGbtYL9BioXuvrsj6StaBa','法务部',24,'法务主管',41,'ACTIVE',NULL,'2026-09-10 16:53:12','2026-09-12 16:05:51'),(76,'朱铭骏','HXJ033','zhumingjun','$2a$10$ZsRipWdrw20upluSMr6mn.H9yjHax3XHvVzd.bjLUepD91BrIs00K','行政部',26,'行政专员',42,'ACTIVE',52,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(77,'刘颖宁','HXJ034','liuyingning','$2a$10$r7JnrFXt6XcuiSRynMiMwOTLzfmJJi7U5Lit4xuOwoRgoS6/GP9ne','运营服务部',28,'商务专员',44,'ACTIVE',57,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(78,'杨淑欢','HXJ035','yangshuhuan','$2a$10$nc99of3Avthj92dKwUrlJuY0mKQC/VjpB7U6.dXbFE90jgM8YiOKW','运营服务部',28,'商务专员',44,'ACTIVE',57,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(79,'龚蓉','HXJ036','gongrong','$2a$10$C9PPgQC4sw4gyxHIP4NKmeT17UlpdkL32GhmIdokq7a.oMwckK4vm','运营服务部',28,'商务专员',44,'ACTIVE',57,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(80,'林丽婷','HXJ037','linliting','$2a$10$BWizc02WlGfxGNLqiNxRkuw1cWatbQwHTSBuApDDhA/0UqPR9Jh3.','资管中心',31,'出纳',49,'ACTIVE',49,'2026-09-10 16:53:12','2026-09-12 15:45:36'),(81,'陈伟璇','HXJ038','chenweixuan','$2a$10$q9Nobgi3SnC0JVPVudwbUeSX5ff98XIHoVeK7JXwRu3/9bJUiAyHi','资管中心',31,'出纳',49,'ACTIVE',49,'2026-09-10 16:53:13','2026-09-12 15:45:36'),(82,'沈盼静','HXJ039','shenpanjing','$2a$10$YWRCHM/zc78z8jp50FTdSuVer/zEORkNtVhq0koaHMyA4qYY1.ncy','资管中心',31,'出纳',49,'ACTIVE',49,'2026-09-10 16:53:13','2026-09-12 15:45:36'),(83,'李展仪','HXJ040','lizhanyi','$2a$10$RY5FzoU3bRKVu9wghgOnielLLvmU8kyKQVhWM95XnXiNPlQC2Yl6e','资管中心',31,'出纳',49,'ACTIVE',49,'2026-09-10 16:53:13','2026-09-12 15:45:36');
 /*!40000 ALTER TABLE `sys_user` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -1204,7 +771,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-12 16:06:22
+-- Dump completed on 2026-09-12 18:26:47
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -1242,7 +809,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-12 16:06:22
+-- Dump completed on 2026-09-12 18:26:47
 
 
 SET FOREIGN_KEY_CHECKS = 1;

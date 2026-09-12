@@ -391,21 +391,6 @@ class PermissionManagementServiceTest {
                 .hasMessage("部门被自定义数据范围引用，无法删除");
     }
 
-    @Test
-    void shouldKeepMembershipSemanticsForMultiDepartment() {
-        // 归属部门 = 主部门 + 兼职部门；角色户口（合规岗归属风控部）不混入
-        Long zgc = departmentService.create(new SaveDepartmentRequest("资管中心测试", null, 3)).id();
-        Long fg = departmentService.create(new SaveDepartmentRequest("风控部测试", null, 4)).id();
-        RoleResponse zgcRole = roleService.create(new SaveRoleRequest(
-                "资管出纳", zgc, "出纳", "OWN", null, List.of(permission.getCode())));
-        RoleResponse fgRole = roleService.create(new SaveRoleRequest(
-                "合规岗", fg, "合规岗", "OWN", null, List.of(permission.getCode())));
-        EmployeeResponse emp = employeeService.create(new CreateEmployeeRequest(
-                "跨部门员工", "HXJ301", "crossdept", "password", departmentId, postId, null,
-                List.of(role.getName(), zgcRole.name(), fgRole.name()), List.of(zgc)));
-        assertThat(emp.extraDepartmentIds()).containsExactly(zgc);
-        assertThat(emp.extraDepartments()).containsExactly("资管中心测试");
-    }
 
     @Test
     void shouldGuardRoleReferencedByCcRecord() {
@@ -427,26 +412,4 @@ class PermissionManagementServiceTest {
                 .hasMessage("角色被抄送记录引用，无法删除");
     }
 
-    @Test
-    void shouldSupportSecondaryDepartments() {
-        Long dept2 = departmentService.create(new SaveDepartmentRequest("风控部", null, 2)).id();
-        Long dept3 = departmentService.create(new SaveDepartmentRequest("战略部", null, 3)).id();
-        EmployeeResponse emp = employeeService.create(new CreateEmployeeRequest(
-                "兼职工", "HXJ301", "jianzhi", "password", departmentId, postId, null,
-                List.of(role.getName()), List.of(dept2, dept3)));
-        assertThat(emp.departmentId()).isEqualTo(departmentId);
-        assertThat(emp.extraDepartmentIds()).containsExactlyInAnyOrder(dept2, dept3);
-        assertThat(emp.extraDepartments()).containsExactlyInAnyOrder("风控部", "战略部");
-
-        // 编辑去掉一个兼职部门
-        EmployeeResponse updated = employeeService.update(emp.id(), new UpdateEmployeeRequest(
-                "兼职工", "HXJ301", departmentId, postId, null, UserStatusEnum.ACTIVE,
-                null, List.of(role.getName()), List.of(dept3)));
-        assertThat(updated.extraDepartmentIds()).containsExactly(dept3);
-
-        // 兼职部门删除守卫：战略部仍被兼职工引用
-        assertThatThrownBy(() -> departmentService.delete(dept3))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage("部门有兼职员工，无法删除");
-    }
 }

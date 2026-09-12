@@ -16,8 +16,7 @@ public record CreateEmployeeRequest(
         @Schema(description = "岗位ID（sys_post 字典）") @NotNull Long postId,
         @Schema(description = "直属主管登录账号（汇报线，可空）") String managerAccount,
         @Schema(description = "分配的角色名称列表，与 EmployeeResponse.roles 同源可原样回写")
-        @NotEmpty List<String> roles,
-        @Schema(description = "兼职部门ID列表（可空；主部门用 departmentId）") List<Long> extraDepartmentIds) {
+        @NotEmpty List<String> roles) {
 
     /**
      * 紧凑构造器：集合组件防御性拷贝为不可变列表，null 归一化为不可变空列表。
@@ -27,10 +26,5 @@ public record CreateEmployeeRequest(
     public CreateEmployeeRequest {
         roles = roles == null ? List.of() : List.copyOf(roles);
     }
-    /** 兼容构造：未传兼职部门时视为无兼职。 */
-    public CreateEmployeeRequest(
-            String name, String jobNo, String account, String password,
-            Long departmentId, Long postId, String managerAccount, List<String> roles) {
-        this(name, jobNo, account, password, departmentId, postId, managerAccount, roles, null);
-    }
+
 }

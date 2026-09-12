@@ -34,7 +34,7 @@ public class EmployeeManagementService {
     private final PostManagementService postService;
     private final EmployeeOffboardingService offboardingService;
     private final com.hxj.repository.SysDepartmentRepository departmentRepository;
-    private final com.hxj.repository.SysUserDepartmentRepository userDepartmentRepository;
+
 
     public EmployeeManagementService(
             SysUserRepository userRepository,
@@ -43,8 +43,7 @@ public class EmployeeManagementService {
             DepartmentManagementService departmentService,
             PostManagementService postService,
             EmployeeOffboardingService offboardingService,
-            com.hxj.repository.SysDepartmentRepository departmentRepository,
-            com.hxj.repository.SysUserDepartmentRepository userDepartmentRepository) {
+            com.hxj.repository.SysDepartmentRepository departmentRepository) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
@@ -52,7 +51,7 @@ public class EmployeeManagementService {
         this.postService = postService;
         this.offboardingService = offboardingService;
         this.departmentRepository = departmentRepository;
-        this.userDepartmentRepository = userDepartmentRepository;
+
     }
 
     /** 创建员工账号：解析部门/岗位字典引用，写入外键与快照。 */
@@ -77,7 +76,7 @@ public class EmployeeManagementService {
         user.setStatus(UserStatusEnum.ACTIVE);
         replaceRoles(user, request.roles());
         SysUser saved = userRepository.save(user);
-        syncExtraDepartments(saved, request.extraDepartmentIds());
+
         return toResponse(saved);
     }
 
@@ -113,7 +112,7 @@ public class EmployeeManagementService {
             user.setPassword(passwordEncoder.encode(request.newPassword()));
         }
         replaceRoles(user, request.roles());
-        syncExtraDepartments(user, request.extraDepartmentIds());
+
         return toResponse(user);
     }
 
@@ -177,51 +176,17 @@ public class EmployeeManagementService {
         roles.forEach(user::addRole);
     }
 
-    /** 同步兼职部门：全删全建（主部门不入本表），部门须真实存在。 */
-    private void syncExtraDepartments(SysUser user, java.util.List<Long> extraDepartmentIds) {
-        userDepartmentRepository.deleteByUserId(user.getId());
-        // 立即落库删除，避免同一事务内先插后删的 flush 顺序触发唯一键冲突
-        userDepartmentRepository.flush();
-        if (extraDepartmentIds == null) {
-            return;
-        }
-        java.util.LinkedHashSet<Long> distinct = new java.util.LinkedHashSet<>(extraDepartmentIds);
-        for (Long deptId : distinct) {
-            if (deptId.equals(user.getDepartmentId())) {
-                continue;
-            }
-            com.hxj.entity.SysUserDepartment rel = new com.hxj.entity.SysUserDepartment();
-            rel.setUser(user);
-            rel.setDepartment(departmentService.requireDepartment(deptId));
-            rel.setPrimaryDepartment(false);
-            userDepartmentRepository.save(rel);
-        }
-    }
-
     private EmployeeResponse toResponse(SysUser user) {
         SysUser manager = user.getManagerId() == null
                 ? null : userRepository.findById(user.getManagerId()).orElse(null);
-        // 兼职部门 = sys_user_department（真实归属；主部门在 department_id，角色户口不混入）
-        java.util.List<com.hxj.entity.SysUserDepartment> memberships = userDepartmentRepository.findByUserId(user.getId());
-        java.util.List<Long> extraIds = new java.util.ArrayList<>();
-        for (com.hxj.entity.SysUserDepartment membership : memberships) {
-            if (!membership.isPrimaryDepartment()) {
-                extraIds.add(membership.getDepartment().getId());
-            }
-        }
-        java.util.List<String> extraNames = departmentRepository.findAllById(extraIds).stream()
-                .sorted(java.util.Comparator.comparing(com.hxj.entity.SysDepartment::getId))
-                .map(com.hxj.entity.SysDepartment::getName)
-                .toList();
-        return new EmployeeResponse(
+
+return new EmployeeResponse(
                 user.getId(), user.getName(), user.getJobNo(), user.getAccount(),
                 user.getDepartmentId(), user.getDepartment(),
                 user.getPostId(), user.getPost(),
                 user.getManagerId(), manager == null ? null : manager.getAccount(),
                 manager == null ? null : manager.getName(),
                 user.getStatus(),
-                user.getRoles().stream().map(SysRole::getName).sorted().toList(),
-                List.copyOf(extraIds),
-                extraNames);
+                user.getRoles().stream().map(SysRole::getName).sorted().toList());
     }
 }
