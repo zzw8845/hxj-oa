@@ -10,5 +10,7 @@ public interface FormTemplateRepository extends JpaRepository<FormTemplate, Long
 
     Optional<FormTemplate> findByBusinessType(String businessType);
 
+    Optional<FormTemplate> findByName(String name);
+
     List<FormTemplate> findByStatusOrderBySortOrderAsc(String status);
 }

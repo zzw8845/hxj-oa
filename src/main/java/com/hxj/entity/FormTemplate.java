@@ -10,8 +10,8 @@ import jakarta.persistence.UniqueConstraint;
 
 /** 表单模板：一类单据的字段清单定义（元数据驱动的提交表单）。 */
 @Entity
-@Table(name = "form_template", uniqueConstraints = @UniqueConstraint(name = "uk_form_template_business_type",
-        columnNames = {"business_type"}))
+@Table(name = "form_template", uniqueConstraints = @UniqueConstraint(name = "uk_form_template_name",
+        columnNames = {"name"}))
 public class FormTemplate {
 
     @Id

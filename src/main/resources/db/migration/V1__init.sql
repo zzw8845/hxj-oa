@@ -1,15 +1,9 @@
 -- =====================================================================
--- V1 基线：海峡金 OA 全量 schema + 干净种子数据（压平重建 v2，2026-09-14）
--- 取代此前全部迁移。设计决策：
---   * 角色 18 个：17 具体角色（源头无泛化条目）+ 兜底「普通员工」
---     职能服务范围按现实语义校正：内控专员/法务/法务主管/行政专员/行政主管 = ALL
---     （原型文案"用印及合规/合同与发文/行政与资产"均为全公司性质单据，落库时曾被窄化为 OWN）
---   * 核算会计 CUSTOM 含财务部（7 部门）——自己部门的单自己审完看得见
---   * 汇报线：中心负责人不入系统者跳级挂靠——二级主管(张龙/刘佳慧/黄政哲/孙倩倩/陈楠)→执行总经理，
---     专员→本部门主管（郑宁静→孙倩倩、唐菁蔚→陈楠）；顶层仅 admin/林安然/连力
---   * 业务配置 20 条流程入库，通用审批单模板绑定费用报销流程
---   * 事务数据（单据/审批/附件/抄送）不入基线；Flowable 引擎表由引擎自建
---   * 核算分工（sys_user_service_dept）为业务真空：仅录入真实提供的分工，不编造
+-- V1 基线：海峡金 OA 全量 schema + 干净种子数据（压平重建 v3，2026-09-14）
+-- v3 变更：表单模板全量开放——20 条流程各配模板并绑定；模板唯一身份
+--   从 businessType（3 类锁死模板数）改为模板名（uk_form_template_name）；
+--   business_type 降为普通索引列（台账分类维度）
+-- 其余决策同 v2（见 git 历史 ea2dec1）
 -- =====================================================================
 
 SET NAMES utf8mb4;
@@ -216,7 +210,7 @@ CREATE TABLE `form_field` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_template_field` (`template_id`,`field_key`),
   CONSTRAINT `fk_form_field_template` FOREIGN KEY (`template_id`) REFERENCES `form_template` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=88 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=392 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -238,8 +232,9 @@ CREATE TABLE `form_template` (
   `category` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `attachment_requirements` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_form_template_business_type` (`business_type`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  UNIQUE KEY `uk_form_template_name` (`name`),
+  KEY `idx_form_template_business_type` (`business_type`)
+) ENGINE=InnoDB AUTO_INCREMENT=22 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -317,7 +312,7 @@ CREATE TABLE `oa_document` (
   CONSTRAINT `fk_doc_flow_config` FOREIGN KEY (`flow_config_id`) REFERENCES `flow_config` (`id`),
   CONSTRAINT `fk_doc_link` FOREIGN KEY (`linked_doc_id`) REFERENCES `oa_document` (`id`),
   CONSTRAINT `fk_document_applicant` FOREIGN KEY (`applicant_id`) REFERENCES `sys_user` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=37 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='单据表';
+) ENGINE=InnoDB AUTO_INCREMENT=39 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='单据表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -552,8 +547,7 @@ CREATE TABLE `sys_user_service_dept` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 12:10:53
-
+-- Dump completed on 2026-09-14 14:28:36
 
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
@@ -591,7 +585,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 12:13:23
+-- Dump completed on 2026-09-14 14:28:36
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -628,7 +622,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 12:13:23
+-- Dump completed on 2026-09-14 14:28:36
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -665,7 +659,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 12:13:23
+-- Dump completed on 2026-09-14 14:28:36
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -702,7 +696,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 12:13:23
+-- Dump completed on 2026-09-14 14:28:36
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -739,7 +733,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 12:13:23
+-- Dump completed on 2026-09-14 14:28:36
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -776,7 +770,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 12:13:24
+-- Dump completed on 2026-09-14 14:28:36
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -813,7 +807,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 12:13:24
+-- Dump completed on 2026-09-14 14:28:36
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -850,7 +844,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 12:13:24
+-- Dump completed on 2026-09-14 14:28:36
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -874,7 +868,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `form_template` WRITE;
 /*!40000 ALTER TABLE `form_template` DISABLE KEYS */;
-INSERT INTO `form_template` (`id`, `business_type`, `name`, `doc_prefix`, `flow_config_id`, `version`, `status`, `sort_order`, `category`, `attachment_requirements`) VALUES (1,'通用审批单','通用审批单','SP',1,4,'ENABLED',0,'DAILY_PAYMENT','[\"关联前置单据\",\"业务证明资料\",\"发票\",\"收款信息\"]');
+INSERT INTO `form_template` (`id`, `business_type`, `name`, `doc_prefix`, `flow_config_id`, `version`, `status`, `sort_order`, `category`, `attachment_requirements`) VALUES (1,'通用审批单','通用审批单','SP',1,4,'ENABLED',0,'DAILY_PAYMENT','[\"关联前置单据\",\"业务证明资料\",\"发票\",\"收款信息\"]'),(3,'DAILY_PAYMENT','闭店（入驻店销和代销）','BX',25,1,'ENABLED',0,'DAILY_PAYMENT','[]'),(4,'BUSINESS_PAYMENT','应付款申请','FK',27,1,'ENABLED',0,'BUSINESS_PAYMENT','[]'),(5,'SEAL_APPLICATION','通用审批申请','YY',36,1,'ENABLED',0,'SEAL_APPLICATION','[]'),(6,'DAILY_PAYMENT','费用预算','BX',26,1,'ENABLED',0,'DAILY_PAYMENT','[]'),(7,'DAILY_PAYMENT','公司发文申请','BX',28,1,'ENABLED',0,'DAILY_PAYMENT','[]'),(8,'DAILY_PAYMENT','固定资产报废报损','BX',29,1,'ENABLED',0,'DAILY_PAYMENT','[]'),(9,'DAILY_PAYMENT','固定资产调拨','BX',30,1,'ENABLED',0,'DAILY_PAYMENT','[]'),(10,'DAILY_PAYMENT','固定资产入库','BX',31,1,'ENABLED',0,'DAILY_PAYMENT','[]'),(11,'DAILY_PAYMENT','借款申请','BX',32,1,'ENABLED',0,'DAILY_PAYMENT','[]'),(12,'DAILY_PAYMENT','客户交易手续费调整','BX',33,1,'ENABLED',0,'DAILY_PAYMENT','[]'),(13,'DAILY_PAYMENT','客户结算服务费','BX',34,1,'ENABLED',0,'DAILY_PAYMENT','[]'),(14,'DAILY_PAYMENT','提货人新增或变更','BX',35,1,'ENABLED',0,'DAILY_PAYMENT','[]'),(15,'DAILY_PAYMENT','业务招待申请','BX',37,1,'ENABLED',0,'DAILY_PAYMENT','[]'),(16,'DAILY_PAYMENT','银行账户管理调整','BX',38,1,'ENABLED',0,'DAILY_PAYMENT','[]'),(17,'DAILY_PAYMENT','采购申请','BX',39,1,'ENABLED',0,'DAILY_PAYMENT','[]'),(18,'DAILY_PAYMENT','低值易耗品（含办公物品）领用','BX',40,1,'ENABLED',0,'DAILY_PAYMENT','[]'),(19,'SEAL_APPLICATION','非标合同审批及用印','YY',41,1,'ENABLED',0,'SEAL_APPLICATION','[]'),(20,'DAILY_PAYMENT','黄金业务开户','BX',42,1,'ENABLED',0,'DAILY_PAYMENT','[]'),(21,'SEAL_APPLICATION','用印及证照申请','YY',43,1,'ENABLED',0,'SEAL_APPLICATION','[]');
 /*!40000 ALTER TABLE `form_template` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -887,7 +881,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 12:13:24
+-- Dump completed on 2026-09-14 14:28:36
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -911,7 +905,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `form_field` WRITE;
 /*!40000 ALTER TABLE `form_field` DISABLE KEYS */;
-INSERT INTO `form_field` (`id`, `template_id`, `field_key`, `label`, `control_type`, `required`, `options`, `reserved`, `sort_order`, `enabled`) VALUES (72,1,'title','单据标题','TEXT',1,'[]',1,1,1),(73,1,'company','所属公司','SELECT',1,'[\"海峡金\",\"海峡金供应链\"]',0,2,1),(74,1,'amount','金额','NUMBER',1,'[]',1,3,1),(75,1,'invoiceSummary','发票摘要','TEXT',0,'[]',0,4,1),(76,1,'reason','事由明细','TEXTAREA',1,'[]',0,5,1),(77,1,'contractNo','合同编号','TEXT',0,'[]',0,6,1),(78,1,'involvesFunds','是否涉及资金','BOOLEAN',0,'[]',1,7,1),(79,1,'requiresAdminReview','是否需行政复核','BOOLEAN',0,'[]',1,8,1),(80,1,'businessMode','业务模式','SELECT',0,'[\"标准\",\"非标\"]',1,9,1),(81,1,'needPostMaterial','是否后置补材料','BOOLEAN',0,'[]',1,10,1),(82,1,'sealProject','用印项目','TEXT',0,'[]',0,11,1),(83,1,'sealType','印章类型','SELECT',0,'[\"公章\",\"合同章\",\"法人章\",\"财务章\"]',0,12,1),(84,1,'sealDepartment','用印部门','TEXT',0,'[]',0,13,1),(85,1,'sealTime','用印时间','DATE',0,'[]',0,14,1),(86,1,'sealFileName','用印文件名','TEXT',0,'[]',0,15,1),(87,1,'sealReason','用印事由','TEXTAREA',0,'[]',0,16,1);
+INSERT INTO `form_field` (`id`, `template_id`, `field_key`, `label`, `control_type`, `required`, `options`, `reserved`, `sort_order`, `enabled`) VALUES (72,1,'title','单据标题','TEXT',1,'[]',1,1,1),(73,1,'company','所属公司','SELECT',1,'[\"海峡金\",\"海峡金供应链\"]',0,2,1),(74,1,'amount','金额','NUMBER',1,'[]',1,3,1),(75,1,'invoiceSummary','发票摘要','TEXT',0,'[]',0,4,1),(76,1,'reason','事由明细','TEXTAREA',1,'[]',0,5,1),(77,1,'contractNo','合同编号','TEXT',0,'[]',0,6,1),(78,1,'involvesFunds','是否涉及资金','BOOLEAN',0,'[]',1,7,1),(79,1,'requiresAdminReview','是否需行政复核','BOOLEAN',0,'[]',1,8,1),(80,1,'businessMode','业务模式','SELECT',0,'[\"标准\",\"非标\"]',1,9,1),(81,1,'needPostMaterial','是否后置补材料','BOOLEAN',0,'[]',1,10,1),(82,1,'sealProject','用印项目','TEXT',0,'[]',0,11,1),(83,1,'sealType','印章类型','SELECT',0,'[\"公章\",\"合同章\",\"法人章\",\"财务章\"]',0,12,1),(84,1,'sealDepartment','用印部门','TEXT',0,'[]',0,13,1),(85,1,'sealTime','用印时间','DATE',0,'[]',0,14,1),(86,1,'sealFileName','用印文件名','TEXT',0,'[]',0,15,1),(87,1,'sealReason','用印事由','TEXTAREA',0,'[]',0,16,1),(88,3,'title','单据标题','TEXT',1,'[]',1,1,1),(89,3,'company','所属公司','SELECT',1,'[\"海峡金\",\"海峡金供应链\"]',0,2,1),(90,3,'amount','金额','NUMBER',1,'[]',1,3,1),(91,3,'invoiceSummary','发票摘要','TEXT',0,'[]',0,4,1),(92,3,'reason','事由明细','TEXTAREA',1,'[]',0,5,1),(93,3,'contractNo','合同编号','TEXT',0,'[]',0,6,1),(94,3,'involvesFunds','是否涉及资金','BOOLEAN',0,'[]',1,7,1),(95,3,'requiresAdminReview','是否需行政复核','BOOLEAN',0,'[]',1,8,1),(96,3,'businessMode','业务模式','SELECT',0,'[\"标准\",\"非标\"]',1,9,1),(97,3,'needPostMaterial','是否后置补材料','BOOLEAN',0,'[]',1,10,1),(98,3,'sealProject','用印项目','TEXT',0,'[]',0,11,1),(99,3,'sealType','印章类型','SELECT',0,'[\"公章\",\"合同章\",\"法人章\",\"财务章\"]',0,12,1),(100,3,'sealDepartment','用印部门','TEXT',0,'[]',0,13,1),(101,3,'sealTime','用印时间','DATE',0,'[]',0,14,1),(102,3,'sealFileName','用印文件名','TEXT',0,'[]',0,15,1),(103,3,'sealReason','用印事由','TEXTAREA',0,'[]',0,16,1),(104,4,'title','单据标题','TEXT',1,'[]',1,1,1),(105,4,'company','所属公司','SELECT',1,'[\"海峡金\",\"海峡金供应链\"]',0,2,1),(106,4,'amount','金额','NUMBER',1,'[]',1,3,1),(107,4,'invoiceSummary','发票摘要','TEXT',0,'[]',0,4,1),(108,4,'reason','事由明细','TEXTAREA',1,'[]',0,5,1),(109,4,'contractNo','合同编号','TEXT',0,'[]',0,6,1),(110,4,'involvesFunds','是否涉及资金','BOOLEAN',0,'[]',1,7,1),(111,4,'requiresAdminReview','是否需行政复核','BOOLEAN',0,'[]',1,8,1),(112,4,'businessMode','业务模式','SELECT',0,'[\"标准\",\"非标\"]',1,9,1),(113,4,'needPostMaterial','是否后置补材料','BOOLEAN',0,'[]',1,10,1),(114,4,'sealProject','用印项目','TEXT',0,'[]',0,11,1),(115,4,'sealType','印章类型','SELECT',0,'[\"公章\",\"合同章\",\"法人章\",\"财务章\"]',0,12,1),(116,4,'sealDepartment','用印部门','TEXT',0,'[]',0,13,1),(117,4,'sealTime','用印时间','DATE',0,'[]',0,14,1),(118,4,'sealFileName','用印文件名','TEXT',0,'[]',0,15,1),(119,4,'sealReason','用印事由','TEXTAREA',0,'[]',0,16,1),(120,5,'title','单据标题','TEXT',1,'[]',1,1,1),(121,5,'company','所属公司','SELECT',1,'[\"海峡金\",\"海峡金供应链\"]',0,2,1),(122,5,'amount','金额','NUMBER',1,'[]',1,3,1),(123,5,'invoiceSummary','发票摘要','TEXT',0,'[]',0,4,1),(124,5,'reason','事由明细','TEXTAREA',1,'[]',0,5,1),(125,5,'contractNo','合同编号','TEXT',0,'[]',0,6,1),(126,5,'involvesFunds','是否涉及资金','BOOLEAN',0,'[]',1,7,1),(127,5,'requiresAdminReview','是否需行政复核','BOOLEAN',0,'[]',1,8,1),(128,5,'businessMode','业务模式','SELECT',0,'[\"标准\",\"非标\"]',1,9,1),(129,5,'needPostMaterial','是否后置补材料','BOOLEAN',0,'[]',1,10,1),(130,5,'sealProject','用印项目','TEXT',0,'[]',0,11,1),(131,5,'sealType','印章类型','SELECT',0,'[\"公章\",\"合同章\",\"法人章\",\"财务章\"]',0,12,1),(132,5,'sealDepartment','用印部门','TEXT',0,'[]',0,13,1),(133,5,'sealTime','用印时间','DATE',0,'[]',0,14,1),(134,5,'sealFileName','用印文件名','TEXT',0,'[]',0,15,1),(135,5,'sealReason','用印事由','TEXTAREA',0,'[]',0,16,1),(136,6,'title','单据标题','TEXT',1,'[]',1,1,1),(137,6,'company','所属公司','SELECT',1,'[\"海峡金\",\"海峡金供应链\"]',0,2,1),(138,6,'amount','金额','NUMBER',1,'[]',1,3,1),(139,6,'invoiceSummary','发票摘要','TEXT',0,'[]',0,4,1),(140,6,'reason','事由明细','TEXTAREA',1,'[]',0,5,1),(141,6,'contractNo','合同编号','TEXT',0,'[]',0,6,1),(142,6,'involvesFunds','是否涉及资金','BOOLEAN',0,'[]',1,7,1),(143,6,'requiresAdminReview','是否需行政复核','BOOLEAN',0,'[]',1,8,1),(144,6,'businessMode','业务模式','SELECT',0,'[\"标准\",\"非标\"]',1,9,1),(145,6,'needPostMaterial','是否后置补材料','BOOLEAN',0,'[]',1,10,1),(146,6,'sealProject','用印项目','TEXT',0,'[]',0,11,1),(147,6,'sealType','印章类型','SELECT',0,'[\"公章\",\"合同章\",\"法人章\",\"财务章\"]',0,12,1),(148,6,'sealDepartment','用印部门','TEXT',0,'[]',0,13,1),(149,6,'sealTime','用印时间','DATE',0,'[]',0,14,1),(150,6,'sealFileName','用印文件名','TEXT',0,'[]',0,15,1),(151,6,'sealReason','用印事由','TEXTAREA',0,'[]',0,16,1),(152,7,'title','单据标题','TEXT',1,'[]',1,1,1),(153,7,'company','所属公司','SELECT',1,'[\"海峡金\",\"海峡金供应链\"]',0,2,1),(154,7,'amount','金额','NUMBER',1,'[]',1,3,1),(155,7,'invoiceSummary','发票摘要','TEXT',0,'[]',0,4,1),(156,7,'reason','事由明细','TEXTAREA',1,'[]',0,5,1),(157,7,'contractNo','合同编号','TEXT',0,'[]',0,6,1),(158,7,'involvesFunds','是否涉及资金','BOOLEAN',0,'[]',1,7,1),(159,7,'requiresAdminReview','是否需行政复核','BOOLEAN',0,'[]',1,8,1),(160,7,'businessMode','业务模式','SELECT',0,'[\"标准\",\"非标\"]',1,9,1),(161,7,'needPostMaterial','是否后置补材料','BOOLEAN',0,'[]',1,10,1),(162,7,'sealProject','用印项目','TEXT',0,'[]',0,11,1),(163,7,'sealType','印章类型','SELECT',0,'[\"公章\",\"合同章\",\"法人章\",\"财务章\"]',0,12,1),(164,7,'sealDepartment','用印部门','TEXT',0,'[]',0,13,1),(165,7,'sealTime','用印时间','DATE',0,'[]',0,14,1),(166,7,'sealFileName','用印文件名','TEXT',0,'[]',0,15,1),(167,7,'sealReason','用印事由','TEXTAREA',0,'[]',0,16,1),(168,8,'title','单据标题','TEXT',1,'[]',1,1,1),(169,8,'company','所属公司','SELECT',1,'[\"海峡金\",\"海峡金供应链\"]',0,2,1),(170,8,'amount','金额','NUMBER',1,'[]',1,3,1),(171,8,'invoiceSummary','发票摘要','TEXT',0,'[]',0,4,1),(172,8,'reason','事由明细','TEXTAREA',1,'[]',0,5,1),(173,8,'contractNo','合同编号','TEXT',0,'[]',0,6,1),(174,8,'involvesFunds','是否涉及资金','BOOLEAN',0,'[]',1,7,1),(175,8,'requiresAdminReview','是否需行政复核','BOOLEAN',0,'[]',1,8,1),(176,8,'businessMode','业务模式','SELECT',0,'[\"标准\",\"非标\"]',1,9,1),(177,8,'needPostMaterial','是否后置补材料','BOOLEAN',0,'[]',1,10,1),(178,8,'sealProject','用印项目','TEXT',0,'[]',0,11,1),(179,8,'sealType','印章类型','SELECT',0,'[\"公章\",\"合同章\",\"法人章\",\"财务章\"]',0,12,1),(180,8,'sealDepartment','用印部门','TEXT',0,'[]',0,13,1),(181,8,'sealTime','用印时间','DATE',0,'[]',0,14,1),(182,8,'sealFileName','用印文件名','TEXT',0,'[]',0,15,1),(183,8,'sealReason','用印事由','TEXTAREA',0,'[]',0,16,1),(184,9,'title','单据标题','TEXT',1,'[]',1,1,1),(185,9,'company','所属公司','SELECT',1,'[\"海峡金\",\"海峡金供应链\"]',0,2,1),(186,9,'amount','金额','NUMBER',1,'[]',1,3,1),(187,9,'invoiceSummary','发票摘要','TEXT',0,'[]',0,4,1),(188,9,'reason','事由明细','TEXTAREA',1,'[]',0,5,1),(189,9,'contractNo','合同编号','TEXT',0,'[]',0,6,1),(190,9,'involvesFunds','是否涉及资金','BOOLEAN',0,'[]',1,7,1),(191,9,'requiresAdminReview','是否需行政复核','BOOLEAN',0,'[]',1,8,1),(192,9,'businessMode','业务模式','SELECT',0,'[\"标准\",\"非标\"]',1,9,1),(193,9,'needPostMaterial','是否后置补材料','BOOLEAN',0,'[]',1,10,1),(194,9,'sealProject','用印项目','TEXT',0,'[]',0,11,1),(195,9,'sealType','印章类型','SELECT',0,'[\"公章\",\"合同章\",\"法人章\",\"财务章\"]',0,12,1),(196,9,'sealDepartment','用印部门','TEXT',0,'[]',0,13,1),(197,9,'sealTime','用印时间','DATE',0,'[]',0,14,1),(198,9,'sealFileName','用印文件名','TEXT',0,'[]',0,15,1),(199,9,'sealReason','用印事由','TEXTAREA',0,'[]',0,16,1),(200,10,'title','单据标题','TEXT',1,'[]',1,1,1),(201,10,'company','所属公司','SELECT',1,'[\"海峡金\",\"海峡金供应链\"]',0,2,1),(202,10,'amount','金额','NUMBER',1,'[]',1,3,1),(203,10,'invoiceSummary','发票摘要','TEXT',0,'[]',0,4,1),(204,10,'reason','事由明细','TEXTAREA',1,'[]',0,5,1),(205,10,'contractNo','合同编号','TEXT',0,'[]',0,6,1),(206,10,'involvesFunds','是否涉及资金','BOOLEAN',0,'[]',1,7,1),(207,10,'requiresAdminReview','是否需行政复核','BOOLEAN',0,'[]',1,8,1),(208,10,'businessMode','业务模式','SELECT',0,'[\"标准\",\"非标\"]',1,9,1),(209,10,'needPostMaterial','是否后置补材料','BOOLEAN',0,'[]',1,10,1),(210,10,'sealProject','用印项目','TEXT',0,'[]',0,11,1),(211,10,'sealType','印章类型','SELECT',0,'[\"公章\",\"合同章\",\"法人章\",\"财务章\"]',0,12,1),(212,10,'sealDepartment','用印部门','TEXT',0,'[]',0,13,1),(213,10,'sealTime','用印时间','DATE',0,'[]',0,14,1),(214,10,'sealFileName','用印文件名','TEXT',0,'[]',0,15,1),(215,10,'sealReason','用印事由','TEXTAREA',0,'[]',0,16,1),(216,11,'title','单据标题','TEXT',1,'[]',1,1,1),(217,11,'company','所属公司','SELECT',1,'[\"海峡金\",\"海峡金供应链\"]',0,2,1),(218,11,'amount','金额','NUMBER',1,'[]',1,3,1),(219,11,'invoiceSummary','发票摘要','TEXT',0,'[]',0,4,1),(220,11,'reason','事由明细','TEXTAREA',1,'[]',0,5,1),(221,11,'contractNo','合同编号','TEXT',0,'[]',0,6,1),(222,11,'involvesFunds','是否涉及资金','BOOLEAN',0,'[]',1,7,1),(223,11,'requiresAdminReview','是否需行政复核','BOOLEAN',0,'[]',1,8,1),(224,11,'businessMode','业务模式','SELECT',0,'[\"标准\",\"非标\"]',1,9,1),(225,11,'needPostMaterial','是否后置补材料','BOOLEAN',0,'[]',1,10,1),(226,11,'sealProject','用印项目','TEXT',0,'[]',0,11,1),(227,11,'sealType','印章类型','SELECT',0,'[\"公章\",\"合同章\",\"法人章\",\"财务章\"]',0,12,1),(228,11,'sealDepartment','用印部门','TEXT',0,'[]',0,13,1),(229,11,'sealTime','用印时间','DATE',0,'[]',0,14,1),(230,11,'sealFileName','用印文件名','TEXT',0,'[]',0,15,1),(231,11,'sealReason','用印事由','TEXTAREA',0,'[]',0,16,1),(232,12,'title','单据标题','TEXT',1,'[]',1,1,1),(233,12,'company','所属公司','SELECT',1,'[\"海峡金\",\"海峡金供应链\"]',0,2,1),(234,12,'amount','金额','NUMBER',1,'[]',1,3,1),(235,12,'invoiceSummary','发票摘要','TEXT',0,'[]',0,4,1),(236,12,'reason','事由明细','TEXTAREA',1,'[]',0,5,1),(237,12,'contractNo','合同编号','TEXT',0,'[]',0,6,1),(238,12,'involvesFunds','是否涉及资金','BOOLEAN',0,'[]',1,7,1),(239,12,'requiresAdminReview','是否需行政复核','BOOLEAN',0,'[]',1,8,1),(240,12,'businessMode','业务模式','SELECT',0,'[\"标准\",\"非标\"]',1,9,1),(241,12,'needPostMaterial','是否后置补材料','BOOLEAN',0,'[]',1,10,1),(242,12,'sealProject','用印项目','TEXT',0,'[]',0,11,1),(243,12,'sealType','印章类型','SELECT',0,'[\"公章\",\"合同章\",\"法人章\",\"财务章\"]',0,12,1),(244,12,'sealDepartment','用印部门','TEXT',0,'[]',0,13,1),(245,12,'sealTime','用印时间','DATE',0,'[]',0,14,1),(246,12,'sealFileName','用印文件名','TEXT',0,'[]',0,15,1),(247,12,'sealReason','用印事由','TEXTAREA',0,'[]',0,16,1),(248,13,'title','单据标题','TEXT',1,'[]',1,1,1),(249,13,'company','所属公司','SELECT',1,'[\"海峡金\",\"海峡金供应链\"]',0,2,1),(250,13,'amount','金额','NUMBER',1,'[]',1,3,1),(251,13,'invoiceSummary','发票摘要','TEXT',0,'[]',0,4,1),(252,13,'reason','事由明细','TEXTAREA',1,'[]',0,5,1),(253,13,'contractNo','合同编号','TEXT',0,'[]',0,6,1),(254,13,'involvesFunds','是否涉及资金','BOOLEAN',0,'[]',1,7,1),(255,13,'requiresAdminReview','是否需行政复核','BOOLEAN',0,'[]',1,8,1),(256,13,'businessMode','业务模式','SELECT',0,'[\"标准\",\"非标\"]',1,9,1),(257,13,'needPostMaterial','是否后置补材料','BOOLEAN',0,'[]',1,10,1),(258,13,'sealProject','用印项目','TEXT',0,'[]',0,11,1),(259,13,'sealType','印章类型','SELECT',0,'[\"公章\",\"合同章\",\"法人章\",\"财务章\"]',0,12,1),(260,13,'sealDepartment','用印部门','TEXT',0,'[]',0,13,1),(261,13,'sealTime','用印时间','DATE',0,'[]',0,14,1),(262,13,'sealFileName','用印文件名','TEXT',0,'[]',0,15,1),(263,13,'sealReason','用印事由','TEXTAREA',0,'[]',0,16,1),(264,14,'title','单据标题','TEXT',1,'[]',1,1,1),(265,14,'company','所属公司','SELECT',1,'[\"海峡金\",\"海峡金供应链\"]',0,2,1),(266,14,'amount','金额','NUMBER',1,'[]',1,3,1),(267,14,'invoiceSummary','发票摘要','TEXT',0,'[]',0,4,1),(268,14,'reason','事由明细','TEXTAREA',1,'[]',0,5,1),(269,14,'contractNo','合同编号','TEXT',0,'[]',0,6,1),(270,14,'involvesFunds','是否涉及资金','BOOLEAN',0,'[]',1,7,1),(271,14,'requiresAdminReview','是否需行政复核','BOOLEAN',0,'[]',1,8,1),(272,14,'businessMode','业务模式','SELECT',0,'[\"标准\",\"非标\"]',1,9,1),(273,14,'needPostMaterial','是否后置补材料','BOOLEAN',0,'[]',1,10,1),(274,14,'sealProject','用印项目','TEXT',0,'[]',0,11,1),(275,14,'sealType','印章类型','SELECT',0,'[\"公章\",\"合同章\",\"法人章\",\"财务章\"]',0,12,1),(276,14,'sealDepartment','用印部门','TEXT',0,'[]',0,13,1),(277,14,'sealTime','用印时间','DATE',0,'[]',0,14,1),(278,14,'sealFileName','用印文件名','TEXT',0,'[]',0,15,1),(279,14,'sealReason','用印事由','TEXTAREA',0,'[]',0,16,1),(280,15,'title','单据标题','TEXT',1,'[]',1,1,1),(281,15,'company','所属公司','SELECT',1,'[\"海峡金\",\"海峡金供应链\"]',0,2,1),(282,15,'amount','金额','NUMBER',1,'[]',1,3,1),(283,15,'invoiceSummary','发票摘要','TEXT',0,'[]',0,4,1),(284,15,'reason','事由明细','TEXTAREA',1,'[]',0,5,1),(285,15,'contractNo','合同编号','TEXT',0,'[]',0,6,1),(286,15,'involvesFunds','是否涉及资金','BOOLEAN',0,'[]',1,7,1),(287,15,'requiresAdminReview','是否需行政复核','BOOLEAN',0,'[]',1,8,1),(288,15,'businessMode','业务模式','SELECT',0,'[\"标准\",\"非标\"]',1,9,1),(289,15,'needPostMaterial','是否后置补材料','BOOLEAN',0,'[]',1,10,1),(290,15,'sealProject','用印项目','TEXT',0,'[]',0,11,1),(291,15,'sealType','印章类型','SELECT',0,'[\"公章\",\"合同章\",\"法人章\",\"财务章\"]',0,12,1),(292,15,'sealDepartment','用印部门','TEXT',0,'[]',0,13,1),(293,15,'sealTime','用印时间','DATE',0,'[]',0,14,1),(294,15,'sealFileName','用印文件名','TEXT',0,'[]',0,15,1),(295,15,'sealReason','用印事由','TEXTAREA',0,'[]',0,16,1),(296,16,'title','单据标题','TEXT',1,'[]',1,1,1),(297,16,'company','所属公司','SELECT',1,'[\"海峡金\",\"海峡金供应链\"]',0,2,1),(298,16,'amount','金额','NUMBER',1,'[]',1,3,1),(299,16,'invoiceSummary','发票摘要','TEXT',0,'[]',0,4,1),(300,16,'reason','事由明细','TEXTAREA',1,'[]',0,5,1),(301,16,'contractNo','合同编号','TEXT',0,'[]',0,6,1),(302,16,'involvesFunds','是否涉及资金','BOOLEAN',0,'[]',1,7,1),(303,16,'requiresAdminReview','是否需行政复核','BOOLEAN',0,'[]',1,8,1),(304,16,'businessMode','业务模式','SELECT',0,'[\"标准\",\"非标\"]',1,9,1),(305,16,'needPostMaterial','是否后置补材料','BOOLEAN',0,'[]',1,10,1),(306,16,'sealProject','用印项目','TEXT',0,'[]',0,11,1),(307,16,'sealType','印章类型','SELECT',0,'[\"公章\",\"合同章\",\"法人章\",\"财务章\"]',0,12,1),(308,16,'sealDepartment','用印部门','TEXT',0,'[]',0,13,1),(309,16,'sealTime','用印时间','DATE',0,'[]',0,14,1),(310,16,'sealFileName','用印文件名','TEXT',0,'[]',0,15,1),(311,16,'sealReason','用印事由','TEXTAREA',0,'[]',0,16,1),(312,17,'title','单据标题','TEXT',1,'[]',1,1,1),(313,17,'company','所属公司','SELECT',1,'[\"海峡金\",\"海峡金供应链\"]',0,2,1),(314,17,'amount','金额','NUMBER',1,'[]',1,3,1),(315,17,'invoiceSummary','发票摘要','TEXT',0,'[]',0,4,1),(316,17,'reason','事由明细','TEXTAREA',1,'[]',0,5,1),(317,17,'contractNo','合同编号','TEXT',0,'[]',0,6,1),(318,17,'involvesFunds','是否涉及资金','BOOLEAN',0,'[]',1,7,1),(319,17,'requiresAdminReview','是否需行政复核','BOOLEAN',0,'[]',1,8,1),(320,17,'businessMode','业务模式','SELECT',0,'[\"标准\",\"非标\"]',1,9,1),(321,17,'needPostMaterial','是否后置补材料','BOOLEAN',0,'[]',1,10,1),(322,17,'sealProject','用印项目','TEXT',0,'[]',0,11,1),(323,17,'sealType','印章类型','SELECT',0,'[\"公章\",\"合同章\",\"法人章\",\"财务章\"]',0,12,1),(324,17,'sealDepartment','用印部门','TEXT',0,'[]',0,13,1),(325,17,'sealTime','用印时间','DATE',0,'[]',0,14,1),(326,17,'sealFileName','用印文件名','TEXT',0,'[]',0,15,1),(327,17,'sealReason','用印事由','TEXTAREA',0,'[]',0,16,1),(328,18,'title','单据标题','TEXT',1,'[]',1,1,1),(329,18,'company','所属公司','SELECT',1,'[\"海峡金\",\"海峡金供应链\"]',0,2,1),(330,18,'amount','金额','NUMBER',1,'[]',1,3,1),(331,18,'invoiceSummary','发票摘要','TEXT',0,'[]',0,4,1),(332,18,'reason','事由明细','TEXTAREA',1,'[]',0,5,1),(333,18,'contractNo','合同编号','TEXT',0,'[]',0,6,1),(334,18,'involvesFunds','是否涉及资金','BOOLEAN',0,'[]',1,7,1),(335,18,'requiresAdminReview','是否需行政复核','BOOLEAN',0,'[]',1,8,1),(336,18,'businessMode','业务模式','SELECT',0,'[\"标准\",\"非标\"]',1,9,1),(337,18,'needPostMaterial','是否后置补材料','BOOLEAN',0,'[]',1,10,1),(338,18,'sealProject','用印项目','TEXT',0,'[]',0,11,1),(339,18,'sealType','印章类型','SELECT',0,'[\"公章\",\"合同章\",\"法人章\",\"财务章\"]',0,12,1),(340,18,'sealDepartment','用印部门','TEXT',0,'[]',0,13,1),(341,18,'sealTime','用印时间','DATE',0,'[]',0,14,1),(342,18,'sealFileName','用印文件名','TEXT',0,'[]',0,15,1),(343,18,'sealReason','用印事由','TEXTAREA',0,'[]',0,16,1),(344,19,'title','单据标题','TEXT',1,'[]',1,1,1),(345,19,'company','所属公司','SELECT',1,'[\"海峡金\",\"海峡金供应链\"]',0,2,1),(346,19,'amount','金额','NUMBER',1,'[]',1,3,1),(347,19,'invoiceSummary','发票摘要','TEXT',0,'[]',0,4,1),(348,19,'reason','事由明细','TEXTAREA',1,'[]',0,5,1),(349,19,'contractNo','合同编号','TEXT',0,'[]',0,6,1),(350,19,'involvesFunds','是否涉及资金','BOOLEAN',0,'[]',1,7,1),(351,19,'requiresAdminReview','是否需行政复核','BOOLEAN',0,'[]',1,8,1),(352,19,'businessMode','业务模式','SELECT',0,'[\"标准\",\"非标\"]',1,9,1),(353,19,'needPostMaterial','是否后置补材料','BOOLEAN',0,'[]',1,10,1),(354,19,'sealProject','用印项目','TEXT',0,'[]',0,11,1),(355,19,'sealType','印章类型','SELECT',0,'[\"公章\",\"合同章\",\"法人章\",\"财务章\"]',0,12,1),(356,19,'sealDepartment','用印部门','TEXT',0,'[]',0,13,1),(357,19,'sealTime','用印时间','DATE',0,'[]',0,14,1),(358,19,'sealFileName','用印文件名','TEXT',0,'[]',0,15,1),(359,19,'sealReason','用印事由','TEXTAREA',0,'[]',0,16,1),(360,20,'title','单据标题','TEXT',1,'[]',1,1,1),(361,20,'company','所属公司','SELECT',1,'[\"海峡金\",\"海峡金供应链\"]',0,2,1),(362,20,'amount','金额','NUMBER',1,'[]',1,3,1),(363,20,'invoiceSummary','发票摘要','TEXT',0,'[]',0,4,1),(364,20,'reason','事由明细','TEXTAREA',1,'[]',0,5,1),(365,20,'contractNo','合同编号','TEXT',0,'[]',0,6,1),(366,20,'involvesFunds','是否涉及资金','BOOLEAN',0,'[]',1,7,1),(367,20,'requiresAdminReview','是否需行政复核','BOOLEAN',0,'[]',1,8,1),(368,20,'businessMode','业务模式','SELECT',0,'[\"标准\",\"非标\"]',1,9,1),(369,20,'needPostMaterial','是否后置补材料','BOOLEAN',0,'[]',1,10,1),(370,20,'sealProject','用印项目','TEXT',0,'[]',0,11,1),(371,20,'sealType','印章类型','SELECT',0,'[\"公章\",\"合同章\",\"法人章\",\"财务章\"]',0,12,1),(372,20,'sealDepartment','用印部门','TEXT',0,'[]',0,13,1),(373,20,'sealTime','用印时间','DATE',0,'[]',0,14,1),(374,20,'sealFileName','用印文件名','TEXT',0,'[]',0,15,1),(375,20,'sealReason','用印事由','TEXTAREA',0,'[]',0,16,1),(376,21,'title','单据标题','TEXT',1,'[]',1,1,1),(377,21,'company','所属公司','SELECT',1,'[\"海峡金\",\"海峡金供应链\"]',0,2,1),(378,21,'amount','金额','NUMBER',1,'[]',1,3,1),(379,21,'invoiceSummary','发票摘要','TEXT',0,'[]',0,4,1),(380,21,'reason','事由明细','TEXTAREA',1,'[]',0,5,1),(381,21,'contractNo','合同编号','TEXT',0,'[]',0,6,1),(382,21,'involvesFunds','是否涉及资金','BOOLEAN',0,'[]',1,7,1),(383,21,'requiresAdminReview','是否需行政复核','BOOLEAN',0,'[]',1,8,1),(384,21,'businessMode','业务模式','SELECT',0,'[\"标准\",\"非标\"]',1,9,1),(385,21,'needPostMaterial','是否后置补材料','BOOLEAN',0,'[]',1,10,1),(386,21,'sealProject','用印项目','TEXT',0,'[]',0,11,1),(387,21,'sealType','印章类型','SELECT',0,'[\"公章\",\"合同章\",\"法人章\",\"财务章\"]',0,12,1),(388,21,'sealDepartment','用印部门','TEXT',0,'[]',0,13,1),(389,21,'sealTime','用印时间','DATE',0,'[]',0,14,1),(390,21,'sealFileName','用印文件名','TEXT',0,'[]',0,15,1),(391,21,'sealReason','用印事由','TEXTAREA',0,'[]',0,16,1);
 /*!40000 ALTER TABLE `form_field` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -924,7 +918,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 12:13:24
+-- Dump completed on 2026-09-14 14:28:37
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -961,7 +955,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 12:13:24
+-- Dump completed on 2026-09-14 14:28:37
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -998,7 +992,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 12:13:24
+-- Dump completed on 2026-09-14 14:28:37
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -1035,7 +1029,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 12:13:24
+-- Dump completed on 2026-09-14 14:28:37
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -1072,7 +1066,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 12:13:24
+-- Dump completed on 2026-09-14 14:28:37
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -1109,7 +1103,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 12:13:24
+-- Dump completed on 2026-09-14 14:28:37
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -1146,7 +1140,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 12:13:42
+-- Dump completed on 2026-09-14 14:28:37
 
 
 SET FOREIGN_KEY_CHECKS = 1;

@@ -94,9 +94,12 @@ public class FormTemplateManagementService {
     @Transactional
     public TemplateView create(SaveFormTemplateRequest request) {
         validateTemplatePayload(request);
-        if (templateRepository.findByBusinessType(request.businessType()).isPresent()) {
+        // 模板唯一身份 = 模板名（入口展示名）；businessType 是台账分类维度（3 类），
+        // 多条流程可同属一类——V27 时代的"业务类型键唯一"会把模板锁死在 3 个，
+        // 与 20 条流程的多入口模型冲突，已随模板化 v2 移除
+        if (templateRepository.findByName(request.name()).isPresent()) {
             throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID,
-                    "业务类型键已存在：" + request.businessType());
+                    "模板名称已存在：" + request.name());
         }
         FormTemplate template = new FormTemplate();
         applyTemplate(template, request);
@@ -109,6 +112,13 @@ public class FormTemplateManagementService {
     public TemplateView update(Long id, SaveFormTemplateRequest request) {
         FormTemplate template = require(id);
         validateTemplatePayload(request);
+        // 改名冲突检查（排除自身）：与其他模板重名会让工作台入口无法区分
+        templateRepository.findByName(request.name())
+                .filter(other -> !other.getId().equals(id))
+                .ifPresent(other -> {
+                    throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID,
+                            "模板名称已存在：" + request.name());
+                });
         Set<String> existingReserved = fieldRepository.findByTemplateIdOrderBySortOrderAsc(id).stream()
                 .filter(FormField::isReserved)
                 .map(FormField::getFieldKey)
