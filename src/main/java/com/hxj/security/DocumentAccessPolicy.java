@@ -93,6 +93,11 @@ public class DocumentAccessPolicy {
      * 参与关系三类来源：当前持有任务（处理人或候选组）、历史审批留痕、被抄送记录。
      */
     public Specification<OaDocument> accessibleTo(AuthenticatedUserResponse currentUser) {
+        if (currentUser != null && currentUser.dataScopes() != null
+                && currentUser.dataScopes().contains(ALL)) {
+            // 全量范围已覆盖一切，无需再并入参与关系（省一次 Flowable 任务查询）
+            return Specification.where(null);
+        }
         return visibleTo(currentUser).or(participation(currentUser));
     }
 
