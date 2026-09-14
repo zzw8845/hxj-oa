@@ -303,7 +303,7 @@ createApp({
       walk(departmentsTree.value);
       if (fromDict.length) return [...new Set(fromDict)].sort();
       return [...new Set([
-        ...roleConfigs.map(r => r.department), ...people.map(p => p.department),
+        ...people.map(p => p.department),
         ...(me.value && me.value.department ? [me.value.department] : [])
       ].filter(Boolean))].sort();
     });
@@ -366,7 +366,7 @@ createApp({
     const SCOPE_TEXT = Object.fromEntries(Object.entries(SCOPE_CODES).map(([k, v]) => [v, k]));
     // 岗位候选：来自真实角色的岗位值（去重），不再使用写死清单
     const postOptions = computed(() => postDicts.value.map(p => p.name));
-    const consoleTree = computed(() => { const attach = (nodes) => (nodes || []).map(n => ({ ...n, roles: roleConfigs.filter(r => r.departmentId === n.id).sort((a, b) => a.name.localeCompare(b.name, 'zh')), children: attach(n.children) })); return attach(departmentsTree.value); });
+    const consoleTree = computed(() => { const attach = (nodes) => (nodes || []).map(n => ({ ...n, roles: roleConfigs.filter(r => (r.scopeDepartmentIds || []).includes(n.id)).sort((a, b) => a.name.localeCompare(b.name, 'zh')), children: attach(n.children) })); return attach(departmentsTree.value); });
     function newRoleIn(deptId) { newRole(); editingRole.value.departmentId = deptId; }
     async function deleteRole(r) { try { await ElementPlus.ElMessageBox.confirm('确定删除角色「' + r.name + '」吗？被员工或流程引用时会被后端拒绝。', '删除角色', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }); } catch (e) { return; } try { await apiCall('delete', '/admin/roles/' + r.id); ElementPlus.ElMessage.success('角色已删除'); await loadRoles(); } catch (e) { ElementPlus.ElMessage.error(e.message); } }
     const newPerson = reactive({ name: '', jobNo: '', account: '', password: '', departmentId: null, postId: null, roles: [], permissions: [] });
@@ -666,10 +666,20 @@ createApp({
     const myDocuments = computed(() => documents.filter(d => d.applicant === userName.value && (`${d.id}${d.title}`).includes(keyword.value)));
     const archiveRows = ref([]), archiveDocs = computed(() => archiveRows.value.filter(d => (!archiveApplicant.value || d.applicant.includes(archiveApplicant.value)) && (!archiveDepartment.value || d.department === archiveDepartment.value) && (!archiveCode.value || d.id.includes(archiveCode.value))));
     const filteredLinks = computed(() => linkCandidates.filter(d => `${linkMode.value === 'daily' ? d.code : d.contract}${d.name}${d.applicant}${d.department}`.toLowerCase().includes(linkKeyword.value.toLowerCase())));
-    const roleTreeData = computed(() => [...new Set(roleConfigs.map(r => r.department))].map(dept => ({
-      label: dept, type: 'department',
-      children: roleConfigs.filter(r => r.department === dept).map(r => ({ label: r.name, type: 'role', role: r }))
-    })));
+    const roleTreeData = computed(() => {
+      const nameById = {};
+      const walk = (nodes) => (nodes || []).forEach(n => { nameById[n.id] = n.name; walk(n.children); });
+      walk(departmentsTree.value);
+      const buckets = {};
+      roleConfigs.forEach(r => (r.scopeDepartmentIds || []).forEach(id => {
+        const name = nameById[id] || '未分配';
+        (buckets[name] = buckets[name] || []).push(r);
+      }));
+      return Object.keys(buckets).sort((a, b) => a.localeCompare(b, 'zh')).map(dept => ({
+        label: dept, type: 'department',
+        children: buckets[dept].sort((a, b) => a.name.localeCompare(b.name, 'zh')).map(r => ({ label: r.name, type: 'role', role: r }))
+      }));
+    });
     const allFiles = computed(() => (detailData.value?.attachments || []).map(a => ({ id: a.id, name: a.fileName, node: a.nodeName || '', uploader: a.uploader || '', time: a.createdAt ? String(a.createdAt).slice(0, 10) : '' })));
     const canApprove = computed(() => selected.value && ['待审批', '审批中'].includes(selected.value.status) && (role.value === '超级管理员' || selected.value.current.includes(role.value)));
 
@@ -734,7 +744,7 @@ createApp({
       } catch (e) { console.error('加载员工失败:', e); }
     }
 
-    async function loadRoles() { try { const data = await apiCall('get', '/admin/roles'); roleConfigs.length = 0; (Array.isArray(data) ? data : []).forEach(role => { roleConfigs.push({ id: role.id, name: role.name, departmentId: role.departmentId, department: role.department, post: role.post, scope: role.dataScope, scopeDepartmentIds: role.scopeDepartmentIds || [], permissions: role.permissions || [], members: role.members || [] }); }); } catch (e) { console.error('加载角色失败:', e); }
+    async function loadRoles() { try { const data = await apiCall('get', '/admin/roles'); roleConfigs.length = 0; (Array.isArray(data) ? data : []).forEach(role => { roleConfigs.push({ id: role.id, name: role.name, post: role.post, scope: role.dataScope, scopeDepartmentIds: role.scopeDepartmentIds || [], permissions: role.permissions || [], members: role.members || [] }); }); } catch (e) { console.error('加载角色失败:', e); }
     }
 
     async function loadFlowConfigs() {
