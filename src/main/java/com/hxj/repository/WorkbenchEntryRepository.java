@@ -14,4 +14,10 @@ public interface WorkbenchEntryRepository extends JpaRepository<WorkbenchEntry, 
 
     /** 引用指定模板的事项数（模板删除保护）。 */
     long countByTemplateId(Long templateId);
+
+    /** 模板删除时的级联清除。 */
+    long deleteByTemplateId(Long templateId);
+
+    /** 建模板时自动生成的入口（文案跟随模板名）。 */
+    List<WorkbenchEntry> findByTemplateIdAndAutoCreatedTrue(Long templateId);
 }

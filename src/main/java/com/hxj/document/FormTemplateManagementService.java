@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hxj.common.ErrorCodeEnum;
 import com.hxj.entity.FormField;
 import com.hxj.entity.FormTemplate;
+import com.hxj.entity.WorkbenchEntry;
 import com.hxj.exception.BusinessException;
 import com.hxj.repository.FlowConfigRepository;
 import com.hxj.repository.FormFieldRepository;
@@ -119,7 +120,23 @@ public class FormTemplateManagementService {
         applyTemplate(template, request);
         templateRepository.save(template);
         replaceFields(template, request.fields());
+        // 钉钉式生命周期：建模板即自动出现在工作台（事项文案跟随模板名，可由管理员改名细化）
+        autoCreateEntry(template);
         return get(template.getId());
+    }
+
+    /** 建模板自动生成同名片事项（对齐钉钉"模板上线即出现在审批中心"）。 */
+    private void autoCreateEntry(FormTemplate template) {
+        WorkbenchEntry entry = new WorkbenchEntry();
+        entry.setZone(com.hxj.document.WorkbenchEntryManagementService.zoneFor(template.getBusinessType()));
+        entry.setLabel(template.getName());
+        entry.setTemplateId(template.getId());
+        entry.setAutoCreated(true);
+        entry.setSortOrder(workbenchEntryRepository.findAllGroupedByZone().stream()
+                .filter(e -> entry.getZone().equals(e.getZone()))
+                .mapToInt(WorkbenchEntry::getSortOrder)
+                .max().orElse(0) + 1);
+        workbenchEntryRepository.save(entry);
     }
 
     @Transactional
@@ -150,12 +167,20 @@ public class FormTemplateManagementService {
         template.setVersion(template.getVersion() + 1);
         templateRepository.save(template);
         replaceFields(template, request.fields());
+        // 自动事项文案跟随模板名（读时已按模板名覆盖，此处同步存量值保持一致）
+        workbenchEntryRepository.findByTemplateIdAndAutoCreatedTrue(id)
+                .forEach(entry -> {
+                    entry.setLabel(template.getName());
+                    entry.setZone(com.hxj.document.WorkbenchEntryManagementService.zoneFor(template.getBusinessType()));
+                    workbenchEntryRepository.save(entry);
+                });
         return get(template.getId());
     }
 
     /**
-     * 删除模板：与流程删除同规则——被单据引用（历史单据按模板快照回溯）或被
-     * 工作台事项承接（入口悬空）时拒绝；字段清单随之清除。
+     * 删除模板：与流程删除同规则——被单据引用（历史单据按模板快照回溯）时拒绝；
+     * 工作台事项（自动生成的入口 + 指向本模板的事由快捷）随之级联清除——
+     * 模板没了它们就是死链，对齐钉钉"删模板即从审批中心消失"。
      */
     @Transactional
     public void delete(Long id) {
@@ -165,11 +190,7 @@ public class FormTemplateManagementService {
             throw new BusinessException(ErrorCodeEnum.FORM_TEMPLATE_IN_USE,
                     "模板已被 " + docRefs + " 张单据引用，无法删除");
         }
-        long entryRefs = workbenchEntryRepository.countByTemplateId(id);
-        if (entryRefs > 0) {
-            throw new BusinessException(ErrorCodeEnum.FORM_TEMPLATE_IN_USE,
-                    "模板被 " + entryRefs + " 个工作台事项承接，请先调整事项配置");
-        }
+        workbenchEntryRepository.deleteByTemplateId(id);
         fieldRepository.deleteByTemplateId(id);
         templateRepository.delete(template);
     }

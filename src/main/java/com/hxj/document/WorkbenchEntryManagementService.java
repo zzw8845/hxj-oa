@@ -25,6 +25,11 @@ public class WorkbenchEntryManagementService {
     private static final Map<String, String> ZONE_BY_BUSINESS_TYPE =
             Map.of("DAILY_PAYMENT", "DAILY", "BUSINESS_PAYMENT", "BUSINESS", "SEAL_APPLICATION", "SEAL");
 
+    /** 分区由承接模板的业务类型唯一派生——事项卡片归属与单据台账归类同源。 */
+    public static String zoneFor(String businessType) {
+        return ZONE_BY_BUSINESS_TYPE.get(businessType);
+    }
+
     private final WorkbenchEntryRepository entryRepository;
     private final FormTemplateRepository templateRepository;
 
@@ -94,7 +99,7 @@ public class WorkbenchEntryManagementService {
         entry.setLabel(payload.label().trim());
         entry.setHint(StringUtils.hasText(payload.hint()) ? payload.hint().trim() : null);
         entry.setTemplateId(template.getId());
-        entry.setZone(ZONE_BY_BUSINESS_TYPE.get(template.getBusinessType()));
+        entry.setZone(zoneFor(template.getBusinessType()));
     }
 
     private int nextSortOrder(String zone) {

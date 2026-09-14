@@ -51,13 +51,17 @@ public class WorkbenchController {
                 .stream()
                 .collect(Collectors.toMap(com.hxj.entity.FormTemplate::getId, Function.identity()));
         return ApiResponse.success(entryRepository.findAllGroupedByZone().stream()
-                .map(entry -> new EntryView(
-                        entry.getZone(),
-                        entry.getLabel(),
-                        entry.getHint(),
-                        entry.getTemplateId(),
-                        templates.get(entry.getTemplateId()) == null
-                                ? null : templates.get(entry.getTemplateId()).getName()))
+                .map(entry -> {
+                    com.hxj.entity.FormTemplate tpl = templates.get(entry.getTemplateId());
+                    // 自动事项的文案实时跟随模板名（模板改名入口即变，无需二次维护）
+                    boolean auto = Boolean.TRUE.equals(entry.getAutoCreated());
+                    return new EntryView(
+                            entry.getZone(),
+                            auto && tpl != null ? tpl.getName() : entry.getLabel(),
+                            entry.getHint(),
+                            entry.getTemplateId(),
+                            tpl == null ? null : tpl.getName());
+                })
                 .toList());
     }
 }

@@ -35,6 +35,9 @@ public class WorkbenchEntry {
 
     private Integer sortOrder;
 
+    /** 是否建模板时自动生成（自动事项的文案跟随模板名，模板删除时级联清除）。 */
+    private Boolean autoCreated;
+
     public Long getId() { return id; }
     public String getZone() { return zone; }
     public void setZone(String zone) { this.zone = zone; }
@@ -46,4 +49,6 @@ public class WorkbenchEntry {
     public void setTemplateId(Long templateId) { this.templateId = templateId; }
     public Integer getSortOrder() { return sortOrder; }
     public void setSortOrder(Integer sortOrder) { this.sortOrder = sortOrder; }
+    public Boolean getAutoCreated() { return autoCreated; }
+    public void setAutoCreated(Boolean autoCreated) { this.autoCreated = autoCreated; }
 }

@@ -1,9 +1,9 @@
 -- =====================================================================
--- V1 基线：海峡金 OA 全量 schema + 干净种子数据（压平重建 v4，2026-09-14）
--- v4 变更：新增 workbench_entry 工作台事项入口表（46 条种子）——事项→承接模板
---   的映射为后端业务配置（对齐原型工作台按钮清单），经 GET /api/workbench/entries
---   下发；前端只消费渲染，事项增删改不依赖前端发版
--- 其余决策同 v3（git 08e966c）
+-- V1 基线：海峡金 OA 全量 schema + 干净种子数据（压平重建 v5，2026-09-14）
+-- v5 变更：表单管理对齐钉钉生命周期——workbench_entry 加 auto_created 标记：
+--   建模板自动生成同名事项入口（读时文案跟随模板名）；删模板级联清除事项；
+--   模板改名入口跟随。手动事项（差旅费等事由快捷）不受影响
+-- 其余决策同 v4（git 7be65d8）
 -- =====================================================================
 
 SET NAMES utf8mb4;
@@ -210,7 +210,7 @@ CREATE TABLE `form_field` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_template_field` (`template_id`,`field_key`),
   CONSTRAINT `fk_form_field_template` FOREIGN KEY (`template_id`) REFERENCES `form_template` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=392 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=419 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -234,7 +234,7 @@ CREATE TABLE `form_template` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_form_template_name` (`name`),
   KEY `idx_form_template_business_type` (`business_type`)
-) ENGINE=InnoDB AUTO_INCREMENT=22 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=28 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -312,7 +312,7 @@ CREATE TABLE `oa_document` (
   CONSTRAINT `fk_doc_flow_config` FOREIGN KEY (`flow_config_id`) REFERENCES `flow_config` (`id`),
   CONSTRAINT `fk_doc_link` FOREIGN KEY (`linked_doc_id`) REFERENCES `oa_document` (`id`),
   CONSTRAINT `fk_document_applicant` FOREIGN KEY (`applicant_id`) REFERENCES `sys_user` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=42 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='单据表';
+) ENGINE=InnoDB AUTO_INCREMENT=44 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='单据表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -547,13 +547,14 @@ DROP TABLE IF EXISTS `workbench_entry`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `workbench_entry` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `zone` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `label` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `hint` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `zone` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `label` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `hint` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `template_id` bigint NOT NULL,
   `sort_order` int NOT NULL DEFAULT '0',
+  `auto_created` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=47 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=53 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
@@ -565,7 +566,7 @@ CREATE TABLE `workbench_entry` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 14:59:17
+-- Dump completed on 2026-09-14 16:39:00
 
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
@@ -603,7 +604,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 14:59:17
+-- Dump completed on 2026-09-14 16:39:00
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -640,7 +641,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 14:59:17
+-- Dump completed on 2026-09-14 16:39:00
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -677,7 +678,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 14:59:17
+-- Dump completed on 2026-09-14 16:39:00
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -714,7 +715,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 14:59:17
+-- Dump completed on 2026-09-14 16:39:00
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -751,7 +752,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 14:59:18
+-- Dump completed on 2026-09-14 16:39:00
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -788,7 +789,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 14:59:18
+-- Dump completed on 2026-09-14 16:39:00
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -825,7 +826,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 14:59:18
+-- Dump completed on 2026-09-14 16:39:00
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -862,7 +863,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 14:59:18
+-- Dump completed on 2026-09-14 16:39:00
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -886,7 +887,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `workbench_entry` WRITE;
 /*!40000 ALTER TABLE `workbench_entry` DISABLE KEYS */;
-INSERT INTO `workbench_entry` (`id`, `zone`, `label`, `hint`, `template_id`, `sort_order`) VALUES (1,'DAILY','闭店','入驻店销和代销',3,1),(2,'DAILY','采购申请','物资与服务采购',17,2),(3,'DAILY','低值易耗品领用','办公用品领用',18,3),(4,'DAILY','费用预算','部门费用预算申报',6,4),(5,'DAILY','公司发文申请','公司红头文件发布',7,5),(6,'DAILY','固定资产报废报损','资产报废与报损',8,6),(7,'DAILY','固定资产调拨','部门间资产调拨',9,7),(8,'DAILY','固定资产入库','新增资产登记',10,8),(9,'DAILY','黄金业务开户','黄金交易开户',20,9),(10,'DAILY','借款申请','员工与部门借款',11,10),(11,'DAILY','客户交易手续费调整','客户费率调整',12,11),(12,'DAILY','客户结算服务费','结算服务费核算',13,12),(13,'DAILY','提货人新增或变更','提货人信息管理',14,13),(14,'DAILY','业务招待申请','业务招待费',15,14),(15,'DAILY','银行账户管理调整','账户开立与变更',16,15),(16,'DAILY','差旅费','交通、住宿、餐费',1,16),(17,'DAILY','招待费','业务招待',15,17),(18,'DAILY','员工加班交通费','加班交通报销',1,18),(19,'DAILY','检测费证书费','检测认证费用',1,19),(20,'DAILY','快递费','快递物流费用',1,20),(21,'DAILY','水电网络费','水电与网络费用',1,21),(22,'DAILY','日常费用','水费等零星支出',1,22),(23,'DAILY','租金-物业费','房租与物业费用',1,23),(24,'DAILY','装修费','场地装修改造',1,24),(25,'DAILY','技术服务费','技术服务采购',1,25),(26,'DAILY','验货专项服务费','验货服务费用',1,26),(27,'DAILY','广告费','广告投放费用',1,27),(28,'DAILY','宽带费-电费','宽带与电费',1,28),(29,'DAILY','固定资产采购','固定资产购置',17,29),(30,'DAILY','税盘缴费','税控盘服务费',1,30),(31,'DAILY','平台保证金','平台入驻保证金',4,31),(32,'DAILY','电商投流推广充值','电商推广预充值',4,32),(33,'DAILY','合作方退款','合作方款项退回',4,33),(34,'DAILY','付款利息','借款利息支付',4,34),(35,'BUSINESS','应付款申请','供应商货款支付',4,35),(36,'BUSINESS','加工费','委托加工费用',4,36),(37,'BUSINESS','直销-代销结算服务费','渠道结算服务费',4,37),(38,'BUSINESS','供应商货款','采购货款支付',4,38),(39,'BUSINESS','员工工资-社保-公积金','薪酬社保发放',4,39),(40,'BUSINESS','备用金申请','部门备用金',11,40),(41,'BUSINESS','银行账户规费利息','账户规费与利息',4,41),(42,'BUSINESS','招商风险业务资质保证金','招商资质保证金',4,42),(43,'BUSINESS','借款利息','借款利息结算',4,43),(44,'SEAL','非标合同审批及用印','合同用印',19,44),(45,'SEAL','通用审批申请','通用盖章事项',5,45),(46,'SEAL','用印及证照申请','用印与证照领取',21,46);
+INSERT INTO `workbench_entry` (`id`, `zone`, `label`, `hint`, `template_id`, `sort_order`, `auto_created`) VALUES (1,'DAILY','闭店','入驻店销和代销',3,1,1),(2,'DAILY','采购申请','物资与服务采购',17,2,1),(3,'DAILY','低值易耗品领用','办公用品领用',18,3,1),(4,'DAILY','费用预算','部门费用预算申报',6,4,1),(5,'DAILY','公司发文申请','公司红头文件发布',7,5,1),(6,'DAILY','固定资产报废报损','资产报废与报损',8,6,1),(7,'DAILY','固定资产调拨','部门间资产调拨',9,7,1),(8,'DAILY','固定资产入库','新增资产登记',10,8,1),(9,'DAILY','黄金业务开户','黄金交易开户',20,9,1),(10,'DAILY','借款申请','员工与部门借款',11,10,1),(11,'DAILY','客户交易手续费调整','客户费率调整',12,11,1),(12,'DAILY','客户结算服务费','结算服务费核算',13,12,1),(13,'DAILY','提货人新增或变更','提货人信息管理',14,13,1),(14,'DAILY','业务招待申请','业务招待费',15,14,1),(15,'DAILY','银行账户管理调整','账户开立与变更',16,15,1),(16,'DAILY','差旅费','交通、住宿、餐费',1,16,0),(17,'DAILY','招待费','业务招待',15,17,0),(18,'DAILY','员工加班交通费','加班交通报销',1,18,0),(19,'DAILY','检测费证书费','检测认证费用',1,19,0),(20,'DAILY','快递费','快递物流费用',1,20,0),(21,'DAILY','水电网络费','水电与网络费用',1,21,0),(22,'DAILY','日常费用','水费等零星支出',1,22,0),(23,'DAILY','租金-物业费','房租与物业费用',1,23,0),(24,'DAILY','装修费','场地装修改造',1,24,0),(25,'DAILY','技术服务费','技术服务采购',1,25,0),(26,'DAILY','验货专项服务费','验货服务费用',1,26,0),(27,'DAILY','广告费','广告投放费用',1,27,0),(28,'DAILY','宽带费-电费','宽带与电费',1,28,0),(29,'DAILY','固定资产采购','固定资产购置',17,29,0),(30,'DAILY','税盘缴费','税控盘服务费',1,30,0),(31,'DAILY','平台保证金','平台入驻保证金',4,31,0),(32,'DAILY','电商投流推广充值','电商推广预充值',4,32,0),(33,'DAILY','合作方退款','合作方款项退回',4,33,0),(34,'DAILY','付款利息','借款利息支付',4,34,0),(35,'BUSINESS','应付款申请','供应商货款支付',4,35,1),(36,'BUSINESS','加工费','委托加工费用',4,36,0),(37,'BUSINESS','直销-代销结算服务费','渠道结算服务费',4,37,0),(38,'BUSINESS','供应商货款','采购货款支付',4,38,0),(39,'BUSINESS','员工工资-社保-公积金','薪酬社保发放',4,39,0),(40,'BUSINESS','备用金申请','部门备用金',11,40,0),(41,'BUSINESS','银行账户规费利息','账户规费与利息',4,41,0),(42,'BUSINESS','招商风险业务资质保证金','招商资质保证金',4,42,0),(43,'BUSINESS','借款利息','借款利息结算',4,43,0),(44,'SEAL','非标合同审批及用印','合同用印',19,44,1),(45,'SEAL','通用审批申请','通用盖章事项',5,45,1),(46,'SEAL','用印及证照申请','用印与证照领取',21,46,1),(51,'DAILY','费用报销','费用报销申请',1,1,1);
 /*!40000 ALTER TABLE `workbench_entry` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -899,7 +900,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 14:59:18
+-- Dump completed on 2026-09-14 16:39:00
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -936,7 +937,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 14:59:18
+-- Dump completed on 2026-09-14 16:39:00
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -973,7 +974,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 14:59:18
+-- Dump completed on 2026-09-14 16:39:00
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -1010,7 +1011,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 14:59:18
+-- Dump completed on 2026-09-14 16:39:00
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -1047,7 +1048,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 14:59:18
+-- Dump completed on 2026-09-14 16:39:00
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -1084,7 +1085,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 14:59:18
+-- Dump completed on 2026-09-14 16:39:00
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -1121,7 +1122,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 14:59:18
+-- Dump completed on 2026-09-14 16:39:00
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -1158,7 +1159,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 14:59:18
+-- Dump completed on 2026-09-14 16:39:00
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -1195,7 +1196,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14 14:59:18
+-- Dump completed on 2026-09-14 16:39:00
 
 
 SET FOREIGN_KEY_CHECKS = 1;
