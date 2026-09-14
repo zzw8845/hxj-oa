@@ -221,6 +221,126 @@ class FlowConfigManagementServiceTest {
         assertThat(taskCount).isEqualTo(3);
     }
 
+    // ============ 保存关口校验：条件变量白名单 / 比较值类型匹配 / 抄送目标 ============
+
+    @Test
+    void shouldRejectConditionVariableOutsideWhitelist() {
+        FlowConfigItems.SaveFlowConfigRequest invalid = new FlowConfigItems.SaveFlowConfigRequest(
+                "借款申请", FlowCategoryEnum.DAILY,
+                List.of(
+                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload("发起人", FlowNodeTypeEnum.START, null),
+                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload(
+                                "直属主管", FlowNodeTypeEnum.APPROVAL, "二级部门负责人"),
+                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload(
+                                "领导审批", FlowNodeTypeEnum.APPROVAL, "执行总经理")),
+                List.of(new FlowConfigItems.SaveFlowConfigRequest.FlowConditionRulePayload(
+                        // 变量名打错一个字母：旧版会静默入库，网关求值时流程永久卡死
+                        "amout", ConditionOperatorEnum.GREATER_THAN_OR_EQUAL, "20000", "领导审批")));
+        assertThatThrownBy(() -> managementService.create(invalid))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("条件变量不可用");
+    }
+
+    @Test
+    void shouldRejectAmountExpectedValueNotNumeric() {
+        FlowConfigItems.SaveFlowConfigRequest invalid = new FlowConfigItems.SaveFlowConfigRequest(
+                "借款申请", FlowCategoryEnum.DAILY,
+                List.of(
+                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload("发起人", FlowNodeTypeEnum.START, null),
+                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload(
+                                "直属主管", FlowNodeTypeEnum.APPROVAL, "二级部门负责人"),
+                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload(
+                                "领导审批", FlowNodeTypeEnum.APPROVAL, "执行总经理")),
+                List.of(new FlowConfigItems.SaveFlowConfigRequest.FlowConditionRulePayload(
+                        "amount", ConditionOperatorEnum.GREATER_THAN_OR_EQUAL, "两万", "领导审批")));
+        assertThatThrownBy(() -> managementService.create(invalid))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("必须是数字");
+    }
+
+    @Test
+    void shouldRejectBooleanExpectedValueNotBoolean() {
+        FlowConfigItems.SaveFlowConfigRequest invalid = new FlowConfigItems.SaveFlowConfigRequest(
+                "非标合同审批", FlowCategoryEnum.SEAL,
+                List.of(
+                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload("发起人", FlowNodeTypeEnum.START, null),
+                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload(
+                                "直属主管", FlowNodeTypeEnum.APPROVAL, "二级部门负责人"),
+                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload(
+                                "财务复核", FlowNodeTypeEnum.APPROVAL, "财务经理")),
+                List.of(new FlowConfigItems.SaveFlowConfigRequest.FlowConditionRulePayload(
+                        "involvesFunds", ConditionOperatorEnum.EQUAL, "yes", "财务复核")));
+        assertThatThrownBy(() -> managementService.create(invalid))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("true / false");
+    }
+
+    @Test
+    void shouldRejectMalformedCcTargets() {
+        FlowConfigItems.SaveFlowConfigRequest invalid = new FlowConfigItems.SaveFlowConfigRequest(
+                "借款申请", FlowCategoryEnum.DAILY,
+                List.of(
+                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload("发起人", FlowNodeTypeEnum.START, null),
+                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload(
+                                "直属主管", FlowNodeTypeEnum.APPROVAL, "二级部门负责人"),
+                        // 旧版会存进坏数据，流程跑到抄送节点才解析失败，单据卡死最后一步
+                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload(
+                                "抄送", FlowNodeTypeEnum.CC, null, "[\"财务经理\"]")),
+                List.of());
+        assertThatThrownBy(() -> managementService.create(invalid))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("抄送目标格式错误");
+    }
+
+    @Test
+    void shouldRejectCcTargetRoleNotExists() {
+        FlowConfigItems.SaveFlowConfigRequest invalid = new FlowConfigItems.SaveFlowConfigRequest(
+                "借款申请", FlowCategoryEnum.DAILY,
+                List.of(
+                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload("发起人", FlowNodeTypeEnum.START, null),
+                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload(
+                                "直属主管", FlowNodeTypeEnum.APPROVAL, "二级部门负责人"),
+                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload(
+                                "抄送", FlowNodeTypeEnum.CC, null,
+                                "[{\"type\":\"ROLE\",\"value\":\"不存在的角色\"}]")),
+                List.of());
+        assertThatThrownBy(() -> managementService.create(invalid))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("抄送角色不存在");
+    }
+
+    @Test
+    void shouldRejectCcTargetUnknownType() {
+        FlowConfigItems.SaveFlowConfigRequest invalid = new FlowConfigItems.SaveFlowConfigRequest(
+                "借款申请", FlowCategoryEnum.DAILY,
+                List.of(
+                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload("发起人", FlowNodeTypeEnum.START, null),
+                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload(
+                                "直属主管", FlowNodeTypeEnum.APPROVAL, "二级部门负责人"),
+                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload(
+                                "抄送", FlowNodeTypeEnum.CC, null,
+                                "[{\"type\":\"GROUP\",\"value\":\"财务经理\"}]")),
+                List.of());
+        assertThatThrownBy(() -> managementService.create(invalid))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("ROLE / DEPT / USER");
+    }
+
+    @Test
+    void shouldAcceptValidCcTargets() {
+        FlowConfigItems.SaveFlowConfigRequest valid = new FlowConfigItems.SaveFlowConfigRequest(
+                "借款申请", FlowCategoryEnum.DAILY,
+                List.of(
+                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload("发起人", FlowNodeTypeEnum.START, null),
+                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload(
+                                "直属主管", FlowNodeTypeEnum.APPROVAL, "二级部门负责人"),
+                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload(
+                                "抄送", FlowNodeTypeEnum.CC, null,
+                                "[{\"type\":\"ROLE\",\"value\":\"财务经理\"}]")),
+                List.of());
+        assertThatCode(() -> managementService.create(valid)).doesNotThrowAnyException();
+    }
+
     private FlowConfigItems.SaveFlowConfigRequest request() {
         return new FlowConfigItems.SaveFlowConfigRequest(
                 "采购申请", FlowCategoryEnum.DAILY,

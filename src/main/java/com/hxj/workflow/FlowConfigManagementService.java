@@ -1,5 +1,7 @@
 package com.hxj.workflow;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hxj.common.ErrorCodeEnum;
 import com.hxj.entity.FlowConfig;
 import com.hxj.entity.FlowConditionRule;
@@ -10,13 +12,17 @@ import com.hxj.repository.FlowConditionRuleRepository;
 import com.hxj.repository.FlowConfigRepository;
 import com.hxj.repository.FlowNodeConfigRepository;
 import com.hxj.repository.OaDocumentRepository;
+import com.hxj.repository.SysDepartmentRepository;
 import com.hxj.repository.SysRoleRepository;
+import com.hxj.repository.SysUserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -26,10 +32,17 @@ import java.util.Set;
 @Service
 public class FlowConfigManagementService {
 
+    /** 条件规则可引用的流程变量白名单——与提交链路 {@code workflowVariables} 写入的变量一一对应。 */
+    private static final Set<String> CONDITION_VARIABLES =
+            Set.of("amount", "involvesFunds", "requiresAdminReview", "businessMode");
+    private static final ObjectMapper JSON = new ObjectMapper();
+
     private final FlowConfigRepository flowConfigRepository;
     private final FlowNodeConfigRepository nodeRepository;
     private final FlowConditionRuleRepository conditionRuleRepository;
     private final SysRoleRepository sysRoleRepository;
+    private final SysUserRepository sysUserRepository;
+    private final SysDepartmentRepository sysDepartmentRepository;
     private final OaDocumentRepository oaDocumentRepository;
     private final ConfigDrivenProcessDefinitionService definitionService;
     public FlowConfigManagementService(
@@ -37,12 +50,16 @@ public class FlowConfigManagementService {
             FlowNodeConfigRepository nodeRepository,
             FlowConditionRuleRepository conditionRuleRepository,
             SysRoleRepository sysRoleRepository,
+            SysUserRepository sysUserRepository,
+            SysDepartmentRepository sysDepartmentRepository,
             OaDocumentRepository oaDocumentRepository,
             ConfigDrivenProcessDefinitionService definitionService) {
         this.flowConfigRepository = flowConfigRepository;
         this.nodeRepository = nodeRepository;
         this.conditionRuleRepository = conditionRuleRepository;
         this.sysRoleRepository = sysRoleRepository;
+        this.sysUserRepository = sysUserRepository;
+        this.sysDepartmentRepository = sysDepartmentRepository;
         this.oaDocumentRepository = oaDocumentRepository;
         this.definitionService = definitionService;
     }
@@ -174,6 +191,11 @@ public class FlowConfigManagementService {
                     }
                 }
             }
+            // 抄送目标在保存关口做完整校验：坏配置若流入运行时，会在流程走到抄送节点时
+            // 才解析失败，单据卡死在最后一步且无管理端修复手段（错误延迟爆炸）
+            if (node.nodeType() == FlowNodeTypeEnum.CC && StringUtils.hasText(node.ccTargets())) {
+                validateCcTargets(node.ccTargets());
+            }
         }
         // 节点名是 BPMN 编译期与驳回层级匹配的唯一标识，重名会导致节点被静默覆盖、审批环节丢失
         Set<String> seenNodeNames = new HashSet<>();
@@ -189,11 +211,75 @@ public class FlowConfigManagementService {
                         || !StringUtils.hasText(rule.targetNodeName())) {
                     throw new BusinessException(ErrorCodeEnum.FLOW_RULE_INVALID, "条件分支规则不完整");
                 }
+                // 变量白名单：条件表达式为裸 JUEL，引用不存在的变量会在网关求值时抛异常，
+                // 流程实例永久卡死且无修复手段——必须在保存关口拒绝
+                if (!CONDITION_VARIABLES.contains(rule.variableName())) {
+                    throw new BusinessException(ErrorCodeEnum.FLOW_RULE_INVALID,
+                            "条件变量不可用：" + rule.variableName()
+                                    + "（可用变量：amount / involvesFunds / requiresAdminReview / businessMode）");
+                }
+                // 比较值与变量类型匹配：数值变量配非数字、布尔变量配非布尔，
+                // 同样会在网关求值时抛类型转换异常卡死流程
+                if ("amount".equals(rule.variableName())) {
+                    try {
+                        new BigDecimal(rule.expectedValue());
+                    } catch (NumberFormatException e) {
+                        throw new BusinessException(ErrorCodeEnum.FLOW_RULE_INVALID,
+                                "amount 条件的比较值必须是数字：" + rule.expectedValue());
+                    }
+                }
+                if (("involvesFunds".equals(rule.variableName())
+                        || "requiresAdminReview".equals(rule.variableName()))
+                        && !"true".equalsIgnoreCase(rule.expectedValue())
+                        && !"false".equalsIgnoreCase(rule.expectedValue())) {
+                    throw new BusinessException(ErrorCodeEnum.FLOW_RULE_INVALID,
+                            rule.variableName() + " 条件的比较值只能是 true / false");
+                }
                 boolean targetExists = request.nodes().stream()
                         .anyMatch(node -> node.name().equals(rule.targetNodeName()));
                 if (!targetExists) {
                     throw new BusinessException(ErrorCodeEnum.FLOW_RULE_TARGET_INVALID, "条件规则目标节点不在节点链中");
                 }
+            }
+        }
+    }
+
+    /**
+     * 抄送目标校验：合法 JSON 数组，每项 type ∈ {ROLE, DEPT, USER} 且 value 真实存在
+     * （与运行时 {@code OaCcNodeDelegate} 的解析语义一致：ROLE 按角色名、DEPT 按部门名、USER 按账号）。
+     */
+    private void validateCcTargets(String ccTargets) {
+        List<Map<String, String>> targets;
+        try {
+            targets = JSON.readValue(ccTargets, new TypeReference<List<Map<String, String>>>() {});
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCodeEnum.FLOW_NODE_INVALID,
+                    "抄送目标格式错误：应为 JSON 数组 [{\"type\":\"ROLE|DEPT|USER\",\"value\":\"...\"}]");
+        }
+        for (Map<String, String> target : targets) {
+            String type = target.getOrDefault("type", "");
+            String value = target.getOrDefault("value", "");
+            if (!StringUtils.hasText(value)) {
+                throw new BusinessException(ErrorCodeEnum.FLOW_NODE_INVALID, "抄送目标的 value 不能为空");
+            }
+            switch (type) {
+                case "ROLE" -> {
+                    if (!sysRoleRepository.findByName(value).isPresent()) {
+                        throw new BusinessException(ErrorCodeEnum.FLOW_NODE_INVALID, "抄送角色不存在：" + value);
+                    }
+                }
+                case "USER" -> {
+                    if (!sysUserRepository.findByAccount(value).isPresent()) {
+                        throw new BusinessException(ErrorCodeEnum.FLOW_NODE_INVALID, "抄送账号不存在：" + value);
+                    }
+                }
+                case "DEPT" -> {
+                    if (!sysDepartmentRepository.findByName(value).isPresent()) {
+                        throw new BusinessException(ErrorCodeEnum.FLOW_NODE_INVALID, "抄送部门不存在：" + value);
+                    }
+                }
+                default -> throw new BusinessException(ErrorCodeEnum.FLOW_NODE_INVALID,
+                        "抄送目标类型必须是 ROLE / DEPT / USER：" + type);
             }
         }
     }

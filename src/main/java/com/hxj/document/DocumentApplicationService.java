@@ -166,7 +166,9 @@ public class DocumentApplicationService {
                 }
                 spec = spec.and((root, query, builder) -> root.get("processInstanceId").in(active));
             } else {
-                // 普通审批人：按其在 Flowable 中持有的任务（处理人/候选）反查单据
+                // 普通审批人：按其在 Flowable 中持有的任务（处理人/候选）反查单据。
+                // 任务持有本身即访问依据——不再叠加数据范围过滤，否则候选组审批人
+                // 会陷入"收得到待办、待审列表却看不见"的死锁
                 Set<String> processInstanceIds = workflowPort
                         .pendingTasksForUser(currentUser.account(), currentUser.roles()).stream()
                         .map(task -> task.getProcessInstanceId())
@@ -174,7 +176,8 @@ public class DocumentApplicationService {
                 if (processInstanceIds.isEmpty()) {
                     return PageResponse.of(new PageImpl<OaDocument>(List.of(), request.toPageable(sort), 0).map(this::toSummary));
                 }
-                spec = spec.and((root, query, builder) -> root.get("processInstanceId").in(processInstanceIds));
+                spec = criteriaSpecification(request.toCriteria())
+                        .and((root, query, builder) -> root.get("processInstanceId").in(processInstanceIds));
             }
         }
         return PageResponse.of(documentRepository.findAll(spec, request.toPageable(sort)).map(this::toSummary));
@@ -359,7 +362,9 @@ public class DocumentApplicationService {
     }
 
     private OaDocument visibleDocument(Long id, AuthenticatedUserResponse currentUser) {
-        Specification<OaDocument> spec = accessPolicy.visibleTo(currentUser)
+        // 统一访问语义（数据范围 ∪ 流程参与人）下沉在 DocumentAccessPolicy——
+        // 审批人/被抄送人即使数据范围不覆盖该单据，也能查看、上传凭证、再次提交
+        Specification<OaDocument> spec = accessPolicy.accessibleTo(currentUser)
                 .and((root, query, builder) -> builder.equal(root.get("id"), id));
         return documentRepository.findOne(spec)
                 .orElseThrow(() -> new BusinessException(ErrorCodeEnum.DOCUMENT_NOT_FOUND, "单据不存在或无权查看"));

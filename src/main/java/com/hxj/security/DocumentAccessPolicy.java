@@ -2,14 +2,20 @@ package com.hxj.security;
 
 import com.hxj.entity.OaDocument;
 import com.hxj.entity.SysDepartment;
+import com.hxj.repository.ApprovalRecordRepository;
+import com.hxj.repository.CcRecordRepository;
 import com.hxj.repository.SysDepartmentRepository;
 import com.hxj.repository.SysRoleRepository;
+import com.hxj.workflow.WorkflowPort;
+import org.flowable.task.api.Task;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 将当前用户的数据范围转换为单据查询约束，未知范围默认拒绝（仅剩本人单据基线）。
@@ -23,6 +29,11 @@ import java.util.Set;
  *   <li>{@code CUSTOM}：自定义部门集合（角色配置，经 sys_role_scope_department）。</li>
  * </ul>
  * 「本人提交的单据」是所有用户的基线权利，与数据范围类型取并集。
+ *
+ * <p>单据级访问（详情/附件/凭证上传）使用 {@link #accessibleTo}：在数据范围之上
+ * 并入「流程参与关系」——当前任务持有人、已审批留痕人、被抄送人。审批路由把任务
+ * 派给谁与他的数据范围宽窄无关，参与人必须能看见并操作自己名下的单据，
+ * 否则出现"收得到待办、打不开单据、传不了凭证"的死锁。
  */
 @Component
 public class DocumentAccessPolicy {
@@ -35,12 +46,21 @@ public class DocumentAccessPolicy {
 
     private final SysDepartmentRepository departmentRepository;
     private final SysRoleRepository roleRepository;
+    private final ApprovalRecordRepository approvalRecordRepository;
+    private final CcRecordRepository ccRecordRepository;
+    private final WorkflowPort workflowPort;
 
     public DocumentAccessPolicy(
             SysDepartmentRepository departmentRepository,
-            SysRoleRepository roleRepository) {
+            SysRoleRepository roleRepository,
+            ApprovalRecordRepository approvalRecordRepository,
+            CcRecordRepository ccRecordRepository,
+            WorkflowPort workflowPort) {
         this.departmentRepository = departmentRepository;
         this.roleRepository = roleRepository;
+        this.approvalRecordRepository = approvalRecordRepository;
+        this.ccRecordRepository = ccRecordRepository;
+        this.workflowPort = workflowPort;
     }
 
     public Specification<OaDocument> visibleTo(AuthenticatedUserResponse currentUser) {
@@ -64,6 +84,42 @@ public class DocumentAccessPolicy {
             result = or(result, departmentNameIn(customDepartmentNames(currentUser.roles())));
         }
         return result;
+    }
+
+    /**
+     * 单据级统一访问语义：数据范围 ∪ 流程参与关系。
+     *
+     * <p>列表与单查共用本方法，避免"范围口径"与"参与人口径"在多个服务各自实现后漂移。
+     * 参与关系三类来源：当前持有任务（处理人或候选组）、历史审批留痕、被抄送记录。
+     */
+    public Specification<OaDocument> accessibleTo(AuthenticatedUserResponse currentUser) {
+        return visibleTo(currentUser).or(participation(currentUser));
+    }
+
+    /** 流程参与关系：按单据 ID（审批留痕/抄送）与流程实例 ID（在办任务）并入可见集。 */
+    private Specification<OaDocument> participation(AuthenticatedUserResponse currentUser) {
+        if (currentUser == null || currentUser.userId() == null) {
+            return denyAll();
+        }
+        Set<Long> participatedIds = new LinkedHashSet<>();
+        participatedIds.addAll(ccRecordRepository.findDocumentIdsByTargetUserId(currentUser.userId()));
+        participatedIds.addAll(approvalRecordRepository.findDocumentIdsByApproverId(currentUser.userId()));
+        Specification<OaDocument> spec = documentIdIn(participatedIds);
+        Set<String> activeInstanceIds = workflowPort
+                .pendingTasksForUser(currentUser.account(), currentUser.roles()).stream()
+                .map(Task::getProcessInstanceId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (!activeInstanceIds.isEmpty()) {
+            spec = or(spec, (root, query, builder) -> root.get("processInstanceId").in(activeInstanceIds));
+        }
+        return spec;
+    }
+
+    private Specification<OaDocument> documentIdIn(Set<Long> ids) {
+        return ids.isEmpty()
+                ? denyAll()
+                : (root, query, builder) -> root.get("id").in(ids);
     }
 
     /** 本部门及以下的部门名称集合（闭包表求子树；部门字典缺失时退化为仅本部门）。 */

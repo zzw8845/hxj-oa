@@ -1,6 +1,10 @@
 package com.hxj.security;
 
+import com.hxj.enums.ApprovalActionEnum;
 import com.hxj.enums.BusinessTypeEnum;
+import com.hxj.enums.CcSourceEnum;
+import com.hxj.entity.ApprovalRecord;
+import com.hxj.entity.CcRecord;
 import com.hxj.entity.OaDocument;
 import com.hxj.entity.SysDataScope;
 import com.hxj.entity.SysDepartment;
@@ -11,15 +15,21 @@ import com.hxj.repository.SysDataScopeRepository;
 import com.hxj.repository.SysDepartmentRepository;
 import com.hxj.repository.SysPostRepository;
 import com.hxj.repository.SysRoleRepository;
+import com.hxj.workflow.WorkflowPort;
+import org.flowable.task.api.Task;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * 数据范围策略测试（V12 收敛后的 5 种类型）：
@@ -52,6 +62,9 @@ class DocumentAccessPolicyTest {
 
     @Autowired
     private jakarta.persistence.EntityManager entityManager;
+
+    @MockBean
+    private WorkflowPort workflowPort;
 
     @Autowired
     private DocumentAccessPolicy accessPolicy;
@@ -148,6 +161,75 @@ class DocumentAccessPolicyTest {
     @Test
     void shouldDenyAllWhenPrincipalMissing() {
         assertThat(findVisibleCodes(null)).isEmpty();
+    }
+
+    // ============ 流程参与人豁免（accessibleTo）：审批路由与数据范围解耦的兜底 ============
+
+    @Test
+    void shouldGrantTaskHolderAccessBeyondDataScope() {
+        OaDocument financeDoc = documentByCode("FK202608290103");
+        financeDoc.setProcessInstanceId("pi-participant-1");
+        entityManager.flush();
+
+        Task heldTask = mock(Task.class);
+        when(heldTask.getProcessInstanceId()).thenReturn("pi-participant-1");
+        when(workflowPort.pendingTasksForUser(any(), any())).thenReturn(List.of(heldTask));
+
+        // user-a 仅 OWN 范围：数据范围看不到财务部单据，但作为任务持有人经参与人豁免可见
+        AuthenticatedUserResponse currentUser = principal(
+                applicantAId, "user-a", businessName, List.of("测试角色"), List.of(DocumentAccessPolicy.OWN));
+
+        assertThat(findAccessibleCodes(currentUser))
+                .contains("FK202608290103");
+        // visibleTo（纯数据范围）依旧不含它——豁免只在单据级语义生效，不放大列表可见面
+        assertThat(findVisibleCodes(currentUser)).doesNotContain("FK202608290103");
+    }
+
+    @Test
+    void shouldGrantCcRecipientAccessBeyondDataScope() {
+        OaDocument financeDoc = documentByCode("FK202608290103");
+        SysUser userA = entityManager.find(SysUser.class, applicantAId);
+        entityManager.persist(CcRecord.toUser(financeDoc, userA, CcSourceEnum.FLOW));
+        entityManager.flush();
+        when(workflowPort.pendingTasksForUser(any(), any())).thenReturn(List.of());
+
+        AuthenticatedUserResponse currentUser = principal(
+                applicantAId, "user-a", businessName, List.of("测试角色"), List.of(DocumentAccessPolicy.OWN));
+
+        assertThat(findAccessibleCodes(currentUser)).contains("FK202608290103");
+    }
+
+    @Test
+    void shouldGrantHistoricalApproverAccessBeyondDataScope() {
+        OaDocument financeDoc = documentByCode("FK202608290103");
+        SysUser userA = entityManager.find(SysUser.class, applicantAId);
+        ApprovalRecord record = new ApprovalRecord();
+        record.setDocument(financeDoc);
+        record.setApprover(userA);
+        record.setAction(ApprovalActionEnum.APPROVE);
+        record.setNodeName("直属主管");
+        entityManager.persist(record);
+        entityManager.flush();
+        when(workflowPort.pendingTasksForUser(any(), any())).thenReturn(List.of());
+
+        AuthenticatedUserResponse currentUser = principal(
+                applicantAId, "user-a", businessName, List.of("测试角色"), List.of(DocumentAccessPolicy.OWN));
+
+        assertThat(findAccessibleCodes(currentUser)).contains("FK202608290103");
+    }
+
+    private OaDocument documentByCode(String code) {
+        return documentRepository.findAll().stream()
+                .filter(doc -> code.equals(doc.getDocCode()))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private List<String> findAccessibleCodes(AuthenticatedUserResponse currentUser) {
+        return documentRepository.findAll(accessPolicy.accessibleTo(currentUser)).stream()
+                .map(OaDocument::getDocCode)
+                .sorted()
+                .toList();
     }
 
     private List<String> findVisibleCodes(AuthenticatedUserResponse currentUser) {

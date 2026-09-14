@@ -478,28 +478,48 @@ public class ApprovalActionService {
     }
 
     private OaDocument visibleDocument(Long id, AuthenticatedUserResponse currentUser) {
-        Specification<OaDocument> spec = accessPolicy.visibleTo(currentUser)
+        // 统一走 DocumentAccessPolicy.accessibleTo：数据范围 ∪ 流程参与人（任务持有人/已审批/被抄送），
+        // 与单据详情、附件上传等入口共享同一份语义，避免多处实现漂移
+        Specification<OaDocument> spec = accessPolicy.accessibleTo(currentUser)
                 .and((root, query, builder) -> builder.equal(root.get("id"), id));
         return documentRepository.findOne(spec)
-                .orElseGet(() -> approverAccessibleDocument(id, currentUser));
+                .orElseThrow(() -> new BusinessException(ErrorCodeEnum.DOCUMENT_NOT_FOUND, "单据不存在或无权查看"));
     }
 
-    /** 数据范围之外的兜底：当前任务持有人、超管、已审批人或被抄送人可访问。 */
-    private OaDocument approverAccessibleDocument(Long id, AuthenticatedUserResponse currentUser) {
-        OaDocument document = documentRepository.findById(id)
-                .orElseThrow(() -> new BusinessException(ErrorCodeEnum.DOCUMENT_NOT_FOUND, "单据不存在或无权查看"));
-        // 候选组任务的 assignee 为空，需按“待办人+候选角色”查询才能命中审批人
-        boolean taskHolder = currentUser != null && document.getProcessInstanceId() != null
-                && workflowPort.pendingTasksForUser(currentUser.account(), currentUser.roles()).stream()
-                    .anyMatch(task -> document.getProcessInstanceId().equals(task.getProcessInstanceId()));
-        boolean acted = currentUser != null && currentUser.userId() != null
-                && approvalRepository.existsByDocumentIdAndApproverId(document.getId(), currentUser.userId());
-        boolean cc = currentUser != null && currentUser.userId() != null
-                && ccRepository.existsByDocumentIdAndTargetUserId(document.getId(), currentUser.userId());
-        if (taskHolder || acted || cc || (currentUser != null && isSuperApprover(currentUser))) {
-            return document;
+    /**
+     * 管理端任务转办：动态指派为空（无汇报线/无核算分工）或候选组无人认领时的兜底，
+     * 与离职交接共用 TRANSFER 留痕机制。仅流程与权限配置者可操作。
+     */
+    @Transactional
+    public ApprovalResultResponse transfer(Long documentId, TransferTaskRequest request) {
+        if (request == null || !StringUtils.hasText(request.account())) {
+            throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND, "请指定被转办人账号");
         }
-        throw new BusinessException(ErrorCodeEnum.DOCUMENT_NOT_FOUND, "单据不存在或无权查看");
+        AuthenticatedUserResponse currentUser = CurrentUser.require();
+        if (currentUser == null || !isConfigurator(currentUser)) {
+            throw new BusinessException(ErrorCodeEnum.ACCESS_DENIED, "仅管理员可转办任务");
+        }
+        OaDocument document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new BusinessException(ErrorCodeEnum.DOCUMENT_NOT_FOUND, "单据不存在或无权查看"));
+        if (document.getProcessInstanceId() == null || document.getStatus() == DocumentStatusEnum.APPROVED
+                || document.getStatus() == DocumentStatusEnum.VOIDED) {
+            throw new BusinessException(ErrorCodeEnum.TASK_TRANSFER_INVALID, "单据当前没有进行中的审批任务");
+        }
+        Task task = workflowPort.tasksForProcess(document.getProcessInstanceId()).stream()
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(ErrorCodeEnum.TASK_TRANSFER_INVALID,
+                        "单据当前没有待办任务"));
+        SysUser target = userRepository.findByAccount(request.account())
+                .orElseThrow(() -> new BusinessException(ErrorCodeEnum.USER_NOT_FOUND,
+                        "被转办人不存在：" + request.account()));
+        workflowPort.setAssignee(task.getId(), target.getAccount());
+        ApprovalRecord record = record(document, task, ApprovalActionEnum.TRANSFER, currentUser);
+        record.setComment(StringUtils.hasText(request.comment())
+                ? request.comment()
+                : "管理员将待办转办给「" + target.getName() + "」");
+        approvalRepository.save(record);
+        document.setCurrentNode(task.getName());
+        return state(document);
     }
 
     private SysUser user(AuthenticatedUserResponse currentUser) {

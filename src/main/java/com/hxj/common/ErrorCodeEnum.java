@@ -83,6 +83,8 @@ public enum ErrorCodeEnum {
     SIGN_COMMENT_REQUIRED("请填写加签意见"),
     /** 当前用户没有该单据的加签任务 */
     SIGN_TASK_NOT_FOUND("当前用户没有该单据的加签任务"),
+    /** 单据当前没有可转办的待办任务（已办结/作废或流程无活跃节点） */
+    TASK_TRANSFER_INVALID("单据当前没有可转办的待办任务"),
     /** 请上传盖章文件 */
     STAMPED_FILE_REQUIRED("请上传盖章文件"),
     /** 仅用印申请可回传盖章文件 */
