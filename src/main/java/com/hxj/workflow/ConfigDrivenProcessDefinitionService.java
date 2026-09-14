@@ -169,6 +169,17 @@ public class ConfigDrivenProcessDefinitionService {
             case MANAGER ->
                     // 钉钉式汇报线节点：动态指派给申请人提交时确定的直属主管（提交时写入 managerAccount 流程变量）
                     task.setAssignee("${managerAccount}");
+            case MULTI_MANAGER -> {
+                    // 连续多级主管（钉钉同款）：沿汇报线自下而上串行逐级审批。
+                    // 集合 = 提交时写入的 managerChain（直属主管→上级→…），元素变量 chainManager 供 assignee 表达式取值
+                    task.setAssignee("${chainManager}");
+                    org.flowable.bpmn.model.MultiInstanceLoopCharacteristics multi =
+                            new org.flowable.bpmn.model.MultiInstanceLoopCharacteristics();
+                    multi.setSequential(true);
+                    multi.setInputDataItem("managerChain");
+                    multi.setElementVariable("chainManager");
+                    task.setLoopCharacteristics(multi);
+            }
             case DEPT_ROLE ->
                     // 按发起人部门路由：提交时解析核算分工（服务部门=申请人部门且挂「核算会计」角色的成员），
                     // 写入 deptAccountant 流程变量；无分工映射时为空串（任务待管理员指派）

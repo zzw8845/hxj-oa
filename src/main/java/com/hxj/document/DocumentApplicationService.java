@@ -327,6 +327,16 @@ public class DocumentApplicationService {
         String managerAccount = applicant.getManagerId() == null ? ""
                 : userRepository.findById(applicant.getManagerId())
                         .map(SysUser::getAccount).orElse("");
+        // 连续多级主管链：「逐级主管」节点以 ${managerChain} 串行逐级审批（自下而上，去环，上限 10 级）
+        List<String> managerChain = new ArrayList<>();
+        Long cursor = applicant.getManagerId();
+        java.util.Set<Long> visited = new java.util.HashSet<>();
+        while (cursor != null && visited.add(cursor) && managerChain.size() < 10) {
+            SysUser manager = userRepository.findById(cursor).orElse(null);
+            if (manager == null) break;
+            managerChain.add(manager.getAccount());
+            cursor = manager.getManagerId();
+        }
         // 主办会计账号：「会计（按部门）」节点以 ${deptAccountant} 动态指派（核算分工表解析，无映射时为空串）
         String deptAccountant = deptAccountantResolver.resolve(applicant);
         return Map.ofEntries(
@@ -338,6 +348,7 @@ public class DocumentApplicationService {
                 // 发起人回环节点（签收/归还/上传归档附件等）以此为 assignee 表达式动态指派
                 Map.entry("initiator", applicant.getAccount()),
                 Map.entry("managerAccount", managerAccount),
+                Map.entry("managerChain", managerChain),
                 Map.entry("deptAccountant", deptAccountant));
     }
 

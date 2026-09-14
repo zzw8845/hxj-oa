@@ -19,7 +19,10 @@ public enum NodeAssigneeRuleEnum {
     MANAGER,
 
     /** 按部门职能：「会计（按部门）」，按核算分工解析主办会计。 */
-    DEPT_ROLE;
+    DEPT_ROLE,
+
+    /** 连续多级主管：「逐级主管」，沿汇报线自下而上串行逐级审批（提交时写入 managerChain）。 */
+    MULTI_MANAGER;
 
     /**
      * 归类一个节点。优先级：发起人节点名前缀 &gt; 直属主管 &gt; 会计（按部门） &gt; 静态角色。
@@ -30,6 +33,9 @@ public enum NodeAssigneeRuleEnum {
         }
         if ("直属主管".equals(assigneeRole)) {
             return MANAGER;
+        }
+        if ("逐级主管".equals(assigneeRole)) {
+            return MULTI_MANAGER;
         }
         if ("会计（按部门）".equals(assigneeRole)) {
             return DEPT_ROLE;
