@@ -35,13 +35,6 @@ public class SysRole {
     @Column(nullable = false, unique = true, length = 100)
     private String name;
 
-    /** 归属部门ID（sys_department 外键；可空表示暂未归属，管理接口保存时强制选择）。 */
-    @Column(name = "department_id")
-    private Long departmentId;
-
-    /** 归属部门展示快照（由服务层在部门改名时同步）。 */
-    @Column(length = 100)
-    private String department;
 
     /** 对应岗位。 */
     @Column(length = 100)
@@ -86,11 +79,7 @@ public class SysRole {
     public void setId(Long id) { this.id = id; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
-    public Long getDepartmentId() { return departmentId; }
-    public void setDepartmentId(Long departmentId) { this.departmentId = departmentId; }
-    public String getDepartment() { return department; }
-    public void setDepartment(String department) { this.department = department; }
-    public String getPost() { return post; }
+public String getPost() { return post; }
     public void setPost(String post) { this.post = post; }
     public SysDataScope getDataScope() { return dataScope; }
     public void setDataScope(SysDataScope dataScope) { this.dataScope = dataScope; }

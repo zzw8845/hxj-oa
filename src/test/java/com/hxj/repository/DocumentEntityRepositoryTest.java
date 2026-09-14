@@ -139,7 +139,7 @@ class DocumentEntityRepositoryTest {
 
         SysRole role = new SysRole();
         role.setName("普通员工-" + account);
-        role.setDepartment("业务支持中心");
+
         role.setPost("员工");
         role.setDataScope(scope);
         roleRepository.save(role);

@@ -145,14 +145,17 @@ public class RoleManagementService {
 
     /**
      * 部门角色架构：真树形结构——部门取自闭包表字典（支持任意层级），
-     * 角色按归属部门（departmentId）挂载到对应节点；未归属部门的角色归入"未分配"虚拟节点。
+     * 角色按关联部门（scopeDepartmentIds）挂载到对应节点（一个角色可挂多个节点）；未关联部门的角色归入"未分配"虚拟节点。
      */
     @Transactional(readOnly = true)
     public List<DepartmentRoleNodeResponse> departmentTree() {
         List<com.hxj.entity.SysDepartment> all = departmentRepository.findAllByOrderBySortOrderAscIdAsc();
-        Map<Long, List<SysRole>> rolesByDept = roleRepository.findAll().stream()
-                .filter(role -> role.getDepartmentId() != null)
-                .collect(Collectors.groupingBy(SysRole::getDepartmentId));
+        Map<Long, List<SysRole>> rolesByDept = new java.util.LinkedHashMap<>();
+        for (SysRole role : roleRepository.findAll()) {
+            for (com.hxj.entity.SysDepartment dept : role.getScopeDepartments()) {
+                rolesByDept.computeIfAbsent(dept.getId(), key -> new java.util.ArrayList<>()).add(role);
+            }
+        }
         Map<Long, List<com.hxj.entity.SysDepartment>> childrenByParent = new java.util.LinkedHashMap<>();
         List<com.hxj.entity.SysDepartment> roots = new java.util.ArrayList<>();
         for (com.hxj.entity.SysDepartment dept : all) {
@@ -166,7 +169,7 @@ public class RoleManagementService {
                 .map(root -> buildDepartmentNode(root, childrenByParent, rolesByDept))
                 .toList());
         List<SysRole> unassigned = roleRepository.findAll().stream()
-                .filter(role -> role.getDepartmentId() == null)
+                .filter(role -> role.getScopeDepartments().isEmpty())
                 .sorted(Comparator.comparing(SysRole::getName))
                 .toList();
         if (!unassigned.isEmpty()) {
@@ -200,16 +203,14 @@ public class RoleManagementService {
         if (permissionCodes.isEmpty() || permissions.size() != permissionCodes.size()) {
             throw new BusinessException(ErrorCodeEnum.PERMISSION_NOT_FOUND, "权限点不存在");
         }
-        com.hxj.entity.SysDepartment department = departmentRepository.findById(request.departmentId())
-                .orElseThrow(() -> new BusinessException(ErrorCodeEnum.DEPARTMENT_NOT_FOUND, "归属部门不存在"));
+        List<Long> scopeDepartmentIds = request.scopeDepartmentIds() == null
+                ? List.of() : request.scopeDepartmentIds();
         List<com.hxj.entity.SysDepartment> scopeDepartments =
-                departmentRepository.findAllById(request.scopeDepartmentIds());
-        if (scopeDepartments.size() != request.scopeDepartmentIds().size()) {
-            throw new BusinessException(ErrorCodeEnum.DEPARTMENT_NOT_FOUND, "自定义数据范围部门不存在");
+                departmentRepository.findAllById(scopeDepartmentIds);
+        if (scopeDepartments.size() != scopeDepartmentIds.size()) {
+            throw new BusinessException(ErrorCodeEnum.DEPARTMENT_NOT_FOUND, "关联部门不存在");
         }
         role.setName(request.name());
-        role.setDepartmentId(department.getId());
-        role.setDepartment(department.getName());
         role.setPost(request.post());
         role.setDataScope(dataScope);
         role.setScopeDepartments(new LinkedHashSet<>(scopeDepartments));
@@ -218,7 +219,7 @@ public class RoleManagementService {
 
     private RoleResponse toResponse(SysRole role) {
         return new RoleResponse(
-                role.getId(), role.getName(), role.getDepartmentId(), role.getDepartment(), role.getPost(),
+                role.getId(), role.getName(), role.getPost(),
                 role.getDataScope().getCode(), scopeDepartmentIds(role),
                 permissionCodes(role), memberNames(role));
     }
