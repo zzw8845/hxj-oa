@@ -145,15 +145,24 @@ public class RoleManagementService {
 
     /**
      * 部门角色架构：真树形结构——部门取自闭包表字典（支持任意层级），
-     * 角色按关联部门（scopeDepartmentIds）挂载到对应节点（一个角色可挂多个节点）；未关联部门的角色归入"未分配"虚拟节点。
+     * 角色按成员分布挂载：角色出现在其持有者所在部门节点下（跨部门成员则挂多节点）；无成员的角色归入"未分配"虚拟节点。
      */
     @Transactional(readOnly = true)
     public List<DepartmentRoleNodeResponse> departmentTree() {
         List<com.hxj.entity.SysDepartment> all = departmentRepository.findAllByOrderBySortOrderAscIdAsc();
         Map<Long, List<SysRole>> rolesByDept = new java.util.LinkedHashMap<>();
+        List<SysRole> unassignedRoles = new java.util.ArrayList<>();
         for (SysRole role : roleRepository.findAll()) {
-            for (com.hxj.entity.SysDepartment dept : role.getScopeDepartments()) {
-                rolesByDept.computeIfAbsent(dept.getId(), key -> new java.util.ArrayList<>()).add(role);
+            Set<Long> deptIds = role.getMembers().stream()
+                    .map(SysUser::getDepartmentId)
+                    .filter(java.util.Objects::nonNull)
+                    .collect(java.util.stream.Collectors.toSet());
+            if (deptIds.isEmpty()) {
+                unassignedRoles.add(role);
+                continue;
+            }
+            for (Long deptId : deptIds) {
+                rolesByDept.computeIfAbsent(deptId, key -> new java.util.ArrayList<>()).add(role);
             }
         }
         Map<Long, List<com.hxj.entity.SysDepartment>> childrenByParent = new java.util.LinkedHashMap<>();
@@ -168,8 +177,7 @@ public class RoleManagementService {
         List<DepartmentRoleNodeResponse> tree = new java.util.ArrayList<>(roots.stream()
                 .map(root -> buildDepartmentNode(root, childrenByParent, rolesByDept))
                 .toList());
-        List<SysRole> unassigned = roleRepository.findAll().stream()
-                .filter(role -> role.getScopeDepartments().isEmpty())
+        List<SysRole> unassigned = unassignedRoles.stream()
                 .sorted(Comparator.comparing(SysRole::getName))
                 .toList();
         if (!unassigned.isEmpty()) {

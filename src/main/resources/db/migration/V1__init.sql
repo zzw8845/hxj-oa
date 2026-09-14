@@ -4,9 +4,9 @@
 --   * 角色 18 个 = 17 具体角色（见《原型数据清单》表 1）+ 兜底「普通员工」；
 --     原型两条泛化负责人条目（"各一级中心/各二级部门"占位）不落库，
 --     混淆根源见《权限模型设计说明》V30~V35 裁决记录
---   * 角色的部门关联唯一载体 = scopeDepartmentIds（sys_role_scope_department）：
---     架构树按它挂载展示；dataScope=CUSTOM 时它同时是可见部门集合（V35，
---     原 sys_role.department_id「目录分类」字段已删除）
+--   * 角色的部门关联唯一载体 = scopeDepartmentIds（sys_role_scope_department），
+--     仅 dataScope=CUSTOM 时作为可见部门集合（V35：目录分类字段已删除，
+--     架构树改按成员分布自动生成，不再依赖任何配置）
 --   * 用户 32 = admin + 31 名有具体职能角色的人员；9 名纯负责人
 --     （舒飞/卢乙芬/王海亮/苗福鑫/翁建发/陈成辉/郭静宇/李林华/王莹）
 --     因原型仅有泛化身份、无具体职能角色，不入库——记录见《原型数据清单》表 2，
@@ -155,7 +155,7 @@ CREATE TABLE `flow_condition_rule` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_flow_condition_order` (`flow_config_id`,`sort_order`),
   CONSTRAINT `fk_flow_condition_config` FOREIGN KEY (`flow_config_id`) REFERENCES `flow_config` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=43 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='流程条件分支规则表';
+) ENGINE=InnoDB AUTO_INCREMENT=46 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='流程条件分支规则表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -195,7 +195,7 @@ CREATE TABLE `flow_node_config` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_flow_node_order` (`flow_config_id`,`sort_order`),
   CONSTRAINT `fk_flow_node_config` FOREIGN KEY (`flow_config_id`) REFERENCES `flow_config` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=328 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='流程节点配置表';
+) ENGINE=InnoDB AUTO_INCREMENT=349 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='流程节点配置表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -551,7 +551,7 @@ CREATE TABLE `sys_user_service_dept` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14  9:19:25
+-- Dump completed on 2026-09-14  9:59:22
 
 
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
@@ -647,7 +647,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `sys_role_scope_department` WRITE;
 /*!40000 ALTER TABLE `sys_role_scope_department` DISABLE KEYS */;
-INSERT INTO `sys_role_scope_department` (`role_id`, `department_id`) VALUES (26,16),(32,16),(33,16),(25,20),(20,22),(33,22),(38,22),(27,23),(28,23),(34,24),(35,24),(36,26),(37,26),(33,27),(31,28),(33,28),(39,28),(33,29),(24,30),(33,30),(29,31),(30,31),(33,31);
+INSERT INTO `sys_role_scope_department` (`role_id`, `department_id`) VALUES (33,16),(33,22),(33,27),(33,28),(33,29),(33,30),(33,31);
 /*!40000 ALTER TABLE `sys_role_scope_department` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -687,7 +687,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `flow_node_config` WRITE;
 /*!40000 ALTER TABLE `flow_node_config` DISABLE KEYS */;
-INSERT INTO `flow_node_config` (`id`, `flow_config_id`, `name`, `node_type`, `assignee_role`, `sort_order`, `cc_targets`) VALUES (321,1,'发起人','START',NULL,0,NULL),(322,1,'直属主管','APPROVAL','直属主管',1,NULL),(323,1,'会计（按部门）','APPROVAL','会计（按部门）',2,NULL),(324,1,'会计主管&内控','APPROVAL','会计主管&内控',3,NULL),(325,1,'公司领导（大额）','APPROVAL','公司领导',4,NULL),(326,1,'出纳','APPROVAL','出纳',5,NULL),(327,1,'抄送相关负责人','CC',NULL,6,'[{\"type\":\"ROLE\",\"value\":\"会计主管&内控\"},{\"type\":\"ROLE\",\"value\":\"出纳\"}]');
+INSERT INTO `flow_node_config` (`id`, `flow_config_id`, `name`, `node_type`, `assignee_role`, `sort_order`, `cc_targets`) VALUES (342,1,'发起人','START',NULL,0,NULL),(343,1,'直属主管','APPROVAL','直属主管',1,NULL),(344,1,'会计（按部门）','APPROVAL','会计（按部门）',2,NULL),(345,1,'会计主管&内控','APPROVAL','会计主管&内控',3,NULL),(346,1,'公司领导（大额）','APPROVAL','公司领导',4,NULL),(347,1,'出纳','APPROVAL','出纳',5,NULL),(348,1,'抄送相关负责人','CC',NULL,6,'[{\"type\":\"ROLE\",\"value\":\"会计主管&内控\"},{\"type\":\"ROLE\",\"value\":\"出纳\"}]');
 /*!40000 ALTER TABLE `flow_node_config` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -697,7 +697,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `flow_condition_rule` WRITE;
 /*!40000 ALTER TABLE `flow_condition_rule` DISABLE KEYS */;
-INSERT INTO `flow_condition_rule` (`id`, `flow_config_id`, `variable_name`, `operator`, `expected_value`, `target_node_name`, `sort_order`) VALUES (42,1,'amount','GREATER_THAN_OR_EQUAL','20000','公司领导（大额）',0);
+INSERT INTO `flow_condition_rule` (`id`, `flow_config_id`, `variable_name`, `operator`, `expected_value`, `target_node_name`, `sort_order`) VALUES (45,1,'amount','GREATER_THAN_OR_EQUAL','20000','公司领导（大额）',0);
 /*!40000 ALTER TABLE `flow_condition_rule` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -730,7 +730,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14  9:19:25
+-- Dump completed on 2026-09-14  9:59:22
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -768,7 +768,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14  9:19:25
+-- Dump completed on 2026-09-14  9:59:22
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -806,7 +806,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14  9:19:25
+-- Dump completed on 2026-09-14  9:59:22
 
 
 SET FOREIGN_KEY_CHECKS = 1;

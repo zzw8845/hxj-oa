@@ -176,11 +176,15 @@ class PermissionManagementServiceTest {
                 new SysPermission("DEPARTMENT_HEAD_APPROVAL", "部门负责人审批"));
 
         RoleResponse created = roleService.create(new SaveRoleRequest(
-                "部门负责人", "经理", scope.getCode(), List.of(departmentId), List.of(permission.getCode(), approve.getCode())));
+                "部门负责人", "经理", scope.getCode(), null, List.of(permission.getCode(), approve.getCode())));
         assertThat(created.permissions()).containsExactlyInAnyOrder("VIEW_OWN_FORMS", "DEPARTMENT_HEAD_APPROVAL");
 
+        // 树按成员分布挂载：创建持角色员工后，角色出现在其主部门节点下
+        employeeService.create(new CreateEmployeeRequest(
+                "李四", "HXJ200", "lisi", "password", departmentId, postId, null, List.of("部门负责人")));
+
         RoleResponse updated = roleService.update(created.id(), new SaveRoleRequest(
-                "部门经理", "经理", scope.getCode(), List.of(departmentId), List.of(approve.getCode())));
+                "部门经理", "经理", scope.getCode(), null, List.of(approve.getCode())));
         assertThat(updated.name()).isEqualTo("部门经理");
         assertThat(updated.permissions()).containsExactly("DEPARTMENT_HEAD_APPROVAL");
 
@@ -190,7 +194,12 @@ class PermissionManagementServiceTest {
         assertThat(businessDepartment.id()).isEqualTo(departmentId);
         assertThat(businessDepartment.parentId()).isNull();
         assertThat(businessDepartment.roles()).extracting(RoleTreeNodeResponse::name)
-                .contains("普通员工", "部门经理");
+                .contains("部门经理");
+        // 无成员角色落"未分配"
+        DepartmentRoleNodeResponse unassignedNode = tree.stream()
+                .filter(node -> "未分配".equals(node.name())).findFirst().orElseThrow();
+        assertThat(unassignedNode.roles()).extracting(RoleTreeNodeResponse::name)
+                .contains("普通员工");
     }
 
     @Test
