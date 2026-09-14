@@ -6,6 +6,7 @@ import com.hxj.common.ErrorCodeEnum;
 import com.hxj.entity.FormField;
 import com.hxj.entity.FormTemplate;
 import com.hxj.exception.BusinessException;
+import com.hxj.repository.FlowConfigRepository;
 import com.hxj.repository.FormFieldRepository;
 import com.hxj.repository.FormTemplateRepository;
 import org.springframework.stereotype.Service;
@@ -35,6 +36,10 @@ public class FormTemplateManagementService {
     public static final Set<String> RESERVED_KEYS = Set.of(
             "amount", "title", "involvesFunds", "requiresAdminReview", "businessMode", "needPostMaterial");
 
+    /** 业务类型 → 单号前缀：前缀由业务类型唯一决定，不接受调用方自传。 */
+    private static final Map<String, String> PREFIX_BY_BUSINESS_TYPE =
+            Map.of("DAILY_PAYMENT", "BX", "BUSINESS_PAYMENT", "FK", "SEAL_APPLICATION", "YY");
+
     /** 系统属性保留字：表单字段 key 不得占用。 */
     private static final Set<String> SYSTEM_KEYS = Set.of(
             "docCode", "applicant", "department", "status", "processInstanceId",
@@ -49,15 +54,18 @@ public class FormTemplateManagementService {
     private final FormFieldRepository fieldRepository;
     private final com.hxj.repository.OaDocumentRepository documentRepository;
     private final com.hxj.repository.WorkbenchEntryRepository workbenchEntryRepository;
+    private final FlowConfigRepository flowConfigRepository;
 
     public FormTemplateManagementService(FormTemplateRepository templateRepository,
                                          FormFieldRepository fieldRepository,
                                          com.hxj.repository.OaDocumentRepository documentRepository,
-                                         com.hxj.repository.WorkbenchEntryRepository workbenchEntryRepository) {
+                                         com.hxj.repository.WorkbenchEntryRepository workbenchEntryRepository,
+                                         FlowConfigRepository flowConfigRepository) {
         this.templateRepository = templateRepository;
         this.fieldRepository = fieldRepository;
         this.documentRepository = documentRepository;
         this.workbenchEntryRepository = workbenchEntryRepository;
+        this.flowConfigRepository = flowConfigRepository;
     }
 
     // ==================== 管理端 ====================
@@ -287,8 +295,14 @@ public class FormTemplateManagementService {
     }
 
     private void validateTemplatePayload(SaveFormTemplateRequest request) {
-        if (request.businessType() == null || request.businessType().isBlank()) {
-            throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID, "业务类型键不能为空");
+        // 业务类型是模板的唯一分类输入：必须为合法枚举——它决定单号前缀（派生）、台账归类与工作台卡片
+        boolean validBusinessType = request.businessType() != null && java.util.Arrays
+                .stream(com.hxj.enums.BusinessTypeEnum.values())
+                .anyMatch(e -> e.name().equals(request.businessType()));
+        if (!validBusinessType) {
+            throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID,
+                    "业务类型非法（可用：DAILY_PAYMENT / BUSINESS_PAYMENT / SEAL_APPLICATION）："
+                            + request.businessType());
         }
         if (request.name() == null || request.name().isBlank()) {
             throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID, "模板名称不能为空");
@@ -318,25 +332,21 @@ public class FormTemplateManagementService {
                 throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID,
                         "下拉字段必须提供选项：" + field.label());
             }
-            if (Boolean.TRUE.equals(field.reserved()) && !RESERVED_KEYS.contains(key)) {
-                throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID,
-                        "非保留键不可标记为提升字段：" + key);
-            }
         }
-        if (request.category() != null && !request.category().isBlank()
-                && java.util.Arrays.stream(com.hxj.enums.BusinessTypeEnum.values())
-                        .noneMatch(e -> e.name().equals(request.category()))) {
+        // 绑定流程必须真实存在：否则入口会出现、员工填得完单，提交时才报"未配置对应审批流程"
+        if (request.flowConfigId() != null && flowConfigRepository.findById(request.flowConfigId()).isEmpty()) {
             throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID,
-                    "粗分类非法：" + request.category());
+                    "绑定的流程配置不存在：" + request.flowConfigId());
         }
     }
 
     private void applyTemplate(FormTemplate template, SaveFormTemplateRequest request) {
         template.setBusinessType(request.businessType());
         template.setName(request.name());
-        template.setDocPrefix(request.docPrefix());
+        // 分类与前缀由业务类型唯一派生（收敛"双分类字段/手工前缀"的失配空间）
+        template.setCategory(request.businessType());
+        template.setDocPrefix(PREFIX_BY_BUSINESS_TYPE.get(request.businessType()));
         template.setFlowConfigId(request.flowConfigId());
-        template.setCategory(request.category());
         try {
             template.setAttachmentRequirements(request.attachmentRequirements() == null
                     ? null : MAPPER.writeValueAsString(request.attachmentRequirements()));
@@ -355,8 +365,9 @@ public class FormTemplateManagementService {
             field.setLabel(payload.label() == null ? payload.fieldKey() : payload.label());
             field.setControlType(payload.controlType());
             field.setRequired(Boolean.TRUE.equals(payload.required()));
-            field.setReserved(Boolean.TRUE.equals(payload.reserved()));
-            field.setSortOrder(payload.sortOrder() == null ? order : payload.sortOrder());
+            // 提升字段由服务端白名单标记，客户端不感知；排序由数组顺序决定
+            field.setReserved(RESERVED_KEYS.contains(payload.fieldKey()));
+            field.setSortOrder(++order);
             field.setEnabled(payload.enabled() == null || payload.enabled());
             if (payload.options() != null) {
                 try {

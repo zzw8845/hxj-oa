@@ -222,7 +222,7 @@ class ApiRoundTripContractTest {
 
     private long createTemplate(long configId) throws Exception {
         ObjectNode body = mapper.createObjectNode();
-        body.put("businessType", "采购申请-单据闭环");
+        body.put("businessType", "DAILY_PAYMENT");
         body.put("name", "采购申请-单据闭环");
         body.put("docPrefix", "CG");
         body.put("flowConfigId", configId);
