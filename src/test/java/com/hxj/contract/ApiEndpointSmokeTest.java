@@ -105,7 +105,7 @@ class ApiEndpointSmokeTest {
 
         SysRole role = new SysRole();
         role.setName("冒烟测试管理员");
-
+        role.setDepartment("总经办");
         role.setPost("系统管理员");
         role.setDataScope(scope);
         for (String code : List.of("VIEW_ALL_FORMS", "VIEW_OWN_FORMS", "SUBMIT_ALL_FORMS",

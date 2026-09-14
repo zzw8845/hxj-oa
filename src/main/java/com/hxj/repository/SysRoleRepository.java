@@ -15,8 +15,11 @@ public interface SysRoleRepository extends JpaRepository<SysRole, Long> {
 
     boolean existsByName(String name);
 
+    List<SysRole> findByDepartment(String department);
 
+    List<SysRole> findByDepartmentId(Long departmentId);
 
+    boolean existsByDepartmentId(Long departmentId);
 
     List<SysRole> findByPost(String post);
 }

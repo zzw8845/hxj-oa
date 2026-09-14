@@ -9,11 +9,12 @@ import java.util.List;
 
 public record SaveRoleRequest(
         @Schema(description = "角色名称") @NotBlank String name,
-
+        @Schema(description = "归属部门ID（sys_department 字典），与 RoleResponse.departmentId 同源可原样回写")
+        @NotNull Long departmentId,
         @Schema(description = "适用岗位") @NotBlank String post,
         @Schema(description = "数据范围类型（ALL/OWN/DEPT/DEPT_AND_CHILD/CUSTOM），与 RoleResponse.dataScope 同源可原样回写")
         @NotBlank String dataScope,
-        @Schema(description = "关联部门ID列表（架构树展示；dataScope=CUSTOM 时即为可见部门集合），与 RoleResponse.scopeDepartmentIds 同源可原样回写")
+        @Schema(description = "自定义数据范围的部门ID列表（仅 dataScope=CUSTOM 时生效），与 RoleResponse.scopeDepartmentIds 同源可原样回写")
         List<Long> scopeDepartmentIds,
         @Schema(description = "权限点编码列表（如 VIEW_OWN_FORMS），与 RoleResponse.permissions 同源可原样回写")
         @NotEmpty List<String> permissions) {

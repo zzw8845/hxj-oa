@@ -70,7 +70,7 @@ class AuthLoginIntegrationTest {
 
         SysRole role = new SysRole();
         role.setName("超级管理员");
-
+        role.setDepartment("总经办");
         role.setPost("系统管理员");
         role.setDataScope(scope);
         role.addPermission(permission);
@@ -248,7 +248,7 @@ class AuthLoginIntegrationTest {
 
         SysRole role = new SysRole();
         role.setName("超级管理员");
-
+        role.setDepartment("总经办");
         role.setPost("系统管理员");
         role.setDataScope(scope);
         role.addPermission(permission);

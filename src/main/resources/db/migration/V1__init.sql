@@ -1,16 +1,15 @@
 -- =====================================================================
--- V1 基线：海峡金 OA 全量 schema + 干净种子数据（压平重建，2026-09-14）
+-- V1 基线：海峡金 OA 全量 schema + 干净种子数据（压平重建，2026-09-12）
 -- 设计决策：
 --   * 角色 18 个 = 17 具体角色（见《原型数据清单》表 1）+ 兜底「普通员工」；
 --     原型两条泛化负责人条目（"各一级中心/各二级部门"占位）不落库，
---     混淆根源见《权限模型设计说明》V30~V35 裁决记录
---   * 角色的部门关联唯一载体 = scopeDepartmentIds（sys_role_scope_department），
---     仅 dataScope=CUSTOM 时作为可见部门集合（V35：目录分类字段已删除，
---     架构树改按成员分布自动生成，不再依赖任何配置）
+--     混淆根源见《权限模型设计说明》V30~V34 裁决记录
 --   * 用户 32 = admin + 31 名有具体职能角色的人员；9 名纯负责人
 --     （舒飞/卢乙芬/王海亮/苗福鑫/翁建发/陈成辉/郭静宇/李林华/王莹）
 --     因原型仅有泛化身份、无具体职能角色，不入库——记录见《原型数据清单》表 2，
 --     待组织架构明确后连同正式角色一并创建
+--   * 「兼职部门」字段整体移除（V34）：功能被角色 CUSTOM 数据范围覆盖，
+--     且内容为角色归属的第三份抄写——裁决记录见《权限模型设计说明》
 --   * 汇报线按规则重建（成员→职能主管→中心负责人→王强），弃用 V6 推断数据
 --   * 事务数据不入基线；Flowable 引擎表由引擎自建
 -- =====================================================================
@@ -155,7 +154,7 @@ CREATE TABLE `flow_condition_rule` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_flow_condition_order` (`flow_config_id`,`sort_order`),
   CONSTRAINT `fk_flow_condition_config` FOREIGN KEY (`flow_config_id`) REFERENCES `flow_config` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=46 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='流程条件分支规则表';
+) ENGINE=InnoDB AUTO_INCREMENT=42 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='流程条件分支规则表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -195,7 +194,7 @@ CREATE TABLE `flow_node_config` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_flow_node_order` (`flow_config_id`,`sort_order`),
   CONSTRAINT `fk_flow_node_config` FOREIGN KEY (`flow_config_id`) REFERENCES `flow_config` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=349 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='流程节点配置表';
+) ENGINE=InnoDB AUTO_INCREMENT=321 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='流程节点配置表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -425,6 +424,8 @@ DROP TABLE IF EXISTS `sys_role`;
 CREATE TABLE `sys_role` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `name` varchar(100) NOT NULL COMMENT '角色名称',
+  `department` varchar(100) DEFAULT NULL COMMENT '对应部门',
+  `department_id` bigint DEFAULT NULL COMMENT '归属部门ID',
   `post` varchar(100) DEFAULT NULL COMMENT '对应岗位',
   `data_scope_id` bigint NOT NULL,
   `data_scope` varchar(100) DEFAULT NULL COMMENT '数据范围',
@@ -435,7 +436,9 @@ CREATE TABLE `sys_role` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`),
   KEY `fk_role_data_scope` (`data_scope_id`),
-  CONSTRAINT `fk_role_data_scope` FOREIGN KEY (`data_scope_id`) REFERENCES `sys_data_scope` (`id`)
+  KEY `fk_role_department` (`department_id`),
+  CONSTRAINT `fk_role_data_scope` FOREIGN KEY (`data_scope_id`) REFERENCES `sys_data_scope` (`id`),
+  CONSTRAINT `fk_role_department` FOREIGN KEY (`department_id`) REFERENCES `sys_department` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=41 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='角色表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -551,7 +554,7 @@ CREATE TABLE `sys_user_service_dept` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14  9:59:22
+-- Dump completed on 2026-09-12 18:21:11
 
 
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
@@ -627,7 +630,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `sys_role` WRITE;
 /*!40000 ALTER TABLE `sys_role` DISABLE KEYS */;
-INSERT INTO `sys_role` (`id`, `name`, `post`, `data_scope_id`, `data_scope`, `permissions`, `members`, `created_at`, `updated_at`) VALUES (20,'超级管理员','系统管理岗',20,NULL,NULL,NULL,'2026-09-10 10:18:42','2026-09-12 17:30:05'),(24,'交付主管','交付主管',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(25,'会计主管&内控','会计主管/内控',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(26,'公司领导','公司领导',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(27,'内控专员','内控专员',21,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(28,'内控主管','内控主管',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(29,'出纳','出纳',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(30,'出纳主管','出纳主管',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(31,'商务专员','商务专员',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(32,'执行总经理','执行总经理',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-12 17:30:50'),(33,'核算会计','会计',24,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-11 15:39:06'),(34,'法务','法务',21,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(35,'法务主管','法务主管',22,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-12 14:36:38'),(36,'行政专员','行政专员',21,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(37,'行政主管','行政主管',21,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(38,'财务经理','财务经理',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(39,'运营服务主管','运营服务主管',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(40,'普通员工','普通员工',21,NULL,NULL,NULL,'2026-09-11 15:47:20','2026-09-11 15:47:20');
+INSERT INTO `sys_role` (`id`, `name`, `department`, `department_id`, `post`, `data_scope_id`, `data_scope`, `permissions`, `members`, `created_at`, `updated_at`) VALUES (20,'超级管理员','财务部',22,'系统管理岗',20,NULL,NULL,NULL,'2026-09-10 10:18:42','2026-09-12 17:30:05'),(24,'交付主管','交付部',30,'交付主管',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(25,'会计主管&内控','财务中心',20,'会计主管/内控',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(26,'公司领导','总经办',16,'公司领导',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(27,'内控专员','内控部',23,'内控专员',21,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(28,'内控主管','内控部',23,'内控主管',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(29,'出纳','资管中心',31,'出纳',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(30,'出纳主管','资管中心',31,'出纳主管',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(31,'商务专员','运营服务部',28,'商务专员',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(32,'执行总经理','总经办',16,'执行总经理',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-12 17:30:50'),(33,'核算会计','财务部',22,'会计',24,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-11 15:39:06'),(34,'法务','法务部',24,'法务',21,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(35,'法务主管','法务部',24,'法务主管',22,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-12 14:36:38'),(36,'行政专员','行政部',26,'行政专员',21,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(37,'行政主管','行政部',26,'行政主管',21,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(38,'财务经理','财务部',22,'财务经理',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(39,'运营服务主管','运营服务部',28,'运营服务主管',20,NULL,NULL,NULL,'2026-09-10 16:48:00','2026-09-10 16:48:00'),(40,'普通员工',NULL,NULL,'普通员工',21,NULL,NULL,NULL,'2026-09-11 15:47:20','2026-09-11 15:47:20');
 /*!40000 ALTER TABLE `sys_role` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -647,7 +650,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `sys_role_scope_department` WRITE;
 /*!40000 ALTER TABLE `sys_role_scope_department` DISABLE KEYS */;
-INSERT INTO `sys_role_scope_department` (`role_id`, `department_id`) VALUES (33,16),(33,22),(33,27),(33,28),(33,29),(33,30),(33,31);
+INSERT INTO `sys_role_scope_department` (`role_id`, `department_id`) VALUES (33,16),(33,27),(33,28),(33,29),(33,30),(33,31);
 /*!40000 ALTER TABLE `sys_role_scope_department` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -687,7 +690,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `flow_node_config` WRITE;
 /*!40000 ALTER TABLE `flow_node_config` DISABLE KEYS */;
-INSERT INTO `flow_node_config` (`id`, `flow_config_id`, `name`, `node_type`, `assignee_role`, `sort_order`, `cc_targets`) VALUES (342,1,'发起人','START',NULL,0,NULL),(343,1,'直属主管','APPROVAL','直属主管',1,NULL),(344,1,'会计（按部门）','APPROVAL','会计（按部门）',2,NULL),(345,1,'会计主管&内控','APPROVAL','会计主管&内控',3,NULL),(346,1,'公司领导（大额）','APPROVAL','公司领导',4,NULL),(347,1,'出纳','APPROVAL','出纳',5,NULL),(348,1,'抄送相关负责人','CC',NULL,6,'[{\"type\":\"ROLE\",\"value\":\"会计主管&内控\"},{\"type\":\"ROLE\",\"value\":\"出纳\"}]');
+INSERT INTO `flow_node_config` (`id`, `flow_config_id`, `name`, `node_type`, `assignee_role`, `sort_order`, `cc_targets`) VALUES (314,1,'发起人','START',NULL,0,NULL),(315,1,'直属主管','APPROVAL','直属主管',1,NULL),(316,1,'会计（按部门）','APPROVAL','会计（按部门）',2,NULL),(317,1,'会计主管&内控','APPROVAL','会计主管&内控',3,NULL),(318,1,'公司领导（大额）','APPROVAL','公司领导',4,NULL),(319,1,'出纳','APPROVAL','出纳',5,NULL),(320,1,'抄送相关负责人','CC',NULL,6,'[{\"type\":\"ROLE\",\"value\":\"会计主管&内控\"},{\"type\":\"ROLE\",\"value\":\"出纳\"}]');
 /*!40000 ALTER TABLE `flow_node_config` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -697,7 +700,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `flow_condition_rule` WRITE;
 /*!40000 ALTER TABLE `flow_condition_rule` DISABLE KEYS */;
-INSERT INTO `flow_condition_rule` (`id`, `flow_config_id`, `variable_name`, `operator`, `expected_value`, `target_node_name`, `sort_order`) VALUES (45,1,'amount','GREATER_THAN_OR_EQUAL','20000','公司领导（大额）',0);
+INSERT INTO `flow_condition_rule` (`id`, `flow_config_id`, `variable_name`, `operator`, `expected_value`, `target_node_name`, `sort_order`) VALUES (41,1,'amount','GREATER_THAN_OR_EQUAL','20000','公司领导（大额）',0);
 /*!40000 ALTER TABLE `flow_condition_rule` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -730,7 +733,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14  9:59:22
+-- Dump completed on 2026-09-12 18:26:38
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -768,7 +771,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14  9:59:22
+-- Dump completed on 2026-09-12 18:26:47
 -- MySQL dump 10.13  Distrib 8.0.46, for macos26.4 (arm64)
 --
 -- Host: localhost    Database: oa
@@ -806,7 +809,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-14  9:59:22
+-- Dump completed on 2026-09-12 18:26:47
 
 
 SET FOREIGN_KEY_CHECKS = 1;

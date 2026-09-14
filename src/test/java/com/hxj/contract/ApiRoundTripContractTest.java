@@ -99,8 +99,9 @@ class ApiRoundTripContractTest {
 
         SysRole role = new SysRole();
         role.setName("超级管理员");
-
-
+        role.setDepartmentId(com.hxj.support.DictionaryTestSupport
+                .ensureDepartment(departmentRepository, "总经办").getId());
+        role.setDepartment("总经办");
         role.setPost("系统管理员");
         role.setDataScope(scope);
         role.addPermission(view);
@@ -111,7 +112,9 @@ class ApiRoundTripContractTest {
         // 流程节点审批人引用的角色（createFlowConfig 的 payload 用到）
         SysRole approverRole = new SysRole();
         approverRole.setName("二级部门负责人");
-
+        approverRole.setDepartmentId(com.hxj.support.DictionaryTestSupport
+                .ensureDepartment(departmentRepository, "各二级部门").getId());
+        approverRole.setDepartment("各二级部门");
         approverRole.setPost("部门负责人");
         approverRole.setDataScope(scope);
         roleRepository.save(approverRole);

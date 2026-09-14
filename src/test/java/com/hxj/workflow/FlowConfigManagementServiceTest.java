@@ -59,7 +59,7 @@ class FlowConfigManagementServiceTest {
         for (String name : List.of("二级部门负责人", "执行总经理", "财务经理", "内控主管", "内控专员")) {
             SysRole role = new SysRole();
             role.setName(name);
-
+            role.setDepartment("财务部");
             role.setPost("审批岗");
             role.setDataScope(scope);
             sysRoleRepository.save(role);

@@ -109,11 +109,13 @@ public class DepartmentManagementService {
         if (userRepository.existsByDepartmentId(departmentId)) {
             throw new BusinessException(ErrorCodeEnum.DEPARTMENT_HAS_EMPLOYEES, "部门下存在员工，无法删除");
         }
-
+        if (roleRepository.existsByDepartmentId(departmentId)) {
+            throw new BusinessException(ErrorCodeEnum.DEPARTMENT_HAS_ROLES, "部门被角色引用，无法删除");
+        }
         // CUSTOM 数据范围的部门集合引用：外键为 CASCADE，不守卫会被静默删除，
         // 导致对应角色的可见部门范围悄悄缩水
         if (departmentRepository.countScopeReferences(departmentId) > 0) {
-            throw new BusinessException(ErrorCodeEnum.DEPARTMENT_IN_SCOPE_USE, "部门被角色关联引用，无法删除");
+            throw new BusinessException(ErrorCodeEnum.DEPARTMENT_IN_SCOPE_USE, "部门被自定义数据范围引用，无法删除");
         }
 
         departmentRepository.deleteAllPathsOf(departmentId);
@@ -180,7 +182,11 @@ public class DepartmentManagementService {
             member.setDepartment(newName);
         }
         userRepository.saveAll(members);
-
+        List<com.hxj.entity.SysRole> roles = roleRepository.findByDepartmentId(departmentId);
+        for (com.hxj.entity.SysRole role : roles) {
+            role.setDepartment(newName);
+        }
+        roleRepository.saveAll(roles);
     }
 
     private DepartmentViews.Department toLeafNode(SysDepartment department) {

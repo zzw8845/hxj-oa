@@ -112,7 +112,7 @@ class DocumentAccessPolicyTest {
         SysDataScope custom = dataScopeRepository.save(new SysDataScope("CUSTOM", "自定义部门集合"));
         SysRole role = new SysRole();
         role.setName("自定义范围角色");
-
+        role.setDepartment(centerName);
         role.setPost("员工");
         role.setDataScope(custom);
         role.getScopeDepartments().add(departmentRepository.findByName(financeName).orElseThrow());

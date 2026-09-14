@@ -55,7 +55,7 @@ class RbacEntityRepositoryTest {
 
         SysRole employeeRole = new SysRole();
         employeeRole.setName("普通员工");
-
+        employeeRole.setDepartment("业务支持中心");
         employeeRole.setPost("员工");
         employeeRole.setDataScope(ownScope);
         employeeRole.addPermission(viewOwn);

@@ -73,14 +73,14 @@ class PermissionManagementServiceTest {
         permission = permissionRepository.save(new SysPermission("VIEW_OWN_FORMS", "查看本人表单"));
         role = new SysRole();
         role.setName("普通员工");
-
+        role.setDepartment("业务部");
         role.setPost("员工");
         role.setDataScope(scope);
         role.addPermission(permission);
         roleRepository.save(role);
 
         departmentId = departmentService.create(new SaveDepartmentRequest("业务部", null, 1)).id();
-        role.getScopeDepartments().add(departmentRepository.findById(departmentId).orElseThrow());
+        role.setDepartmentId(departmentId);
         roleRepository.save(role);
         postId = postService.create(new SavePostRequest("专员")).id();
     }
@@ -176,15 +176,11 @@ class PermissionManagementServiceTest {
                 new SysPermission("DEPARTMENT_HEAD_APPROVAL", "部门负责人审批"));
 
         RoleResponse created = roleService.create(new SaveRoleRequest(
-                "部门负责人", "经理", scope.getCode(), null, List.of(permission.getCode(), approve.getCode())));
+                "部门负责人", departmentId, "经理", scope.getCode(), null, List.of(permission.getCode(), approve.getCode())));
         assertThat(created.permissions()).containsExactlyInAnyOrder("VIEW_OWN_FORMS", "DEPARTMENT_HEAD_APPROVAL");
 
-        // 树按成员分布挂载：创建持角色员工后，角色出现在其主部门节点下
-        employeeService.create(new CreateEmployeeRequest(
-                "李四", "HXJ200", "lisi", "password", departmentId, postId, null, List.of("部门负责人")));
-
         RoleResponse updated = roleService.update(created.id(), new SaveRoleRequest(
-                "部门经理", "经理", scope.getCode(), null, List.of(approve.getCode())));
+                "部门经理", departmentId, "经理", scope.getCode(), null, List.of(approve.getCode())));
         assertThat(updated.name()).isEqualTo("部门经理");
         assertThat(updated.permissions()).containsExactly("DEPARTMENT_HEAD_APPROVAL");
 
@@ -194,12 +190,7 @@ class PermissionManagementServiceTest {
         assertThat(businessDepartment.id()).isEqualTo(departmentId);
         assertThat(businessDepartment.parentId()).isNull();
         assertThat(businessDepartment.roles()).extracting(RoleTreeNodeResponse::name)
-                .contains("部门经理");
-        // 无成员角色落"未分配"
-        DepartmentRoleNodeResponse unassignedNode = tree.stream()
-                .filter(node -> "未分配".equals(node.name())).findFirst().orElseThrow();
-        assertThat(unassignedNode.roles()).extracting(RoleTreeNodeResponse::name)
-                .contains("普通员工");
+                .contains("普通员工", "部门经理");
     }
 
     @Test
@@ -234,7 +225,7 @@ class PermissionManagementServiceTest {
         // 有角色引用的部门禁止删除（角色挂在部门上的守卫）
         assertThatThrownBy(() -> departmentService.delete(departmentId))
                 .isInstanceOf(BusinessException.class)
-                .hasMessage("部门被角色关联引用，无法删除");
+                .hasMessage("部门被角色引用，无法删除");
         roleRepository.delete(role);
         departmentService.delete(departmentId);
         assertThat(departmentRepository.existsById(departmentId)).isFalse();
@@ -251,7 +242,7 @@ class PermissionManagementServiceTest {
 
         // 解除员工引用（转入过渡角色）后，被流程节点引用（含组合角色串的段）仍禁止删除
         RoleResponse bridgeRole = roleService.create(new SaveRoleRequest(
-                "过渡角色", "助理", scope.getCode(), null, List.of(permission.getCode())));
+                "过渡角色", departmentId, "助理", scope.getCode(), null, List.of(permission.getCode())));
         employeeService.update(employee.id(), new UpdateEmployeeRequest(
                 "张三", "HXJ100", departmentId, postId, null, UserStatusEnum.RESIGNED,
                 null, List.of(bridgeRole.name())));
@@ -269,7 +260,7 @@ class PermissionManagementServiceTest {
 
         // 名称部分重叠但不同段的角色不受误伤，无引用角色可正常删除
         RoleResponse freeRole = roleService.create(new SaveRoleRequest(
-                "二级部门负责人助理", "助理", scope.getCode(), null, List.of(permission.getCode())));
+                "二级部门负责人助理", departmentId, "助理", scope.getCode(), null, List.of(permission.getCode())));
         roleService.delete(freeRole.id());
         assertThat(roleRepository.existsById(freeRole.id())).isFalse();
     }
@@ -313,7 +304,7 @@ class PermissionManagementServiceTest {
         flowConfigRepository.saveAndFlush(flowConfig);
 
         roleService.update(role.getId(), new SaveRoleRequest(
-                "改名后角色", "员工", scope.getCode(), null, List.of(permission.getCode())));
+                "改名后角色", departmentId, "员工", scope.getCode(), null, List.of(permission.getCode())));
 
         assertThat(roleRepository.findById(role.getId()).orElseThrow().getName()).isEqualTo("改名后角色");
         FlowNodeConfig updated = flowConfigRepository.findById(flowConfig.getId()).orElseThrow()
@@ -392,12 +383,12 @@ class PermissionManagementServiceTest {
     void shouldGuardDepartmentReferencedByCustomScope() {
         Long dept2 = departmentService.create(new SaveDepartmentRequest("风控部", null, 2)).id();
         dataScopeRepository.save(new SysDataScope("CUSTOM", "自定义部门集合"));
-        roleService.create(new SaveRoleRequest("风控合规", "合规岗", "CUSTOM",
+        roleService.create(new SaveRoleRequest("风控合规", departmentId, "合规岗", "CUSTOM",
                 List.of(dept2), List.of(permission.getCode())));
         // CUSTOM 范围的部门集合引用：外键是 CASCADE，必须由守卫拦截，否则角色可见范围静默缩水
         assertThatThrownBy(() -> departmentService.delete(dept2))
                 .isInstanceOf(BusinessException.class)
-                .hasMessage("部门被角色关联引用，无法删除");
+                .hasMessage("部门被自定义数据范围引用，无法删除");
     }
 
 
@@ -405,7 +396,7 @@ class PermissionManagementServiceTest {
     void shouldGuardRoleReferencedByCcRecord() {
         // 申请人挂专用角色，避免占用被删角色的成员引用而触发成员守卫
         RoleResponse applicantRole = roleService.create(new SaveRoleRequest(
-                "申请人专用", "专员", "OWN", null, List.of(permission.getCode())));
+                "申请人专用", departmentId, "专员", "OWN", null, List.of(permission.getCode())));
         EmployeeResponse applicant = employeeService.create(new CreateEmployeeRequest(
                 "张三", "HXJ100", "zhangsan", "password", departmentId, postId, null, List.of(applicantRole.name())));
         OaDocument document = new OaDocument();

@@ -142,7 +142,7 @@ class ProcessPersistenceRepositoryTest {
 
         SysRole role = new SysRole();
         role.setName(roleName);
-
+        role.setDepartment("财务中心");
         role.setPost(roleName);
         role.setDataScope(scope);
         roleRepository.save(role);
