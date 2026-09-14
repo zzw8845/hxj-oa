@@ -12,6 +12,8 @@ public interface OaDocumentRepository extends JpaRepository<OaDocument, Long>, J
     Optional<OaDocument> findByDocCode(String docCode);
     Optional<OaDocument> findByProcessInstanceId(String processInstanceId);
     long countByFlowConfigId(Long flowConfigId);
+
+    long countByFormTemplateId(Long formTemplateId);
     List<OaDocument> findByApplicantIdOrderByCreatedAtDesc(Long applicantId);
     List<OaDocument> findByStatus(DocumentStatusEnum status);
     List<OaDocument> findByRiskFlagTrue();

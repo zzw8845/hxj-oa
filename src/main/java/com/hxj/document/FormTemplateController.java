@@ -4,6 +4,7 @@ import com.hxj.common.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -65,5 +66,13 @@ public class FormTemplateController {
     public ApiResponse<FormTemplateManagementService.TemplateView> update(
             @PathVariable Long id, @RequestBody SaveFormTemplateRequest request) {
         return ApiResponse.success(templateService.update(id, request));
+    }
+
+    @Operation(summary = "删除模板", description = "与流程删除同规则：被单据引用（审计回溯）或被工作台事项承接（入口悬空）时拒绝")
+    @DeleteMapping("/api/admin/form-templates/{id}")
+    @PreAuthorize("hasAuthority('CONFIGURE_FLOW_PERMISSION')")
+    public ApiResponse<Void> delete(@PathVariable Long id) {
+        templateService.delete(id);
+        return ApiResponse.success(null);
     }
 }

@@ -47,11 +47,17 @@ public class FormTemplateManagementService {
 
     private final FormTemplateRepository templateRepository;
     private final FormFieldRepository fieldRepository;
+    private final com.hxj.repository.OaDocumentRepository documentRepository;
+    private final com.hxj.repository.WorkbenchEntryRepository workbenchEntryRepository;
 
     public FormTemplateManagementService(FormTemplateRepository templateRepository,
-                                         FormFieldRepository fieldRepository) {
+                                         FormFieldRepository fieldRepository,
+                                         com.hxj.repository.OaDocumentRepository documentRepository,
+                                         com.hxj.repository.WorkbenchEntryRepository workbenchEntryRepository) {
         this.templateRepository = templateRepository;
         this.fieldRepository = fieldRepository;
+        this.documentRepository = documentRepository;
+        this.workbenchEntryRepository = workbenchEntryRepository;
     }
 
     // ==================== 管理端 ====================
@@ -137,6 +143,27 @@ public class FormTemplateManagementService {
         templateRepository.save(template);
         replaceFields(template, request.fields());
         return get(template.getId());
+    }
+
+    /**
+     * 删除模板：与流程删除同规则——被单据引用（历史单据按模板快照回溯）或被
+     * 工作台事项承接（入口悬空）时拒绝；字段清单随之清除。
+     */
+    @Transactional
+    public void delete(Long id) {
+        FormTemplate template = require(id);
+        long docRefs = documentRepository.countByFormTemplateId(id);
+        if (docRefs > 0) {
+            throw new BusinessException(ErrorCodeEnum.FORM_TEMPLATE_IN_USE,
+                    "模板已被 " + docRefs + " 张单据引用，无法删除");
+        }
+        long entryRefs = workbenchEntryRepository.countByTemplateId(id);
+        if (entryRefs > 0) {
+            throw new BusinessException(ErrorCodeEnum.FORM_TEMPLATE_IN_USE,
+                    "模板被 " + entryRefs + " 个工作台事项承接，请先调整事项配置");
+        }
+        fieldRepository.deleteByTemplateId(id);
+        templateRepository.delete(template);
     }
 
     // ==================== 提交支撑 ====================
