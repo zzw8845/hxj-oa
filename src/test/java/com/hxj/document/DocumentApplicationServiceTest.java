@@ -48,6 +48,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         DocumentApplicationService.class,
         DocumentAccessPolicy.class,
         LocalAttachmentStorage.class,
+        com.hxj.approval.ApprovalActionService.class,
         com.hxj.workflow.DeptAccountantResolver.class,
         FormTemplateManagementService.class,
         DocumentApplicationServiceTest.Config.class

@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 统一审批操作编排：任务授权（仅当前审批人或超管）、业务留痕、
@@ -365,10 +366,82 @@ public class ApprovalActionService {
     }
 
     /**
+     * 提交后状态同步（对齐钉钉去重规则）：发起人自审/重复审批人节点自动通过，
+     * 可能一路推进直至归档——提交即得到与真实审批一致的终态。
+     */
+    @Transactional
+    public ApprovalResultResponse syncAfterSubmit(OaDocument document) {
+        return advance(document);
+    }
+
+    /** 审批人去重（对齐钉钉）：发起人自审、本轮已审批人再次成为审批人时，系统自动通过并留痕。 */
+    private void autoPassRedundant(OaDocument document) {
+        String applicantAccount = document.getApplicant() == null ? null : document.getApplicant().getAccount();
+        for (int guard = 0; guard < 30; guard++) {
+            List<Task> active = document.getProcessInstanceId() == null
+                    ? List.of() : workflowPort.tasksForProcess(document.getProcessInstanceId());
+            if (active.isEmpty()) return;
+            Task task = active.get(0);
+            // 发起人回环节点（签收/归还/上传归档附件）是申请人的实际操作，永不自动通过
+            if (task.getName() != null && task.getName().startsWith("发起人")) return;
+            Set<String> approverAccounts = resolveApproverAccounts(task);
+            if (approverAccounts.isEmpty()) return; // 候选无法解析（角色无成员等）：交管理员处理
+            Set<String> redundant = effectiveApprovedAccounts(document);
+            if (applicantAccount != null) redundant.add(applicantAccount);
+            if (!redundant.containsAll(approverAccounts)) return; // 存在尚未审批的审批人：任务保留
+            // 全部命中冗余条件：整节点自动通过，留痕后继续推进
+            for (String account : approverAccounts) {
+                ApprovalRecord record = new ApprovalRecord();
+                record.setDocument(document);
+                record.setNodeName(task.getName());
+                record.setApprover(userRepository.findByAccount(account)
+                        .orElseThrow(() -> new BusinessException(ErrorCodeEnum.USER_NOT_FOUND,
+                                "自动通过账号不存在：" + account)));
+                record.setAction(ApprovalActionEnum.AUTO_PASS);
+                record.setComment(account.equals(applicantAccount)
+                        ? "发起人自动通过（去重规则）" : "重复审批人自动通过（去重规则）");
+                approvalRepository.save(record);
+            }
+            workflowPort.completeTask(task.getId(), Map.of());
+        }
+    }
+
+    /** 解析任务的候选审批人账号：处理人优先，否则展开候选组（角色）成员。 */
+    private Set<String> resolveApproverAccounts(Task task) {
+        Set<String> accounts = new java.util.HashSet<>();
+        if (StringUtils.hasText(task.getAssignee())) {
+            accounts.add(task.getAssignee());
+            return accounts;
+        }
+        for (String groupName : workflowPort.candidateGroups(task.getId())) {
+            accounts.addAll(userRepository.findAccountByRoleName(groupName));
+        }
+        return accounts;
+    }
+
+    /** 本轮已审批人集合：以最后一次驳回为界（驳回后全线重审，符合财务单据谨慎性）。 */
+    private Set<String> effectiveApprovedAccounts(OaDocument document) {
+        List<ApprovalRecord> records = approvalRepository
+                .findByDocumentIdOrderByCreatedAtAsc(document.getId());
+        int lastReject = -1;
+        for (int i = 0; i < records.size(); i++) {
+            if (records.get(i).getAction() == ApprovalActionEnum.REJECT) lastReject = i;
+        }
+        Set<String> accounts = new java.util.HashSet<>();
+        for (int i = lastReject + 1; i < records.size(); i++) {
+            if (records.get(i).getApprover() != null) {
+                accounts.add(records.get(i).getApprover().getAccount());
+            }
+        }
+        return accounts;
+    }
+
+    /**
      * 任务完成后的状态同步：仍有任务则进入下一节点；流程完结时按
      * 未解决补充要求 / 付款后置材料 / 用印未回传判定是否闭环归档。
      */
     private ApprovalResultResponse advance(OaDocument document) {
+        autoPassRedundant(document);
         List<Task> active = document.getProcessInstanceId() == null
                 ? List.of() : workflowPort.tasksForProcess(document.getProcessInstanceId());
         if (!active.isEmpty()) {

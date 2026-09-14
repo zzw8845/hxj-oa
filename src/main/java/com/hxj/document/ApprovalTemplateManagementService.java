@@ -70,6 +70,7 @@ public class ApprovalTemplateManagementService {
 
     @Transactional
     public FormTemplateManagementService.TemplateView create(SaveApprovalTemplateRequest request) {
+        validateFlowPayload(request);
         FlowCategoryEnum category = requireCategory(request);
         // 同一事务内：流程（含 BPMN 部署）→ 模板（含字段清单）→ 自动事项入口；
         // 任一环节失败整体回滚，不存在"流程建了模板没建"的半拉子状态
@@ -82,6 +83,7 @@ public class ApprovalTemplateManagementService {
 
     @Transactional
     public FormTemplateManagementService.TemplateView update(Long templateId, SaveApprovalTemplateRequest request) {
+        validateFlowPayload(request);
         FormTemplate template = requireTemplate(templateId);
         FlowCategoryEnum category = requireCategory(request);
         if (template.getFlowConfigId() == null) {
@@ -98,9 +100,8 @@ public class ApprovalTemplateManagementService {
     @Transactional
     public void delete(Long templateId) {
         FormTemplate template = requireTemplate(templateId);
-        long docRefs = documentRepository.countByFormTemplateId(templateId)
-                + (template.getFlowConfigId() == null ? 0
-                        : documentRepository.countByFlowConfigId(template.getFlowConfigId()));
+        long docRefs = documentRepository.countByFormTemplateIdOrFlowConfigId(
+                templateId, template.getFlowConfigId());
         if (docRefs > 0) {
             throw new BusinessException(ErrorCodeEnum.FORM_TEMPLATE_IN_USE,
                     "该审批事项已被 " + docRefs + " 张单据引用，无法删除");
@@ -122,6 +123,13 @@ public class ApprovalTemplateManagementService {
     private FormTemplate requireTemplate(Long id) {
         return templateRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCodeEnum.FORM_TEMPLATE_NOT_FOUND, "审批事项不存在"));
+    }
+
+    /** 流程负载防御：空/缺节点链的聚合请求在保存关口拒绝，不落入半拉子状态。 */
+    private void validateFlowPayload(SaveApprovalTemplateRequest request) {
+        if (request.flow() == null || request.flow().nodes() == null || request.flow().nodes().isEmpty()) {
+            throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID, "审批流程节点链不能为空");
+        }
     }
 
     private FlowCategoryEnum requireCategory(SaveApprovalTemplateRequest request) {

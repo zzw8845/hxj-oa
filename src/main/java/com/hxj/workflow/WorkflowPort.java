@@ -22,6 +22,9 @@ public interface WorkflowPort {
     /** 流程实例当前所有活动中的用户任务。 */
     List<Task> tasksForProcess(String processInstanceId);
 
+    /** 任务当前的候选组（角色名集合）——审批人去重判定用。 */
+    List<String> candidateGroups(String taskId);
+
     /** 将当前任务所在活动跳转至目标节点活动（指定层级驳回）。 */
     void moveTaskToActivity(String processInstanceId, String taskId, String targetActivityId);
 

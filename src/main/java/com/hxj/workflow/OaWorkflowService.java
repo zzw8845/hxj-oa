@@ -79,6 +79,17 @@ public class OaWorkflowService implements WorkflowPort {
     }
 
     @Override
+    public List<String> candidateGroups(String taskId) {
+        List<String> groups = new ArrayList<>();
+        for (org.flowable.identitylink.api.IdentityLink link : taskService.getIdentityLinksForTask(taskId)) {
+            if ("candidate".equals(link.getType()) && link.getGroupId() != null) {
+                groups.add(link.getGroupId());
+            }
+        }
+        return groups;
+    }
+
+    @Override
     public void moveTaskToActivity(String processInstanceId, String taskId, String targetActivityId) {
         Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
         runtimeService.createChangeActivityStateBuilder()

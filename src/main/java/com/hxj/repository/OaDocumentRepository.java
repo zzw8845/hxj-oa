@@ -14,6 +14,9 @@ public interface OaDocumentRepository extends JpaRepository<OaDocument, Long>, J
     long countByFlowConfigId(Long flowConfigId);
 
     long countByFormTemplateId(Long formTemplateId);
+
+    /** 双维度去重计数：同一张单同时命中模板与流程引用时只计一次。 */
+    long countByFormTemplateIdOrFlowConfigId(Long formTemplateId, Long flowConfigId);
     List<OaDocument> findByApplicantIdOrderByCreatedAtDesc(Long applicantId);
     List<OaDocument> findByStatus(DocumentStatusEnum status);
     List<OaDocument> findByRiskFlagTrue();
