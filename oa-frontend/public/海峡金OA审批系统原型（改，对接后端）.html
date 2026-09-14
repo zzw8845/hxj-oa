@@ -330,66 +330,16 @@ createApp({
     const stampQuick = ref([]);
     async function loadQuickDocuments() {
       try {
-        const list = await apiCall('get', '/documents/quick') || [];
-        window.__formTemplates = Object.fromEntries(list.map(t => [t.name, t]));
-        const tid = name => ((window.__formTemplates || {})[name] || {}).id || null;
-        // 事项快捷层（对齐原型工作台）：事项 → 承接模板 + 事由预填。
-        // 费用/付款类事项共用报销与应付款模板，靠事由区分——与原型 classifyType 设计一致
-        const ITEMS = [
-          ['daily','闭店','闭店（入驻店销和代销）','入驻店销和代销'],
-          ['daily','采购申请','采购申请','物资与服务采购'],
-          ['daily','低值易耗品领用','低值易耗品（含办公物品）领用','办公用品领用'],
-          ['daily','费用预算','费用预算','部门费用预算申报'],
-          ['daily','公司发文申请','公司发文申请','公司红头文件发布'],
-          ['daily','固定资产报废报损','固定资产报废报损','资产报废与报损'],
-          ['daily','固定资产调拨','固定资产调拨','部门间资产调拨'],
-          ['daily','固定资产入库','固定资产入库','新增资产登记'],
-          ['daily','黄金业务开户','黄金业务开户','黄金交易开户'],
-          ['daily','借款申请','借款申请','员工与部门借款'],
-          ['daily','客户交易手续费调整','客户交易手续费调整','客户费率调整'],
-          ['daily','客户结算服务费','客户结算服务费','结算服务费核算'],
-          ['daily','提货人新增或变更','提货人新增或变更','提货人信息管理'],
-          ['daily','业务招待申请','业务招待申请','业务招待费'],
-          ['daily','银行账户管理调整','银行账户管理调整','账户开立与变更'],
-          ['daily','差旅费','通用审批单','交通、住宿、餐费'],
-          ['daily','招待费','业务招待申请','业务招待'],
-          ['daily','员工加班交通费','通用审批单','加班交通报销'],
-          ['daily','检测费证书费','通用审批单','检测认证费用'],
-          ['daily','快递费','通用审批单','快递物流费用'],
-          ['daily','水电网络费','通用审批单','水电与网络费用'],
-          ['daily','日常费用','通用审批单','水费等零星支出'],
-          ['daily','租金-物业费','通用审批单','房租与物业费用'],
-          ['daily','装修费','通用审批单','场地装修改造'],
-          ['daily','技术服务费','通用审批单','技术服务采购'],
-          ['daily','验货专项服务费','通用审批单','验货服务费用'],
-          ['daily','广告费','通用审批单','广告投放费用'],
-          ['daily','宽带费-电费','通用审批单','宽带与电费'],
-          ['daily','固定资产采购','采购申请','固定资产购置'],
-          ['daily','税盘缴费','通用审批单','税控盘服务费'],
-          ['daily','平台保证金','应付款申请','平台入驻保证金'],
-          ['daily','电商投流推广充值','应付款申请','电商推广预充值'],
-          ['daily','合作方退款','应付款申请','合作方款项退回'],
-          ['daily','付款利息','应付款申请','借款利息支付'],
-          ['business','应付款申请','应付款申请','供应商货款支付'],
-          ['business','加工费','应付款申请','委托加工费用'],
-          ['business','直销-代销结算服务费','应付款申请','渠道结算服务费'],
-          ['business','供应商货款','应付款申请','采购货款支付'],
-          ['business','员工工资-社保-公积金','应付款申请','薪酬社保发放'],
-          ['business','备用金申请','借款申请','部门备用金'],
-          ['business','银行账户规费利息','应付款申请','账户规费与利息'],
-          ['business','招商风险业务资质保证金','应付款申请','招商资质保证金'],
-          ['business','借款利息','应付款申请','借款利息结算'],
-          ['seal','非标合同审批及用印','非标合同审批及用印','合同用印'],
-          ['seal','通用审批申请','通用审批申请','通用盖章事项'],
-          ['seal','用印及证照申请','用印及证照申请','用印与证照领取']
-        ];
-        const mk = arr => arr.map(([zone, label, tpl, hint]) => ({label, hint, tpl, tplId: tid(tpl)}));
-        dailyQuick.value = mk(ITEMS.filter(i => i[0] === 'daily'));
-        businessQuick.value = mk(ITEMS.filter(i => i[0] === 'business'));
-        stampQuick.value = mk(ITEMS.filter(i => i[0] === 'seal'));
+        // 事项→模板映射为后端业务配置（workbench_entry 表），前端只消费渲染
+        const list = await apiCall('get', '/workbench/entries') || [];
+        const mk = e => ({label: e.label, hint: e.hint, tplId: e.templateId, tpl: e.templateName});
+        dailyQuick.value = list.filter(e => e.zone === 'DAILY').map(mk);
+        businessQuick.value = list.filter(e => e.zone === 'BUSINESS').map(mk);
+        stampQuick.value = list.filter(e => e.zone === 'SEAL').map(mk);
       } catch (e) { console.error('快捷单据加载失败:', e); }
     }
     }
+    })
 
     const submitForm = reactive({ code: '', type: '日常付款', applicant: '', company: '海峡金', department: '', title: '', amount: 0, invoiceSummary: '', reason: '', needPostMaterial: false, businessMode: '', involvesFunds: false, requiresAdminReview: false, sealProject: '', sealReason: '', sealDepartment: '', sealTime: '', fileName: '', sealType: '合同章' });
     const rejectForm = reactive({ level: '提交人', reason: '', materials: '' });
@@ -945,10 +895,9 @@ createApp({
     }
 
     function quickSubmit(q, zone) {
-      const t = q.tplId || (((window.__formTemplates || {})[q.tpl] || {}).id || null);
-      if (!t) return ElementPlus.ElMessage.warning('「' + q.label + '」的表单模板未配置');
+      if (!q.tplId) return ElementPlus.ElMessage.warning('「' + q.label + '」的表单模板未配置');
       openSubmit(zone === 'seal' ? '用印申请' : (zone === 'business' ? '付款申请单' : '报销申请单'),
-        { title: q.label, reason: (q.hint ? q.label + '：' + q.hint : '申请提交' + q.label + '，相关资料将按制度要求上传。'), templateId: t });
+        { title: q.label, reason: (q.hint ? q.label + '：' + q.hint : '申请提交' + q.label + '，相关资料将按制度要求上传。'), templateId: q.tplId });
     }
 
     async function submitRequest() {
