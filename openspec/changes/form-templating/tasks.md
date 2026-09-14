@@ -10,12 +10,12 @@
 - [x] 2.4 测试：CRUD/保留键/版本/唯一性
 
 ## 3. 提交链路重写（M2）
-- [ ] 3.1 SubmitDocumentRequest v2（projectName/company/needPostMaterial/ccUserIds/templateId/fieldValues）
-- [ ] 3.2 模板驱动校验（必填/类型强转/SELECT 选项/未知 key 拒绝）+ 附件要求按模板
-- [ ] 3.3 提升键提取（amount 列+风险标记；involvesFunds/requiresAdminReview/businessMode → 流程变量）+ form_snapshot 冻结
-- [ ] 3.4 DocumentCodeGenerator 前缀参数化
-- [ ] 3.5 暗雷退役：DocumentClassifier 删除；AttachmentRequirementService 改模板驱动；抄送目标结构化（cc_targets）
-- [ ] 3.6 详情响应：snapshot ∪ values 合并数组；测试：校验四场景/提升提取/快照冻结/明细表递归校验
+- [x] 3.1 SubmitDocumentRequest v2（projectName/company/needPostMaterial/ccUserIds/templateId/fieldValues）
+- [x] 3.2 模板驱动校验（必填/类型强转/SELECT 选项/未知 key 拒绝）+ 附件要求按模板
+- [x] 3.3 提升键提取（amount 列+风险标记；involvesFunds/requiresAdminReview/businessMode → 流程变量）+ form_snapshot 冻结
+- [x] 3.4 DocumentCodeGenerator 前缀参数化
+- [x] 3.5 暗雷退役：DocumentClassifier 删除；AttachmentRequirementService 改模板驱动；抄送目标结构化（cc_targets）
+- [x] 3.6 详情响应：snapshot ∪ values 合并数组；测试：校验四场景/提升提取/快照冻结/明细表递归校验
 
 ## 4. 前端动态化（M3）
 - [x] 4.1 提交表单按模板渲染 9 种控件 + fieldValues 提交
