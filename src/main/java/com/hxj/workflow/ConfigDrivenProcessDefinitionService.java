@@ -180,6 +180,17 @@ public class ConfigDrivenProcessDefinitionService {
                     multi.setElementVariable("chainManager");
                     task.setLoopCharacteristics(multi);
             }
+            case SELF_SELECT -> {
+                    // 发起人自选（钉钉同款）：申请人提交时指定审批人，按选择顺序串行审批。
+                    // 集合 = 提交时写入的 approverChain，元素变量 selectedApprover
+                    task.setAssignee("${selectedApprover}");
+                    org.flowable.bpmn.model.MultiInstanceLoopCharacteristics multi =
+                            new org.flowable.bpmn.model.MultiInstanceLoopCharacteristics();
+                    multi.setSequential(true);
+                    multi.setInputDataItem("approverChain");
+                    multi.setElementVariable("selectedApprover");
+                    task.setLoopCharacteristics(multi);
+            }
             case DEPT_ROLE ->
                     // 按发起人部门路由：提交时解析核算分工（服务部门=申请人部门且挂「核算会计」角色的成员），
                     // 写入 deptAccountant 流程变量；无分工映射时为空串（任务待管理员指派）

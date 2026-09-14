@@ -22,7 +22,10 @@ public enum NodeAssigneeRuleEnum {
     DEPT_ROLE,
 
     /** 连续多级主管：「逐级主管」，沿汇报线自下而上串行逐级审批（提交时写入 managerChain）。 */
-    MULTI_MANAGER;
+    MULTI_MANAGER,
+
+    /** 发起人自选：申请人提交时指定审批人（提交时写入 approverChain，按选择顺序串行审批）。 */
+    SELF_SELECT;
 
     /**
      * 归类一个节点。优先级：发起人节点名前缀 &gt; 直属主管 &gt; 会计（按部门） &gt; 静态角色。
@@ -36,6 +39,9 @@ public enum NodeAssigneeRuleEnum {
         }
         if ("逐级主管".equals(assigneeRole)) {
             return MULTI_MANAGER;
+        }
+        if ("发起人自选".equals(assigneeRole)) {
+            return SELF_SELECT;
         }
         if ("会计（按部门）".equals(assigneeRole)) {
             return DEPT_ROLE;

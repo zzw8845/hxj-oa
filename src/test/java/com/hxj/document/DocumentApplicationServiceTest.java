@@ -248,7 +248,7 @@ class DocumentApplicationServiceTest {
         incomplete.remove("sealProject");
 
         assertThatThrownBy(() -> service.submit(
-                new SubmitDocumentRequest(sealTemplateId, incomplete, List.of(), null)))
+                new SubmitDocumentRequest(sealTemplateId, incomplete, List.of(), List.of(), null)))
                 .isInstanceOf(com.hxj.exception.BusinessException.class)
                 .hasMessageContaining("必填字段未填写：用印项目");
     }
@@ -259,17 +259,17 @@ class DocumentApplicationServiceTest {
 
         assertThatThrownBy(() -> service.submit(new SubmitDocumentRequest(
                 paymentTemplateId, Map.of("title", "t", "company", "海峡金", "amount", 1, "reason", "r",
-                "unknownKey", "x"), List.of(), null)))
+                "unknownKey", "x"), List.of(), List.of(), null)))
                 .hasMessageContaining("未知表单字段：unknownKey");
 
         assertThatThrownBy(() -> service.submit(new SubmitDocumentRequest(
                 paymentTemplateId, Map.of("title", "t", "company", "海峡金", "amount", "abc", "reason", "r"),
-                List.of(), null)))
+                List.of(), List.of(), null)))
                 .hasMessageContaining("字段必须为数字");
 
         assertThatThrownBy(() -> service.submit(new SubmitDocumentRequest(
                 paymentTemplateId, Map.of("title", "t", "company", "外星公司", "amount", 1, "reason", "r"),
-                List.of(), null)))
+                List.of(), List.of(), null)))
                 .hasMessageContaining("选项非法：所属公司");
     }
 
@@ -281,7 +281,7 @@ class DocumentApplicationServiceTest {
                 "sealDepartment", "业务部",
                 "sealTime", "2026-09-01",
                 "sealFileName", "经销协议.pdf",
-                "sealReason", "签订年度经销协议"), List.of(), linkedId);
+                "sealReason", "签订年度经销协议"), List.of(), List.of(), linkedId);
     }
 
     private SubmitDocumentRequest paymentRequest(Long linkedId, List<Long> ccIds) {
@@ -292,7 +292,7 @@ class DocumentApplicationServiceTest {
                 "invoiceSummary", "专票1张",
                 "reason", "合作方退款",
                 "contractNo", "HT-001",
-                "involvesFunds", true), ccIds, linkedId);
+                "involvesFunds", true), ccIds, List.of(), linkedId);
     }
 
     private SysUser saveUser(String account, String department) {
@@ -341,5 +341,7 @@ class DocumentApplicationServiceTest {
         @Override public void resolveTask(String taskId) {}
         @Override public List<WorkflowHistoryItemResponse> history(String processInstanceId) { return List.of(); }
         @Override public List<WorkflowNodeStatResponse> nodeStatistics() { return List.of(); }
+        private final List<String> groups = List.of();
+        @Override public List<String> candidateGroups(String taskId) { return groups; }
     }
 }

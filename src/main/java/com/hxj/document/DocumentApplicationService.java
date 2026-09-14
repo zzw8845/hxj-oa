@@ -97,6 +97,20 @@ public class DocumentApplicationService {
         }
         FlowConfig flowConfig = flowConfigRepository.findById(template.getFlowConfigId())
                 .orElseThrow(() -> new BusinessException(ErrorCodeEnum.FLOW_CONFIG_NOT_FOUND, "未配置对应审批流程"));
+        // 「发起人自选」节点需要申请人在提交时指定审批人（防提交后任务无主/空集自动跳过）
+        boolean hasSelfSelect = flowConfig.getNodes().stream()
+                .anyMatch(n -> n.getNodeType() == FlowNodeTypeEnum.APPROVAL
+                        && "发起人自选".equals(n.getAssigneeRole()));
+        if (hasSelfSelect && request.approverAccounts().isEmpty()) {
+            throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID,
+                    "该流程含「发起人自选」节点，请指定审批人");
+        }
+        for (String account : request.approverAccounts()) {
+            if (userRepository.findByAccount(account).isEmpty()) {
+                throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID,
+                        "自选审批人不存在：" + account);
+            }
+        }
         BusinessTypeEnum businessType = BusinessTypeEnum.valueOf(template.getCategory());
 
         OaDocument document = new OaDocument();
@@ -129,7 +143,8 @@ public class DocumentApplicationService {
         createSelfSelectedCc(document, request.ccUserIds());
 
         String processInstanceId = workflowPort.startProcess(
-                flowConfig.getId(), document.getId(), workflowVariables(values, applicant));
+                flowConfig.getId(), document.getId(),
+                workflowVariables(values, applicant, request.approverAccounts()));
         document.setProcessInstanceId(processInstanceId);
         document.setFlowConfigId(flowConfig.getId());
         return toSummary(document);
@@ -272,10 +287,11 @@ public class DocumentApplicationService {
         if (source.getFormTemplateId() == null) {
             throw new BusinessException(ErrorCodeEnum.FORM_TEMPLATE_NOT_FOUND, "该单据无表单模板，无法再次提交");
         }
+        // 再次提交不自动带「发起人自选」审批人（需重新指定；流程含自选节点而未指定时提交会被明确拒绝）
         return submit(new SubmitDocumentRequest(
                 source.getFormTemplateId(),
                 formTemplateService.parseValues(source.getFieldValues()),
-                List.of(), null));
+                List.of(), List.of(), null));
     }
 
     @Transactional
@@ -322,7 +338,7 @@ public class DocumentApplicationService {
     }
 
     private Map<String, Object> workflowVariables(
-            Map<String, Object> fieldValues, SysUser applicant) {
+            Map<String, Object> fieldValues, SysUser applicant, List<String> approverAccounts) {
         // 直属主管账号：审批流「直属主管」节点以 ${managerAccount} 动态指派；未设置汇报线时为空串（任务待管理员指派）
         String managerAccount = applicant.getManagerId() == null ? ""
                 : userRepository.findById(applicant.getManagerId())
@@ -349,6 +365,8 @@ public class DocumentApplicationService {
                 Map.entry("initiator", applicant.getAccount()),
                 Map.entry("managerAccount", managerAccount),
                 Map.entry("managerChain", managerChain),
+                // 「发起人自选」节点串行多实例的审批人集合（提交时申请人指定）
+                Map.entry("approverChain", List.copyOf(approverAccounts)),
                 Map.entry("deptAccountant", deptAccountant));
     }
 
