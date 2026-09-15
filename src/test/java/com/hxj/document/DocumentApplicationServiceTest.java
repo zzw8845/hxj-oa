@@ -227,7 +227,6 @@ class DocumentApplicationServiceTest {
         assertThat(result.documentType()).isEqualTo(DocumentTypeEnum.SEAL_APPLICATION);
         assertThat(result.amount()).isNull();
         assertThat(result.currentNode()).isEqualTo("直属主管");
-        assertThat(workflow.startedVariables).containsEntry("amount", BigDecimal.ZERO);
 
         com.hxj.entity.OaDocument entity = documentRepository.findById(result.id()).orElseThrow();
         assertThat(entity.getFieldValues()).contains("经销商合同用印");

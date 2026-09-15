@@ -11,6 +11,7 @@ import com.hxj.enums.ApproveModeEnum;
 import com.hxj.enums.AssigneeScopeEnum;
 import com.hxj.enums.AssigneeSubjectEnum;
 import com.hxj.enums.ConditionOperatorEnum;
+import com.hxj.enums.FlowCategoryEnum;
 import com.hxj.enums.EmptyAssigneeStrategyEnum;
 import com.hxj.enums.FlowNodeTypeEnum;
 import com.hxj.enums.FlowStatusEnum;
@@ -139,11 +140,10 @@ public class FlowConfigManagementService {
         return conditionVariableCatalog.describe(flowConfigId);
     }
 
-    /** 新增流程配置：校验后落库为草稿（不部署——生效必须显式发布）。 */
+
     @Transactional
-    public FlowConfigItems.Config create(FlowConfigItems.SaveFlowConfigRequest request) {
-        // 新建时尚未绑定模板：条件变量按保留键兜底校验，绑定模板后自动获得该模板声明的字段
-        validate(request, null);
+    public FlowConfigItems.Config create(FlowConfigItems.SaveFlowConfigRequest request, Long templateId) {
+        validate(request, templateId);
         if (flowConfigRepository.findByType(request.type()).isPresent()) {
             throw new BusinessException(ErrorCodeEnum.FLOW_CONFIG_EXISTS, "同名流程配置已存在");
         }
@@ -156,35 +156,14 @@ public class FlowConfigManagementService {
         return toDetail(flowConfigRepository.save(config));
     }
 
-    /** 删除流程配置：已被单据引用的禁止删除（单据回溯审批链依赖 flow_config_id 关联）。 */
     @Transactional
-    public void delete(Long id) {
-        FlowConfig config = findById(id);
-        long refs = oaDocumentRepository.countByFlowConfigId(id);
-        if (refs > 0) {
-            throw new BusinessException(ErrorCodeEnum.FLOW_CONFIG_IN_USE,
-                    "该流程已被 " + refs + " 张单据引用，无法删除");
-        }
-        transitionRepository.deleteByConfigId(id);
-        nodeRepository.deleteByConfigId(id);
-        flowConfigRepository.delete(config);
-    }
-
-    /**
-     * 修改流程配置：校验后整体重建节点与转移边，状态回退为草稿。
-     * 已发布流程被修改后必须重新发布才能影响新单据；在途单据不受影响。
-     */
-    @Transactional
-    public FlowConfigItems.Config update(Long id, FlowConfigItems.SaveFlowConfigRequest request) {
-        validate(request, id);
+    public FlowConfigItems.Config update(Long id, FlowConfigItems.SaveFlowConfigRequest request, Long templateId) {
+        validate(request, templateId);
         FlowConfig config = findById(id);
         if (!config.getType().equals(request.type())
                 && flowConfigRepository.findByType(request.type()).isPresent()) {
             throw new BusinessException(ErrorCodeEnum.FLOW_CONFIG_EXISTS, "同名流程配置已存在");
         }
-        // 删除顺序：先删转移边（外键引用节点）再删节点；
-        // bulk delete 的 clearAutomatically 会清空持久化上下文，必须重新加载实体再操作集合，
-        // 否则集合操作发生在脱离会话的实例上（LazyInitializationException）
         transitionRepository.deleteByConfigId(id);
         nodeRepository.deleteByConfigId(id);
         FlowConfig managed = flowConfigRepository.findById(id)
@@ -196,8 +175,19 @@ public class FlowConfigManagementService {
         managed.setStatus(FlowStatusEnum.DRAFT);
         applyPayload(managed, request);
         flowConfigRepository.saveAndFlush(managed);
-        // 用原托管实体组装详情：save 对存在实体的 merge 返回副本，其集合为不可初始化代理
         return toDetail(managed);
+    }
+
+    public void delete(Long id) {
+        FlowConfig config = findById(id);
+        long refs = oaDocumentRepository.countByFlowConfigId(id);
+        if (refs > 0) {
+            throw new BusinessException(ErrorCodeEnum.FLOW_CONFIG_IN_USE,
+                    "该流程已被 " + refs + " 张单据引用，无法删除");
+        }
+        transitionRepository.deleteByConfigId(id);
+        nodeRepository.deleteByConfigId(id);
+        flowConfigRepository.delete(config);
     }
 
     /**
@@ -250,7 +240,7 @@ public class FlowConfigManagementService {
     }
 
     /** 保存关口完整校验：节点协议、转移边拓扑、图可达性。坏配置在此被拒，绝不流入运行时。 */
-    private void validate(FlowConfigItems.SaveFlowConfigRequest request, Long flowConfigId) {
+    private void validate(FlowConfigItems.SaveFlowConfigRequest request, Long templateId) {
         if (request == null || !StringUtils.hasText(request.type()) || request.category() == null) {
             throw new BusinessException(ErrorCodeEnum.FLOW_CONFIG_INFO_REQUIRED, "流程类型与分类不能为空");
         }
@@ -295,9 +285,9 @@ public class FlowConfigManagementService {
         }
 
         // —— 转移边校验：端点存在、条件合法、默认边唯一 ——
-        // 可用条件变量 = 该流程绑定模板中声明"参与流程条件"的字段 ∪ 保留键兜底（字段即变量）
+        // 可用条件变量 = 模板全部启用字段 + 系统字段（钉钉两档；字段在模板保存后已可查）
         Map<String, WorkflowVariables.ValueTypeEnum> availableVariables =
-                conditionVariableCatalog.available(flowConfigId);
+                conditionVariableCatalog.available(templateId);
         Map<String, List<FlowConfigItems.SaveFlowConfigRequest.FlowTransitionPayload>> outBySource =
                 new LinkedHashMap<>();
         for (FlowConfigItems.SaveFlowConfigRequest.FlowTransitionPayload edge : request.transitions()) {

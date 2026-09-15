@@ -37,13 +37,6 @@ public class FormTemplateManagementService {
     public static final Set<String> RESERVED_KEYS = Set.of(
             "amount", "title", "involvesFunds", "requiresAdminReview", "businessMode", "needPostMaterial");
 
-    /**
-     * 默认参与流程条件的保留键（字段即变量）：未显式声明条件参与时按此推导。
-     * {@code title} 不在其中——标题仅供展示，不天然适合作为分支判据。
-     */
-    public static final Set<String> DEFAULT_PROCESS_VARIABLES = Set.of(
-            "amount", "involvesFunds", "requiresAdminReview", "businessMode", "needPostMaterial");
-
     /** 业务类型 → 单号前缀：前缀由业务类型唯一决定，不接受调用方自传。 */
     private static final Map<String, String> PREFIX_BY_BUSINESS_TYPE =
             Map.of("DAILY_PAYMENT", "BX", "BUSINESS_PAYMENT", "FK", "SEAL_APPLICATION", "YY");
@@ -101,15 +94,21 @@ public class FormTemplateManagementService {
 
     private TemplateView toView(FormTemplate template) {
         List<FormField> fields = fieldRepository.findByTemplateIdOrderBySortOrderAsc(template.getId());
+        // 钉钉同构：发布状态与版本挂在模板自带流程上，列表直接透出
+        com.hxj.entity.FlowConfig flow = template.getFlowConfigId() == null ? null
+                : flowConfigRepository.findById(template.getFlowConfigId()).orElse(null);
         return new TemplateView(
                 template.getId(), template.getBusinessType(), template.getName(),
                 template.getDocPrefix(), template.getFlowConfigId(), template.getVersion(),
-                template.getStatus(), template.getCategory(), template.getSortOrder(),
+                template.getStatus(), template.getCategory(),
+                flow == null ? null : flow.getStatus().name(),
+                flow == null ? 0 : flow.getVersion(),
+                template.getSortOrder(),
                 attachmentRequirements(template),
                 fields.stream()
                         .map(f -> new FieldView(f.getFieldKey(), f.getLabel(), f.getControlType(),
                                 f.isRequired(), parseStringList(f.getOptions()), f.isReserved(),
-                                f.isProcessVariable(), f.getSortOrder(), f.isEnabled()))
+                                f.getSortOrder(), f.isEnabled()))
                         .toList());
     }
 
@@ -395,10 +394,6 @@ public class FormTemplateManagementService {
             field.setRequired(Boolean.TRUE.equals(payload.required()));
             // 提升字段由服务端白名单标记，客户端不感知；排序由数组顺序决定
             field.setReserved(RESERVED_KEYS.contains(payload.fieldKey()));
-            // 字段即变量：条件参与由模板显式声明；未声明时保留键按默认集推导（自定义字段默认不参与）
-            field.setProcessVariable(payload.processVariable() != null
-                    ? payload.processVariable()
-                    : DEFAULT_PROCESS_VARIABLES.contains(payload.fieldKey()));
             field.setSortOrder(++order);
             field.setEnabled(payload.enabled() == null || payload.enabled());
             if (payload.options() != null) {
@@ -558,16 +553,17 @@ public class FormTemplateManagementService {
         }
     }
 
-    /** 模板视图。 */
+    /** 模板视图（flowStatus/flowVersion 为自带流程的发布状态与版本——钉钉同构整体透出）。 */
     public record TemplateView(Long id, String businessType, String name, String docPrefix,
                                Long flowConfigId, int version, String status, String category,
+                               String flowStatus, int flowVersion,
                                int sortOrder, List<String> attachmentRequirements,
                                List<FieldView> fields) {
     }
 
     /** 字段视图（SELECT 选项已解析为数组）。 */
     public record FieldView(String fieldKey, String label, String controlType, boolean required,
-                            List<String> options, boolean reserved, boolean processVariable,
+                            List<String> options, boolean reserved,
                             int sortOrder, boolean enabled) {
     }
 

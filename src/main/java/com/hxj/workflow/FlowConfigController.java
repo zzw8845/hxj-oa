@@ -7,20 +7,20 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
 /**
- * 流程配置管理接口：查询对已认证用户开放（供流程管理页/链条可视化展示），
- * 新增与修改仅限拥有配置权限的管理员。
+ * 流程配置查询接口：流程的配置入口在审批模板设计器（钉钉同构——模板自带流程），
+ * 此处仅保留只读查询，供提交弹窗链条可视化与历史回溯。
  */
-@Tag(name = "流程配置", description = "流程配置查询、新增、修改与可视化链条数据（新增/修改需 CONFIGURE_FLOW_PERMISSION 权限）")
+@Tag(name = "流程配置", description = "流程配置只读查询（配置入口在审批模板设计器）")
 @RestController
 public class FlowConfigController {
 
@@ -50,36 +50,30 @@ public class FlowConfigController {
         return ApiResponse.success(service.detail(id));
     }
 
-    @Operation(summary = "条件变量目录",
-            description = "该流程可用作分支判据的变量：绑定模板中勾选「参与流程条件」的字段 + 系统字段 + 保留键兜底")
-    @GetMapping("/api/flow-configs/{id}/condition-variables")
-    public ApiResponse<List<FlowConfigItems.VariableOption>> conditionVariables(@PathVariable Long id) {
-        return ApiResponse.success(service.conditionVariables(id));
-    }
-
-    @Operation(summary = "新增流程配置", description = "新增流程配置（仅管理员）")
+    @Operation(summary = "新增流程配置（直连）",
+            description = "不走审批模板聚合时的直连接口；templateId 为空时条件变量仅系统字段可用")
     @PostMapping("/api/admin/flow-configs")
     @PreAuthorize("hasAuthority('CONFIGURE_FLOW_PERMISSION')")
     public ApiResponse<FlowConfigItems.Config> create(@RequestBody FlowConfigItems.SaveFlowConfigRequest request) {
-        return ApiResponse.success(service.create(request));
+        return ApiResponse.success(service.create(request, null));
     }
 
-    @Operation(summary = "修改流程配置", description = "修改流程配置节点与转移边（仅管理员），保存后回退为草稿，需重新发布生效")
+    @Operation(summary = "修改流程配置（直连）", description = "保存后回退为草稿，需重新发布生效")
     @PutMapping("/api/admin/flow-configs/{id}")
     @PreAuthorize("hasAuthority('CONFIGURE_FLOW_PERMISSION')")
     public ApiResponse<FlowConfigItems.Config> update(
             @PathVariable Long id, @RequestBody FlowConfigItems.SaveFlowConfigRequest request) {
-        return ApiResponse.success(service.update(id, request));
+        return ApiResponse.success(service.update(id, request, null));
     }
 
-    @Operation(summary = "发布流程", description = "部署 BPMN 并推进版本号（仅管理员）；仅已发布流程可被提交")
+    @Operation(summary = "发布流程", description = "部署 BPMN 并推进版本号；仅已发布流程可被新单据使用")
     @PostMapping("/api/admin/flow-configs/{id}/publish")
     @PreAuthorize("hasAuthority('CONFIGURE_FLOW_PERMISSION')")
     public ApiResponse<FlowConfigItems.Config> publish(@PathVariable Long id) {
         return ApiResponse.success(service.publish(id));
     }
 
-    @Operation(summary = "删除流程配置", description = "删除流程配置（仅管理员；已被单据引用的禁止删除）")
+    @Operation(summary = "删除流程配置", description = "已被单据引用的禁止删除")
     @DeleteMapping("/api/admin/flow-configs/{id}")
     @PreAuthorize("hasAuthority('CONFIGURE_FLOW_PERMISSION')")
     public ApiResponse<Void> delete(@PathVariable Long id) {

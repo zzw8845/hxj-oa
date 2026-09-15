@@ -15,7 +15,7 @@ public record SaveFormTemplateRequest(
         @Schema(description = "业务类型键 DAILY_PAYMENT/BUSINESS_PAYMENT/SEAL_APPLICATION——"
                 + "决定单号前缀（BX/FK/YY）、台账分类与工作台卡片归属") String businessType,
         @Schema(description = "模板名（显示名，唯一）") String name,
-        @Schema(description = "绑定的流程配置 ID（必须为已存在的流程）") Long flowConfigId,
+        @Schema(description = "绑定的流程配置 ID（聚合保存由 ApprovalTemplate 编排回填）") Long flowConfigId,
         @Schema(description = "必附材料清单") List<String> attachmentRequirements,
         @Schema(description = "字段清单（整体替换；排序 = 数组顺序）") List<FieldPayload> fields) {
 
@@ -25,13 +25,6 @@ public record SaveFormTemplateRequest(
             @Schema(description = "控件类型 TEXT/TEXTAREA/NUMBER/DATE/SELECT/BOOLEAN/IMAGE/ATTACHMENT/TABLE") String controlType,
             @Schema(description = "是否必填") Boolean required,
             @Schema(description = "SELECT 选项 / TABLE 列结构（JSON）") List<Object> options,
-            @Schema(description = "是否启用") Boolean enabled,
-            @Schema(description = "是否参与流程条件（字段即变量）；不传按保留键默认规则推导") Boolean processVariable) {
-
-        /** 兼容未声明条件参与的调用方（保留键默认参与，其余默认不参与）。 */
-        public FieldPayload(String fieldKey, String label, String controlType,
-                            Boolean required, List<Object> options, Boolean enabled) {
-            this(fieldKey, label, controlType, required, options, enabled, null);
-        }
+            @Schema(description = "是否启用") Boolean enabled) {
     }
 }

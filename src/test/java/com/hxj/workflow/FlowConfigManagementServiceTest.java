@@ -54,6 +54,47 @@ class FlowConfigManagementServiceTest {
     @Autowired private SysRoleRepository sysRoleRepository;
     @Autowired private com.hxj.repository.SysDataScopeRepository dataScopeRepository;
     @Autowired private RepositoryService repositoryService;
+    @Autowired private com.hxj.repository.FormTemplateRepository templateRepository;
+    @Autowired private com.hxj.repository.FormFieldRepository fieldRepository;
+
+    private com.hxj.entity.FormTemplate lastTemplate;
+
+    /** 条件判据两档化后：独立流程测试需宿主模板（含 amount 字段）承载字段即变量。 */
+    private Long hostTemplate(String name) {
+        com.hxj.entity.FormTemplate template = new com.hxj.entity.FormTemplate();
+        template.setName(name);
+        template.setBusinessType("DAILY_PAYMENT");
+        template.setCategory("DAILY_PAYMENT");
+        template.setStatus("ENABLED");
+        template.setSortOrder(99);
+        template = templateRepository.save(template);
+        com.hxj.entity.FormField amount = new com.hxj.entity.FormField();
+        amount.setFieldKey("amount");
+        amount.setLabel("金额");
+        amount.setControlType("NUMBER");
+        amount.setEnabled(true);
+        amount.setSortOrder(1);
+        amount.setTemplate(template);
+        fieldRepository.save(amount);
+        com.hxj.entity.FormField involvesFunds = new com.hxj.entity.FormField();
+        involvesFunds.setFieldKey("involvesFunds");
+        involvesFunds.setLabel("是否涉及资金");
+        involvesFunds.setControlType("BOOLEAN");
+        involvesFunds.setEnabled(true);
+        involvesFunds.setSortOrder(2);
+        involvesFunds.setTemplate(template);
+        fieldRepository.save(involvesFunds);
+        lastTemplate = template;
+        return template.getId();
+    }
+
+    private FlowConfigItems.Config createFlow(FlowConfigItems.SaveFlowConfigRequest request) {
+        return managementService.create(request, hostTemplate(request.type() + '-' + System.nanoTime()));
+    }
+
+    private FlowConfigItems.Config updateFlow(Long flowId, FlowConfigItems.SaveFlowConfigRequest request) {
+        return managementService.update(flowId, request, lastTemplate.getId());
+    }
 
     private Long managerRoleId;
     private Long ceoRoleId;
@@ -134,7 +175,7 @@ class FlowConfigManagementServiceTest {
 
     @Test
     void shouldCreateDraftWithoutDeployThenPublishToDeploy() {
-        FlowConfigItems.Config created = managementService.create(request());
+        FlowConfigItems.Config created = createFlow(request());
 
         // 保存 = 草稿，不部署（改错配置不污染运行时）
         assertThat(created.status()).isEqualTo(FlowStatusEnum.DRAFT);
@@ -154,7 +195,7 @@ class FlowConfigManagementServiceTest {
 
     @Test
     void shouldRevertToDraftOnUpdateAndRequireRepublish() {
-        FlowConfigItems.Config created = managementService.publish(managementService.create(request()).id());
+        FlowConfigItems.Config created = managementService.publish(createFlow(request()).id());
 
         FlowConfigItems.SaveFlowConfigRequest updated = new FlowConfigItems.SaveFlowConfigRequest(
                 "采购申请", FlowCategoryEnum.DAILY,
@@ -170,7 +211,7 @@ class FlowConfigManagementServiceTest {
                         edge("财务经理审批", "执行总经理审批"),
                         edge("执行总经理审批", "抄送财务"),
                         edge("抄送财务", null)));
-        FlowConfigItems.Config result = managementService.update(created.id(), updated);
+        FlowConfigItems.Config result = updateFlow(created.id(), updated);
 
         // 修改后回退草稿（重新发布才能生效）
         assertThat(result.status()).isEqualTo(FlowStatusEnum.DRAFT);
@@ -185,7 +226,7 @@ class FlowConfigManagementServiceTest {
 
     @Test
     void shouldCompileConditionalBranchToExclusiveGateway() {
-        FlowConfigItems.Config created = managementService.publish(managementService.create(request()).id());
+        FlowConfigItems.Config created = managementService.publish(createFlow(request()).id());
         BpmnModel model = repositoryService.getBpmnModel(
                 repositoryService.createProcessDefinitionQuery()
                         .processDefinitionKey("oa_flow_config_" + created.id()).latestVersion().singleResult().getId());
@@ -202,7 +243,7 @@ class FlowConfigManagementServiceTest {
 
     @Test
     void shouldReturnGraphDataByType() {
-        managementService.publish(managementService.create(request()).id());
+        managementService.publish(createFlow(request()).id());
 
         FlowConfigItems.Config detail = managementService.detailByType("采购申请");
         assertThat(detail.type()).isEqualTo("采购申请");
@@ -218,8 +259,8 @@ class FlowConfigManagementServiceTest {
 
     @Test
     void shouldRejectDuplicateType() {
-        managementService.create(request());
-        assertThatThrownBy(() -> managementService.create(request()))
+        createFlow(request());
+        assertThatThrownBy(() -> createFlow(request()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("已存在");
     }
@@ -235,7 +276,7 @@ class FlowConfigManagementServiceTest {
                         new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload(
                                 "审批节点", FlowNodeTypeEnum.APPROVAL, null, null, null)),
                 List.of(edge("发起人", "审批节点")));
-        assertThatThrownBy(() -> managementService.create(invalid))
+        assertThatThrownBy(() -> createFlow(invalid))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("审批主体");
     }
@@ -248,7 +289,7 @@ class FlowConfigManagementServiceTest {
                         node("发起人", FlowNodeTypeEnum.START),
                         roleNode("直属主管", 99999L)),
                 List.of(edge("发起人", "直属主管")));
-        assertThatThrownBy(() -> managementService.create(invalid))
+        assertThatThrownBy(() -> createFlow(invalid))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("角色不存在");
     }
@@ -261,7 +302,7 @@ class FlowConfigManagementServiceTest {
                         node("发起人", FlowNodeTypeEnum.START),
                         superiorNode("直属主管", AssigneeSubjectEnum.SUPERIOR, 99, null)),
                 List.of(edge("发起人", "直属主管")));
-        assertThatThrownBy(() -> managementService.create(invalid))
+        assertThatThrownBy(() -> createFlow(invalid))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("主管层级需在 1-8");
     }
@@ -278,7 +319,7 @@ class FlowConfigManagementServiceTest {
                         edge("发起人", "直属主管"),
                         edge("直属主管", "逐级主管"),
                         edge("逐级主管", null)));
-        assertThatCode(() -> managementService.create(valid)).doesNotThrowAnyException();
+        assertThatCode(() -> createFlow(valid)).doesNotThrowAnyException();
     }
 
     @Test
@@ -292,7 +333,7 @@ class FlowConfigManagementServiceTest {
                 List.of(
                         edge("发起人", "内控合规"),
                         edge("内控合规", "内控合规")));
-        assertThatThrownBy(() -> managementService.create(invalid))
+        assertThatThrownBy(() -> createFlow(invalid))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("重复");
     }
@@ -305,7 +346,7 @@ class FlowConfigManagementServiceTest {
                 "借款申请", FlowCategoryEnum.DAILY,
                 List.of(node("发起人", FlowNodeTypeEnum.START), roleNode("审批", managerRoleId)),
                 List.of(edge("发起人", "不存在的节点")));
-        assertThatThrownBy(() -> managementService.create(invalid))
+        assertThatThrownBy(() -> createFlow(invalid))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("目标节点不在节点列表");
     }
@@ -316,7 +357,7 @@ class FlowConfigManagementServiceTest {
                 "借款申请", FlowCategoryEnum.DAILY,
                 List.of(node("发起人", FlowNodeTypeEnum.START), roleNode("审批", managerRoleId)),
                 List.of(edge("发起人", "审批"))); // 审批节点无出边 → 悬挂
-        assertThatThrownBy(() -> managementService.create(invalid))
+        assertThatThrownBy(() -> createFlow(invalid))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("缺少出边");
     }
@@ -334,7 +375,7 @@ class FlowConfigManagementServiceTest {
                         // 审批节点只有条件出边、无默认兜底：不满足条件时流程悬挂
                         condEdge("审批", "领导审批",
                                 "amount", ConditionOperatorEnum.GREATER_THAN, "100")));
-        assertThatThrownBy(() -> managementService.create(invalid))
+        assertThatThrownBy(() -> createFlow(invalid))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("无条件兜底出边");
     }
@@ -351,7 +392,7 @@ class FlowConfigManagementServiceTest {
                         edge("发起人", "审批"),
                         edge("审批", null),
                         edge("孤岛审批", "孤岛审批"))); // 孤岛审批自环：无入边、不可达
-        assertThatThrownBy(() -> managementService.create(invalid))
+        assertThatThrownBy(() -> createFlow(invalid))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("不可达");
     }
@@ -368,7 +409,7 @@ class FlowConfigManagementServiceTest {
                         edge("发起人", "审批"),
                         edge("审批", "死胡同"),
                         edge("死胡同", "审批"))); // 审批↔死胡同互指成环：每节点都有出边但到不了结束
-        assertThatThrownBy(() -> managementService.create(invalid))
+        assertThatThrownBy(() -> createFlow(invalid))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("无法到达流程结束");
     }
@@ -390,7 +431,7 @@ class FlowConfigManagementServiceTest {
                                 "amout", ConditionOperatorEnum.GREATER_THAN_OR_EQUAL, "20000"),
                         edge("审批", "领导审批"),
                         edge("领导审批", null)));
-        assertThatThrownBy(() -> managementService.create(invalid))
+        assertThatThrownBy(() -> createFlow(invalid))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("条件变量不可用");
     }
@@ -409,7 +450,7 @@ class FlowConfigManagementServiceTest {
                                 "amount", ConditionOperatorEnum.GREATER_THAN_OR_EQUAL, "两万"),
                         edge("审批", "领导审批"),
                         edge("领导审批", null)));
-        assertThatThrownBy(() -> managementService.create(invalid))
+        assertThatThrownBy(() -> createFlow(invalid))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("必须是数字");
     }
@@ -428,7 +469,7 @@ class FlowConfigManagementServiceTest {
                                 "involvesFunds", ConditionOperatorEnum.EQUAL, "yes"),
                         edge("审批", "财务复核"),
                         edge("财务复核", null)));
-        assertThatThrownBy(() -> managementService.create(invalid))
+        assertThatThrownBy(() -> createFlow(invalid))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("true / false");
     }
@@ -445,7 +486,7 @@ class FlowConfigManagementServiceTest {
                 List.of(
                         edge("发起人", "审批"),
                         edge("审批", "抄送")));
-        assertThatThrownBy(() -> managementService.create(invalid))
+        assertThatThrownBy(() -> createFlow(invalid))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("抄送目标格式错误");
     }
@@ -463,7 +504,7 @@ class FlowConfigManagementServiceTest {
                 List.of(
                         edge("发起人", "审批"),
                         edge("审批", "抄送")));
-        assertThatThrownBy(() -> managementService.create(invalid))
+        assertThatThrownBy(() -> createFlow(invalid))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("抄送角色不存在");
     }
@@ -482,6 +523,6 @@ class FlowConfigManagementServiceTest {
                         edge("发起人", "审批"),
                         edge("审批", "抄送"),
                         edge("抄送", null))); // null 目标 = 流程结束
-        assertThatCode(() -> managementService.create(valid)).doesNotThrowAnyException();
+        assertThatCode(() -> createFlow(valid)).doesNotThrowAnyException();
     }
 }

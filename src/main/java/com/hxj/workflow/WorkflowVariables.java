@@ -64,25 +64,6 @@ public final class WorkflowVariables {
     public static final Set<String> SYSTEM_VARIABLES =
             Set.of(SYS_INITIATOR, SYS_INITIATOR_DEPT_ID, SYS_INITIATOR_DEPT_NAME, SYS_INITIATOR_POST);
 
-    /**
-     * 保留键兜底类型：模板未定义同名字段时仍可用的条件变量。
-     * 一旦模板定义了同名字段，以字段控件类型为准。
-     */
-    private static final Map<String, ValueTypeEnum> RESERVED_KEY_TYPES = Map.of(
-            "amount", ValueTypeEnum.NUMERIC,
-            "involvesFunds", ValueTypeEnum.BOOLEAN,
-            "requiresAdminReview", ValueTypeEnum.BOOLEAN,
-            "businessMode", ValueTypeEnum.STRING,
-            "needPostMaterial", ValueTypeEnum.BOOLEAN);
-
-    /** 保留键兜底条件变量集合（无绑定模板时的可用判据）。 */
-    public static final Set<String> RESERVED_KEY_VARIABLES = RESERVED_KEY_TYPES.keySet();
-
-    /** 保留键的兜底类型；非保留键返回 null。 */
-    public static ValueTypeEnum reservedKeyType(String variableName) {
-        return RESERVED_KEY_TYPES.get(variableName);
-    }
-
     /** 系统字段的类型（供保存关口校验比较值）。 */
     public static ValueTypeEnum systemVariableType(String variableName) {
         return switch (variableName) {

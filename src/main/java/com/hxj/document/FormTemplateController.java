@@ -21,9 +21,15 @@ import java.util.List;
 public class FormTemplateController {
 
     private final FormTemplateManagementService templateService;
+    private final com.hxj.workflow.FlowConfigManagementService flowConfigService;
+    private final com.hxj.workflow.ConditionVariableCatalog conditionVariableCatalog;
 
-    public FormTemplateController(FormTemplateManagementService templateService) {
+    public FormTemplateController(FormTemplateManagementService templateService,
+                                  com.hxj.workflow.FlowConfigManagementService flowConfigService,
+                                  com.hxj.workflow.ConditionVariableCatalog conditionVariableCatalog) {
         this.templateService = templateService;
+        this.flowConfigService = flowConfigService;
+        this.conditionVariableCatalog = conditionVariableCatalog;
     }
 
     @Operation(summary = "启用模板列表", description = "登录即可读取：提交表单按业务类型渲染字段")
@@ -52,7 +58,8 @@ public class FormTemplateController {
         return ApiResponse.success(templateService.get(id));
     }
 
-    @Operation(summary = "创建模板", description = "字段清单整体提交；保留键（提升字段）由系统校验")
+    @Operation(summary = "创建模板",
+            description = "钉钉同构聚合提交：基本信息 + 字段清单 + 自带流程（节点/转移边）一体落库")
     @PostMapping("/api/admin/form-templates")
     @PreAuthorize("hasAuthority('CONFIGURE_FLOW_PERMISSION')")
     public ApiResponse<FormTemplateManagementService.TemplateView> create(
@@ -60,12 +67,33 @@ public class FormTemplateController {
         return ApiResponse.success(templateService.create(request));
     }
 
-    @Operation(summary = "更新模板", description = "字段清单整体替换，版本号 +1；提升字段不可删除")
+    @Operation(summary = "更新模板",
+            description = "字段清单整体替换，自带流程整体重建并回草稿；提升字段不可删除")
     @PutMapping("/api/admin/form-templates/{id}")
     @PreAuthorize("hasAuthority('CONFIGURE_FLOW_PERMISSION')")
     public ApiResponse<FormTemplateManagementService.TemplateView> update(
             @PathVariable Long id, @RequestBody SaveFormTemplateRequest request) {
         return ApiResponse.success(templateService.update(id, request));
+    }
+
+    @Operation(summary = "发布模板",
+            description = "部署自带流程的 BPMN 定义并推进版本号；仅已发布模板的流程可被新单据使用")
+    @PostMapping("/api/admin/form-templates/{id}/publish")
+    @PreAuthorize("hasAuthority('CONFIGURE_FLOW_PERMISSION')")
+    public ApiResponse<FormTemplateManagementService.TemplateView> publish(@PathVariable Long id) {
+        FormTemplateManagementService.TemplateView template = templateService.get(id);
+        if (template.flowConfigId() != null) {
+            flowConfigService.publish(template.flowConfigId());
+        }
+        return ApiResponse.success(templateService.get(id));
+    }
+
+    @Operation(summary = "条件变量目录",
+            description = "该模板的流程分支可用判据：全部启用字段 + 系统字段（钉钉同构两档）")
+    @GetMapping("/api/admin/form-templates/{id}/condition-variables")
+    public ApiResponse<List<com.hxj.workflow.FlowConfigItems.VariableOption>> conditionVariables(
+            @PathVariable Long id) {
+        return ApiResponse.success(conditionVariableCatalog.describe(id));
     }
 
     @Operation(summary = "删除模板", description = "与流程删除同规则：被单据引用（审计回溯）或被工作台事项承接（入口悬空）时拒绝")

@@ -74,11 +74,17 @@ public class ApprovalTemplateManagementService {
         FlowCategoryEnum category = requireCategory(request);
         // 同一事务内：流程（含 BPMN 部署）→ 模板（含字段清单）→ 自动事项入口；
         // 任一环节失败整体回滚，不存在"流程建了模板没建"的半拉子状态
-        FlowConfigItems.Config flow = flowConfigService.create(new FlowConfigItems.SaveFlowConfigRequest(
-                request.name(), category, request.flow().nodes(), request.flow().transitions()));
-        return templateService.create(new SaveFormTemplateRequest(
-                request.businessType(), request.name(), flow.id(),
+        // 条件判据按模板字段校验（两档：模板启用字段 + 系统字段）——模板与字段先落库，流程校验才可查
+        FormTemplateManagementService.TemplateView tv = templateService.create(new SaveFormTemplateRequest(
+                request.businessType(), request.name(), null,
                 request.attachmentRequirements(), request.fields()));
+        FlowConfigItems.Config flow = flowConfigService.create(new FlowConfigItems.SaveFlowConfigRequest(
+                request.name(), category, request.flow().nodes(), request.flow().transitions()), tv.id());
+        templateRepository.findById(tv.id()).ifPresent(t -> {
+            t.setFlowConfigId(flow.id());
+            templateRepository.save(t);
+        });
+        return templateService.get(tv.id());
     }
 
     @Transactional
@@ -89,11 +95,12 @@ public class ApprovalTemplateManagementService {
         if (template.getFlowConfigId() == null) {
             throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID, "模板未绑定流程，请走创建接口");
         }
-        flowConfigService.update(template.getFlowConfigId(), new FlowConfigItems.SaveFlowConfigRequest(
-                request.name(), category, request.flow().nodes(), request.flow().transitions()));
-        return templateService.update(templateId, new SaveFormTemplateRequest(
+        templateService.update(templateId, new SaveFormTemplateRequest(
                 request.businessType(), request.name(), template.getFlowConfigId(),
                 request.attachmentRequirements(), request.fields()));
+        flowConfigService.update(template.getFlowConfigId(), new FlowConfigItems.SaveFlowConfigRequest(
+                request.name(), category, request.flow().nodes(), request.flow().transitions()), templateId);
+        return templateService.get(templateId);
     }
 
     /** 删除：单据引用（按模板与流程双向核查）时拒绝；事项入口、字段清单、节点链、流程部署级联清除。 */

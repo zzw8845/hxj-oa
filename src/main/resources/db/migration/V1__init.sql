@@ -228,7 +228,6 @@ CREATE TABLE `form_field` (
   `required` tinyint(1) NOT NULL DEFAULT '0',
   `options` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `reserved` tinyint(1) NOT NULL DEFAULT '0',
-  `process_variable` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否参与流程条件（字段即变量）',
   `sort_order` int NOT NULL DEFAULT '0',
   `enabled` tinyint(1) NOT NULL DEFAULT '1',
   PRIMARY KEY (`id`),
@@ -249,7 +248,7 @@ CREATE TABLE `form_template` (
   `business_type` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `doc_prefix` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `flow_config_id` bigint DEFAULT NULL,
+  `flow_config_id` bigint DEFAULT NULL UNIQUE,
   `version` int NOT NULL DEFAULT '1',
   `status` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'ENABLED',
   `sort_order` int NOT NULL DEFAULT '0',
@@ -951,7 +950,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `form_field` WRITE;
 /*!40000 ALTER TABLE `form_field` DISABLE KEYS */;
-INSERT INTO `form_field` (`id`, `template_id`, `field_key`, `label`, `control_type`, `required`, `options`, `reserved`, `sort_order`, `enabled`, `process_variable`) VALUES (1,1,'title','单据标题','TEXT',1,'[]',1,1,1,0),(2,1,'amount','金额','NUMBER',1,'[]',1,2,1,1),(3,1,'company','所属公司','SELECT',1,'["海峡金","海峡金子公司"]',0,3,1,1),(4,1,'involvesFunds','是否涉及资金','BOOLEAN',0,'[]',1,4,1,1),(5,1,'reason','事由明细','TEXTAREA',1,'[]',0,5,1,0),(6,1,'contractNo','合同编号','TEXT',0,'[]',0,6,1,0);
+INSERT INTO `form_field` (`id`, `template_id`, `field_key`, `label`, `control_type`, `required`, `options`, `reserved`, `sort_order`, `enabled`) VALUES (1,1,'title','单据标题','TEXT',1,'[]',1,1,1),(2,1,'amount','金额','NUMBER',1,'[]',1,2,1),(3,1,'company','所属公司','SELECT',1,'["海峡金","海峡金子公司"]',0,3,1),(4,1,'involvesFunds','是否涉及资金','BOOLEAN',0,'[]',1,4,1),(5,1,'reason','事由明细','TEXTAREA',1,'[]',0,5,1),(6,1,'contractNo','合同编号','TEXT',0,'[]',0,6,1);
 /*!40000 ALTER TABLE `form_field` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

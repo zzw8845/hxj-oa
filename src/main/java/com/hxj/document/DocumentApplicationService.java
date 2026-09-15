@@ -364,26 +364,19 @@ public class DocumentApplicationService {
     }
 
     /**
-     * 构建流程变量：保留键兜底值 + 模板声明字段（字段即变量）+ 系统字段 + 审批人解析产物。
+     * 构建流程变量：模板启用字段全量提升（字段即变量）+ 系统字段 + 审批人解析产物。
      *
-     * <p>保留键兜底与保存关口的可用变量集合保持一致——「校验通过 ⟹ 运行时可求值」，
-     * 否则流程配了 amount 条件而模板无该字段时，网关求值会因变量缺失异常导致单据卡死。
+     * <p>保存关口已保证条件边变量 ⊆ 模板启用字段 ∪ 系统字段——「校验通过 ⟹ 运行时可求值」。
      */
     private Map<String, Object> workflowVariables(
             Map<String, Object> fieldValues, SysUser applicant, List<FormField> fields,
             Map<String, Object> assigneeVariables) {
         Map<String, Object> variables = new LinkedHashMap<>();
-        variables.put("amount", BigDecimal.ZERO);
-        variables.put("involvesFunds", Boolean.FALSE);
-        variables.put("requiresAdminReview", Boolean.FALSE);
-        variables.put("businessMode", "");
-        variables.put("needPostMaterial", Boolean.FALSE);
-        // 字段即变量：模板声明参与流程条件的字段按控件类型归一后覆盖兜底值
+        // 字段即变量（钉钉同构两档）：模板全部启用字段提升为流程变量，
+        // 类型按控件类型归一、缺失值给类型安全默认，网关求值不会遇到 null
         for (FormField field : fields) {
-            if (field.isProcessVariable()) {
-                variables.put(field.getFieldKey(),
-                        conditionValue(field, fieldValues.get(field.getFieldKey())));
-            }
+            variables.put(field.getFieldKey(),
+                    conditionValue(field, fieldValues.get(field.getFieldKey())));
         }
         // 系统字段（钉钉同款）：发起人/发起人部门/岗位可直接作为条件判据，无需模板声明
         variables.put(WorkflowVariables.SYS_INITIATOR, applicant.getAccount());

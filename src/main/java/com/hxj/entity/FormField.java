@@ -48,16 +48,9 @@ public class FormField {
     @Column
     private String options;
 
-    /** 提升字段：值写结构化列/流程变量（amount/title 等），不可删除。 */
+    /** 提升字段：值写结构化列或流程变量（amount/title 等），不可删除。 */
     @Column(nullable = false)
     private boolean reserved;
-
-    /**
-     * 参与流程条件：该字段可作为流程转移边的条件变量（钉钉"字段即变量"）。
-     * 与 {@link #reserved} 是两个独立维度——保留键写结构化列，未必都适合做条件判据。
-     */
-    @Column(name = "process_variable", nullable = false)
-    private boolean processVariable;
 
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
@@ -82,8 +75,6 @@ public class FormField {
     public void setOptions(String options) { this.options = options; }
     public boolean isReserved() { return reserved; }
     public void setReserved(boolean reserved) { this.reserved = reserved; }
-    public boolean isProcessVariable() { return processVariable; }
-    public void setProcessVariable(boolean processVariable) { this.processVariable = processVariable; }
     public int getSortOrder() { return sortOrder; }
     public void setSortOrder(int sortOrder) { this.sortOrder = sortOrder; }
     public boolean isEnabled() { return enabled; }
