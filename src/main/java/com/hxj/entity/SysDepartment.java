@@ -32,6 +32,13 @@ public class SysDepartment {
     @Column(name = "parent_id")
     private Long parentId;
 
+    /**
+     * 部门负责人用户ID（钉钉模式：主管锚定在部门而非逐人指定）。
+     * 「直属主管/逐级主管」节点在申请人未设汇报线时，沿本部门及其祖先部门的负责人解析主管链。
+     */
+    @Column(name = "leader_user_id")
+    private Long leaderUserId;
+
     /** 同级排序号。 */
     @Column(name = "sort_order", nullable = false)
     private Integer sortOrder = 0;
@@ -50,6 +57,8 @@ public class SysDepartment {
     public void setName(String name) { this.name = name; }
     public Long getParentId() { return parentId; }
     public void setParentId(Long parentId) { this.parentId = parentId; }
+    public Long getLeaderUserId() { return leaderUserId; }
+    public void setLeaderUserId(Long leaderUserId) { this.leaderUserId = leaderUserId; }
     public Integer getSortOrder() { return sortOrder; }
     public void setSortOrder(Integer sortOrder) { this.sortOrder = sortOrder; }
     public LocalDateTime getCreatedAt() { return createdAt; }

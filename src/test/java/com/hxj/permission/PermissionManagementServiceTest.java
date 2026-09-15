@@ -104,6 +104,7 @@ class PermissionManagementServiceTest {
                 @Override public void resolveTask(String taskId) { }
                 @Override public java.util.List<com.hxj.workflow.WorkflowHistoryItemResponse> history(String processInstanceId) { return java.util.List.of(); }
                 @Override public java.util.List<com.hxj.workflow.WorkflowNodeStatResponse> nodeStatistics() { return java.util.List.of(); }
+                @Override public java.util.List<String> candidateGroups(String taskId) { return java.util.List.of(); }
             };
         }
     }

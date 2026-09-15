@@ -37,6 +37,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.hxj.exception.BusinessException;
+
 @DataJpaTest(properties = {
         "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
         "spring.jpa.hibernate.ddl-auto=create-drop",
@@ -50,6 +52,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         LocalAttachmentStorage.class,
         com.hxj.approval.ApprovalActionService.class,
         com.hxj.workflow.DeptAccountantResolver.class,
+        com.hxj.workflow.SupervisorChainResolver.class,
         FormTemplateManagementService.class,
         DocumentApplicationServiceTest.Config.class
 })
@@ -76,6 +79,12 @@ class DocumentApplicationServiceTest {
     void setUp() {
         applicant = saveUser("applicant", "业务部");
         ccUser = saveUser("cc-user", "财务部");
+        // 钉钉模式：业务部设负责人——申请人未设直属主管时，主管链沿部门负责人树兜底
+        SysUser departmentLeader = saveUser("dept-leader", "业务部");
+        departmentRepository.findByName("业务部").ifPresent(department -> {
+            department.setLeaderUserId(departmentLeader.getId());
+            departmentRepository.save(department);
+        });
         principal = new AuthenticatedUserResponse(
                 applicant.getId(), applicant.getAccount(), applicant.getName(), applicant.getDepartment(),
                 applicant.getPost(), List.of(), List.of("VIEW_OWN_FORMS"), List.of("OWN"));
@@ -83,15 +92,21 @@ class DocumentApplicationServiceTest {
         FlowConfig config = new FlowConfig();
         config.setType("合作方退款");
         config.setCategory(FlowCategoryEnum.BUSINESS);
-        config.addNode(new FlowNodeConfig("发起人", FlowNodeTypeEnum.START));
-        config.addNode(new FlowNodeConfig("直属主管", FlowNodeTypeEnum.APPROVAL));
+        FlowNodeConfig start = new FlowNodeConfig("发起人", FlowNodeTypeEnum.START);
+        FlowNodeConfig managerNode = new FlowNodeConfig("直属主管", FlowNodeTypeEnum.APPROVAL);
+        managerNode.setAssigneeRole("直属主管");
+        config.addNode(start);
+        config.addNode(managerNode);
         flowConfigRepository.save(config);
 
         FlowConfig sealConfig = new FlowConfig();
         sealConfig.setType("非标合同审批及用印");
         sealConfig.setCategory(FlowCategoryEnum.SEAL);
-        sealConfig.addNode(new FlowNodeConfig("发起人", FlowNodeTypeEnum.START));
-        sealConfig.addNode(new FlowNodeConfig("直属主管", FlowNodeTypeEnum.APPROVAL));
+        FlowNodeConfig sealStart = new FlowNodeConfig("发起人", FlowNodeTypeEnum.START);
+        FlowNodeConfig sealManagerNode = new FlowNodeConfig("直属主管", FlowNodeTypeEnum.APPROVAL);
+        sealManagerNode.setAssigneeRole("直属主管");
+        sealConfig.addNode(sealStart);
+        sealConfig.addNode(sealManagerNode);
         sealConfig.addNode(new FlowNodeConfig("内控专员用印", FlowNodeTypeEnum.HANDLER));
         flowConfigRepository.save(sealConfig);
 
@@ -293,6 +308,29 @@ class DocumentApplicationServiceTest {
                 "reason", "合作方退款",
                 "contractNo", "HT-001",
                 "involvesFunds", true), ccIds, List.of(), linkedId);
+    }
+
+    // ============ 主管链钉钉模式：部门负责人兜底 + 动态指派前置校验 ============
+
+    @Test
+    void shouldResolveManagerAccountFromDepartmentLeaderWhenNoManagerSet() {
+        TestSecurityContext.mock(principal);
+        service.submit(paymentRequest(null, List.of()));
+        // applicant 无 manager_id → 直属主管节点应指派给业务部负责人 dept-leader
+        assertThat(workflow.startedVariables.get("managerAccount")).isEqualTo("dept-leader");
+    }
+
+    @Test
+    void shouldRejectSubmitWhenSupervisorUnresolvable() {
+        TestSecurityContext.mock(principal);
+        // 清除业务部负责人：申请人无直属主管 + 部门及上级均无负责人 → 提交即拒（不再卡单等管理员救）
+        departmentRepository.findByName("业务部").ifPresent(department -> {
+            department.setLeaderUserId(null);
+            departmentRepository.save(department);
+        });
+        assertThatThrownBy(() -> service.submit(paymentRequest(null, List.of())))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("无法路由");
     }
 
     private SysUser saveUser(String account, String department) {

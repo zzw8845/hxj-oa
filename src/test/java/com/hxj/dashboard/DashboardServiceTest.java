@@ -249,6 +249,7 @@ class DashboardServiceTest {
         @Override public void resolveTask(String taskId) {}
         @Override public List<WorkflowHistoryItemResponse> history(String processInstanceId) { return List.of(); }
         @Override public List<WorkflowNodeStatResponse> nodeStatistics() { return nodeStats; }
+        @Override public List<String> candidateGroups(String taskId) { return List.of(); }
 
         private Task task(Long documentId) {
             Task task = org.mockito.Mockito.mock(Task.class);

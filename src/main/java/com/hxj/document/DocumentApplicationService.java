@@ -54,6 +54,7 @@ public class DocumentApplicationService {
     private final DocumentAccessPolicy accessPolicy;
     private final LocalAttachmentStorage attachmentStorage;
     private final com.hxj.workflow.DeptAccountantResolver deptAccountantResolver;
+    private final com.hxj.workflow.SupervisorChainResolver supervisorChainResolver;
     private final BigDecimal riskThreshold;
 
     public DocumentApplicationService(
@@ -69,6 +70,7 @@ public class DocumentApplicationService {
             DocumentAccessPolicy accessPolicy,
             LocalAttachmentStorage attachmentStorage,
             com.hxj.workflow.DeptAccountantResolver deptAccountantResolver,
+            com.hxj.workflow.SupervisorChainResolver supervisorChainResolver,
             @Value("${app.risk-threshold:80000}") BigDecimal riskThreshold) {
         this.documentRepository = documentRepository;
         this.attachmentRepository = attachmentRepository;
@@ -82,6 +84,7 @@ public class DocumentApplicationService {
         this.accessPolicy = accessPolicy;
         this.attachmentStorage = attachmentStorage;
         this.deptAccountantResolver = deptAccountantResolver;
+        this.supervisorChainResolver = supervisorChainResolver;
         this.riskThreshold = riskThreshold;
     }
 
@@ -110,6 +113,20 @@ public class DocumentApplicationService {
                 throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID,
                         "自选审批人不存在：" + account);
             }
+        }
+        // 动态指派前置校验（钉钉模式）：主管链来源于人员档案直属主管或部门负责人树，
+        // 核算会计按部门分工映射——解析为空时提交即拒，把"卡单等管理员救"变成"提交时发现"
+        if (flowConfig.getNodes().stream().anyMatch(n -> n.getNodeType() == FlowNodeTypeEnum.APPROVAL
+                && ("直属主管".equals(n.getAssigneeRole()) || "逐级主管".equals(n.getAssigneeRole())))
+                && supervisorChainResolver.resolveChain(applicant).isEmpty()) {
+            throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID,
+                    "申请人未设置直属主管，且其部门及上级部门均未设置负责人，无法路由「直属主管」审批节点，请联系管理员在组织架构中补配");
+        }
+        if (flowConfig.getNodes().stream().anyMatch(n -> n.getNodeType() == FlowNodeTypeEnum.APPROVAL
+                && "会计（按部门）".equals(n.getAssigneeRole()))
+                && deptAccountantResolver.resolve(applicant).isEmpty()) {
+            throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID,
+                    "申请人所在部门未配置核算会计分工，无法路由「会计（按部门）」审批节点，请联系管理员补配核算分工");
         }
         BusinessTypeEnum businessType = BusinessTypeEnum.valueOf(template.getCategory());
 
@@ -339,20 +356,10 @@ public class DocumentApplicationService {
 
     private Map<String, Object> workflowVariables(
             Map<String, Object> fieldValues, SysUser applicant, List<String> approverAccounts) {
-        // 直属主管账号：审批流「直属主管」节点以 ${managerAccount} 动态指派；未设置汇报线时为空串（任务待管理员指派）
-        String managerAccount = applicant.getManagerId() == null ? ""
-                : userRepository.findById(applicant.getManagerId())
-                        .map(SysUser::getAccount).orElse("");
-        // 连续多级主管链：「逐级主管」节点以 ${managerChain} 串行逐级审批（自下而上，去环，上限 10 级）
-        List<String> managerChain = new ArrayList<>();
-        Long cursor = applicant.getManagerId();
-        java.util.Set<Long> visited = new java.util.HashSet<>();
-        while (cursor != null && visited.add(cursor) && managerChain.size() < 10) {
-            SysUser manager = userRepository.findById(cursor).orElse(null);
-            if (manager == null) break;
-            managerChain.add(manager.getAccount());
-            cursor = manager.getManagerId();
-        }
+        // 主管链（钉钉模式）：人工指定的直属主管优先，未设则沿部门负责人树自近及远兜底——
+        // 「直属主管」节点取链首 ${managerAccount}，「逐级主管」节点消费整条链串行审批（上限 10 级）
+        List<String> managerChain = supervisorChainResolver.resolveChain(applicant);
+        String managerAccount = managerChain.isEmpty() ? "" : managerChain.get(0);
         // 主办会计账号：「会计（按部门）」节点以 ${deptAccountant} 动态指派（核算分工表解析，无映射时为空串）
         String deptAccountant = deptAccountantResolver.resolve(applicant);
         return Map.ofEntries(

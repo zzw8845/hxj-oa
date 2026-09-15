@@ -84,4 +84,9 @@ public interface SysDepartmentRepository extends JpaRepository<SysDepartment, Lo
     @Query(value = "SELECT descendant_id FROM sys_department_closure WHERE ancestor_id = :rootId",
             nativeQuery = true)
     List<Long> findSubtreeIds(@Param("rootId") Long rootId);
+
+    /** 查询某部门的祖先链 ID（不含自身，自近及远按 depth 升序）——主管链沿部门树向上兜底的数据源。 */
+    @Query(value = "SELECT ancestor_id FROM sys_department_closure "
+            + "WHERE descendant_id = :deptId AND depth > 0 ORDER BY depth", nativeQuery = true)
+    List<Long> findAncestorIdsByDepth(@Param("deptId") Long deptId);
 }

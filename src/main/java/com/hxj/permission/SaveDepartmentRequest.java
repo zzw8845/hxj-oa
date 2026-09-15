@@ -9,10 +9,17 @@ public record SaveDepartmentRequest(
         @Schema(description = "部门名称（全公司唯一）") @NotBlank @Size(max = 100) String name,
         @Schema(description = "上级部门ID；新增时为空表示根部门，编辑时为空表示移动为根部门")
         Long parentId,
-        @Schema(description = "同级排序号，默认 0") Integer sortOrder) {
+        @Schema(description = "同级排序号，默认 0") Integer sortOrder,
+        @Schema(description = "部门负责人用户ID，空表示未设置；主管类审批节点沿部门负责人树兜底解析")
+        Long leaderUserId) {
 
     /** 归一化：排序号缺省为 0。 */
     public SaveDepartmentRequest {
         sortOrder = sortOrder == null ? 0 : sortOrder;
+    }
+
+    /** 兼容构造器：不涉及负责人配置的调用方继续使用三参形式。 */
+    public SaveDepartmentRequest(String name, Long parentId, Integer sortOrder) {
+        this(name, parentId, sortOrder, null);
     }
 }

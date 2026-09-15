@@ -55,6 +55,7 @@ public class DepartmentManagementService {
         department.setName(request.name());
         department.setParentId(parent == null ? null : parent.getId());
         department.setSortOrder(request.sortOrder());
+        department.setLeaderUserId(requireLeader(request.leaderUserId()));
         SysDepartment saved = departmentRepository.saveAndFlush(department);
 
         departmentRepository.insertSelfPath(saved.getId());
@@ -92,6 +93,7 @@ public class DepartmentManagementService {
         department.setName(request.name());
         department.setParentId(newParent == null ? null : newParent.getId());
         department.setSortOrder(request.sortOrder());
+        department.setLeaderUserId(requireLeader(request.leaderUserId()));
         if (renamed) {
             syncDepartmentRename(department.getId(), request.name());
         }
@@ -126,6 +128,7 @@ public class DepartmentManagementService {
     @Transactional(readOnly = true)
     public List<DepartmentViews.Department> tree() {
         List<SysDepartment> all = departmentRepository.findAllByOrderBySortOrderAscIdAsc();
+        Map<Long, String> leaderNames = leaderNames(all);
         Map<Long, List<SysDepartment>> childrenByParent = new LinkedHashMap<>();
         List<SysDepartment> roots = new ArrayList<>();
         for (SysDepartment department : all) {
@@ -137,19 +140,39 @@ public class DepartmentManagementService {
             }
         }
         return roots.stream()
-                .map(root -> buildNode(root, childrenByParent))
+                .map(root -> buildNode(root, childrenByParent, leaderNames))
                 .toList();
+    }
+
+    /** 批量解析负责人姓名（视图展示用；一次查询避免 N+1）。 */
+    private Map<Long, String> leaderNames(List<SysDepartment> departments) {
+        List<Long> leaderIds = departments.stream()
+                .map(SysDepartment::getLeaderUserId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        if (leaderIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, String> names = new LinkedHashMap<>();
+        userRepository.findAllById(leaderIds)
+                .forEach(user -> names.put(user.getId(), user.getName()));
+        return names;
     }
 
     /** 递归构建树节点（子节点保持仓库排序：sort_order 升序、id 升序）。 */
     private DepartmentViews.Department buildNode(
-            SysDepartment department, Map<Long, List<SysDepartment>> childrenByParent) {
+            SysDepartment department, Map<Long, List<SysDepartment>> childrenByParent,
+            Map<Long, String> leaderNames) {
         List<DepartmentViews.Department> children = childrenByParent
                 .getOrDefault(department.getId(), List.of()).stream()
-                .map(child -> buildNode(child, childrenByParent))
+                .map(child -> buildNode(child, childrenByParent, leaderNames))
                 .toList();
         return new DepartmentViews.Department(department.getId(), department.getName(),
-                department.getParentId(), department.getSortOrder(), children);
+                department.getParentId(), department.getSortOrder(),
+                department.getLeaderUserId(),
+                department.getLeaderUserId() == null ? null : leaderNames.get(department.getLeaderUserId()),
+                children);
     }
 
     /** 解析部门引用（员工创建/编辑使用）：必须存在。 */
@@ -190,7 +213,22 @@ public class DepartmentManagementService {
     }
 
     private DepartmentViews.Department toLeafNode(SysDepartment department) {
+        String leaderName = department.getLeaderUserId() == null ? null
+                : userRepository.findById(department.getLeaderUserId())
+                        .map(SysUser::getName).orElse(null);
         return new DepartmentViews.Department(department.getId(), department.getName(),
-                department.getParentId(), department.getSortOrder(), List.of());
+                department.getParentId(), department.getSortOrder(),
+                department.getLeaderUserId(), leaderName, List.of());
+    }
+
+    /** 负责人引用校验：非空时用户必须存在（空表示清除负责人设置）。 */
+    private Long requireLeader(Long leaderUserId) {
+        if (leaderUserId == null) {
+            return null;
+        }
+        if (!userRepository.existsById(leaderUserId)) {
+            throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND, "部门负责人用户不存在");
+        }
+        return leaderUserId;
     }
 }
