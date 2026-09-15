@@ -130,6 +130,15 @@ public class FlowConfigManagementService {
         return toDetail(findById(id));
     }
 
+    /**
+     * 条件变量目录：该流程可用作分支判据的变量（绑定模板勾选字段 + 系统字段 + 保留键兜底）。
+     * 供管理界面「条件变量」下拉渲染——字段即变量的前端数据源。
+     */
+    @Transactional(readOnly = true)
+    public List<FlowConfigItems.VariableOption> conditionVariables(Long flowConfigId) {
+        return conditionVariableCatalog.describe(flowConfigId);
+    }
+
     /** 新增流程配置：校验后落库为草稿（不部署——生效必须显式发布）。 */
     @Transactional
     public FlowConfigItems.Config create(FlowConfigItems.SaveFlowConfigRequest request) {

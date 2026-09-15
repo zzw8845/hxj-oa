@@ -18,8 +18,6 @@ public interface SysUserRepository extends JpaRepository<SysUser, Long> {
 
     boolean existsByJobNo(String jobNo);
 
-    List<SysUser> findByDepartment(String department);
-
     List<SysUser> findByDepartmentId(Long departmentId);
 
     boolean existsByDepartmentId(Long departmentId);

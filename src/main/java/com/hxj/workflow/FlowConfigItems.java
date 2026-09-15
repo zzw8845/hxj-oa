@@ -37,6 +37,18 @@ public final class FlowConfigItems {
         }
     }
 
+    /**
+     * 条件变量目录项：管理界面「条件变量」下拉的选项来源。
+     * 由 {@link ConditionVariableCatalog#describe} 生成——模板勾选字段在前，系统字段与保留键兜底在后。
+     */
+    public record VariableOption(
+            @Schema(description = "变量名（写入转移边的 condition_variable）") String value,
+            @Schema(description = "展示名") String label,
+            @Schema(description = "值类型（NUMERIC/BOOLEAN/STRING）") String valueType,
+            @Schema(description = "来源（FORM_FIELD 模板字段 / SYSTEM 系统字段 / RESERVED_KEY 保留键）")
+            String source) {
+    }
+
     /** 节点条目（六维审批人配置 + 展示辅助）。 */
     public record NodeConfig(
             @Schema(description = "节点名称（纯展示，不参与路由）") String name,

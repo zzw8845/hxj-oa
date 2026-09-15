@@ -50,6 +50,13 @@ public class FlowConfigController {
         return ApiResponse.success(service.detail(id));
     }
 
+    @Operation(summary = "条件变量目录",
+            description = "该流程可用作分支判据的变量：绑定模板中勾选「参与流程条件」的字段 + 系统字段 + 保留键兜底")
+    @GetMapping("/api/flow-configs/{id}/condition-variables")
+    public ApiResponse<List<FlowConfigItems.VariableOption>> conditionVariables(@PathVariable Long id) {
+        return ApiResponse.success(service.conditionVariables(id));
+    }
+
     @Operation(summary = "新增流程配置", description = "新增流程配置（仅管理员）")
     @PostMapping("/api/admin/flow-configs")
     @PreAuthorize("hasAuthority('CONFIGURE_FLOW_PERMISSION')")

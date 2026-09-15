@@ -110,7 +110,7 @@ for (const name of calledInTemplate) {
 }
 
 // ── 5. 旧契约残留（图模型重构后的回归保护）──
-const legacy = ['conditionRules', 'assigneeRole', 'submitFormVars', 'matchedFlow', '__cfv'];
+const legacy = ['conditionRules', 'assigneeRole', 'assigneeType', 'submitFormVars', 'matchedFlow', '__cfv'];
 for (const word of legacy) {
   const count = (html.match(new RegExp(`\\b${word}\\b`, 'g')) || []).length;
   if (count > 0) problems.push(`[旧契约残留] "${word}" 出现 ${count} 次（图模型重构后应清零）`);

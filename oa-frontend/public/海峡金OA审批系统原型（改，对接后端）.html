@@ -92,7 +92,7 @@ const workTemplate = null;
 
 
 document.querySelector('#app').insertAdjacentHTML('beforeend',`<el-dialog v-model="linkVisible" :title="linkMode==='daily'?'关联前置单据':'关联合同或前置审批'" width="780px" append-to-body><el-alert :title="linkMode==='daily'?'可按单据编号、单据名称或提交人查询':'可按合同编号、单据名称或提交人查询'" type="info" :closable="false" show-icon></el-alert><div class="link-search"><el-input v-model="linkKeyword" clearable :placeholder="linkMode==='daily'?'输入单据编号、名称或提交人':'输入合同编号、单据名称或提交人'"><template #prepend>⌕</template></el-input><el-button type="primary" @click="loadLinkCandidates">查询</el-button></div><el-table :data="filteredLinks" highlight-current-row><el-table-column v-if="linkMode==='daily'" prop="code" label="单据编号" width="160"></el-table-column><el-table-column v-else prop="contract" label="合同编号" width="160"></el-table-column><el-table-column prop="name" label="单据名称" min-width="210"></el-table-column><el-table-column label="提交人信息" min-width="170"><template #default="s"><b>{{s.row.applicant}}</b><small class="cell-sub">{{s.row.department}}</small></template></el-table-column><el-table-column label="操作" width="90"><template #default="s"><el-button link type="primary" @click="chooseLink(s.row)">选择关联</el-button></template></el-table-column></el-table><template #footer><el-button @click="linkVisible=false">取消</el-button></template></el-dialog>`);
-document.querySelector('#app').insertAdjacentHTML('beforeend',`<el-dialog v-model="flowVisible" :title="editingFlow?.isNew?'新增审批流程':'修改审批流程'" width="640px" append-to-body><template v-if="editingFlow"><el-form label-position="top" class="flow-editor"><div class="form2"><el-form-item label="流程名称"><el-input v-model="editingFlow.type" :disabled="!editingFlow.isNew" placeholder="例如：采购申请单"></el-input></el-form-item><el-form-item label="流程分类"><el-select v-model="editingFlow.category"><el-option label="日常" value="DAILY"></el-option><el-option label="业务" value="BUSINESS"></el-option><el-option label="用印" value="SEAL"></el-option></el-select></el-form-item></div><el-form-item label="节点链（自上而下依次流转；审批/办理节点须绑定真实角色）"><div class="node-editor"><div class="node-row" v-for="(n,idx) in editingFlow.nodeRows" :key="idx"><el-input v-model="n.name" placeholder="节点名" style="width:170px"></el-input><el-select v-model="n.nodeType" style="width:120px"><el-option label="发起人" value="START"></el-option><el-option label="审批" value="APPROVAL"></el-option><el-option label="办理" value="HANDLER"></el-option><el-option label="抄送" value="CC"></el-option></el-select><template v-if="n.nodeType==='APPROVAL'||n.nodeType==='HANDLER'"><el-select v-model="n.assigneeSubject" style="width:120px" placeholder="审批主体"><el-option v-for="t in assigneeSubjectOptions" :key="t.v" :label="t.t" :value="t.v"></el-option></el-select><el-select v-if="n.assigneeSubject==='MEMBER'" v-model="n.memberAccounts" multiple filterable allow-create default-first-option placeholder="输入账号回车" style="min-width:170px"></el-select><el-select v-if="n.assigneeSubject==='ROLE'" v-model="n.roleIds" multiple filterable placeholder="角色（可多选）" style="min-width:170px"><el-option v-for="r in roleConfigs" :key="r.id" :label="r.name" :value="String(r.id)"></el-option></el-select><el-select v-if="n.assigneeSubject==='ROLE'||n.assigneeSubject==='DEPT_HEAD'" v-model="n.assigneeScope" style="width:125px" placeholder="范围"><el-option v-for="o in assigneeScopeOptions" :key="o.v" :label="o.t" :value="o.v"></el-option></el-select><el-input v-if="n.assigneeScope==='FORM_DEPT'" v-model="n.assigneeScopeValue" placeholder="部门控件key" style="width:120px"></el-input><el-input v-if="n.assigneeSubject==='FORM_MEMBER'" v-model="n.assigneeValue" placeholder="人员控件key" style="width:120px"></el-input><template v-if="n.assigneeSubject==='SUPERIOR'||n.assigneeSubject==='DEPT_HEAD'"><el-input-number v-model="n.assigneeLevel" :min="1" :max="8" :controls="false" size="small" style="width:64px"></el-input-number><el-checkbox v-model="n.assigneeChain">连续</el-checkbox></template><el-select v-model="n.approveMode" style="width:100px" placeholder="多人方式"><el-option v-for="o in approveModeOptions" :key="o.v" :label="o.t" :value="o.v"></el-option></el-select><el-select v-model="n.emptyStrategy" clearable style="width:112px" placeholder="找不到人"><el-option v-for="o in emptyStrategyOptions" :key="o.v" :label="o.t" :value="o.v"></el-option></el-select><el-input v-if="n.emptyStrategy==='TO_USER'" v-model="n.emptyFallback" placeholder="兜底账号" style="width:110px"></el-input><el-select v-model="n.approvalMode" style="width:100px" placeholder="审批类型"><el-option v-for="o in approvalModeOptions" :key="o.v" :label="o.t" :value="o.v"></el-option></el-select><span class="rule-hint">{{assigneeSubjectHint(n.assigneeSubject)}}</span></template><span v-else class="rule-hint">{{n.nodeType==='START'?'流程起点':n.nodeType==='CC'?'仅抄送通知':n.nodeType==='END'?'流程结束':''}}</span><el-button link :disabled="idx===0" @click="moveNode(idx,-1)">↑</el-button><el-button link :disabled="idx===editingFlow.nodeRows.length-1" @click="moveNode(idx,1)">↓</el-button><el-button link type="danger" @click="editingFlow.nodeRows.splice(idx,1)">删除</el-button></div><el-button size="small" @click="editingFlow.nodeRows.push({name:'',nodeType:'APPROVAL',roles:[]})">＋ 添加节点</el-button></div></el-form-item><el-form-item label="转移边（按优先级求值：命中条件走目标节点；全部不命中走无条件兜底边；目标留空=流程结束）"><div class="rule-editor"><div class="rule-row" v-for="(t,idx) in editingFlow.transitions" :key="idx"><el-select v-model="t.fromNodeName" style="width:150px" placeholder="源节点"><el-option v-for="n in editingFlow.nodeRows.filter(x=>x.name)" :key="n.name" :label="n.name" :value="n.name"></el-option></el-select><el-select v-model="t.toNodeName" clearable style="width:150px" placeholder="目标（空=结束）"><el-option v-for="n in editingFlow.nodeRows.filter(x=>x.name)" :key="n.name" :label="n.name" :value="n.name"></el-option></el-select><el-select v-model="t.variableName" clearable style="width:130px" placeholder="条件变量"><el-option v-for="v in conditionVariableOptions" :key="v.v" :label="v.t" :value="v.v"></el-option></el-select><el-select v-if="t.variableName" v-model="t.operator" style="width:125px"><el-option v-for="o in operatorOptions" :key="o.v" :label="o.t" :value="o.v"></el-option></el-select><el-input v-if="t.variableName" v-model="t.expectedValue" style="width:105px" placeholder="期望值"></el-input><el-button link type="danger" @click="editingFlow.transitions.splice(idx,1)">删除</el-button></div><el-button size="small" @click="editingFlow.transitions.push({fromNodeName:'',toNodeName:'',variableName:'',operator:'EQUAL',expectedValue:''})">＋ 添加转移边</el-button><span class="rule-hint">线性流程：每节点一条无条件边；分支：条件边 + 无条件兜底边</span></div></el-form-item></el-form></template><template #footer><el-button @click="flowVisible=false">取消</el-button><el-button type="primary" @click="saveFlow">保存流程</el-button></template></el-dialog>`);
+document.querySelector('#app').insertAdjacentHTML('beforeend',`<el-dialog v-model="flowVisible" :title="editingFlow?.isNew?'新增审批流程':'修改审批流程'" width="640px" append-to-body><template v-if="editingFlow"><el-form label-position="top" class="flow-editor"><div class="form2"><el-form-item label="流程名称"><el-input v-model="editingFlow.type" :disabled="!editingFlow.isNew" placeholder="例如：采购申请单"></el-input></el-form-item><el-form-item label="流程分类"><el-select v-model="editingFlow.category"><el-option label="日常" value="DAILY"></el-option><el-option label="业务" value="BUSINESS"></el-option><el-option label="用印" value="SEAL"></el-option></el-select></el-form-item></div><el-form-item label="节点链（自上而下依次流转；审批/办理节点须绑定真实角色）"><div class="node-editor"><div class="node-row" v-for="(n,idx) in editingFlow.nodeRows" :key="idx"><el-input v-model="n.name" placeholder="节点名" style="width:170px"></el-input><el-select v-model="n.nodeType" style="width:120px"><el-option label="发起人" value="START"></el-option><el-option label="审批" value="APPROVAL"></el-option><el-option label="办理" value="HANDLER"></el-option><el-option label="抄送" value="CC"></el-option></el-select><template v-if="n.nodeType==='APPROVAL'||n.nodeType==='HANDLER'"><el-select v-model="n.assigneeSubject" style="width:120px" placeholder="审批主体"><el-option v-for="t in assigneeSubjectOptions" :key="t.v" :label="t.t" :value="t.v"></el-option></el-select><el-select v-if="n.assigneeSubject==='MEMBER'" v-model="n.memberAccounts" multiple filterable allow-create default-first-option placeholder="输入账号回车" style="min-width:170px"></el-select><el-select v-if="n.assigneeSubject==='ROLE'" v-model="n.roleIds" multiple filterable placeholder="角色（可多选）" style="min-width:170px"><el-option v-for="r in roleConfigs" :key="r.id" :label="r.name" :value="String(r.id)"></el-option></el-select><el-select v-if="n.assigneeSubject==='ROLE'||n.assigneeSubject==='DEPT_HEAD'" v-model="n.assigneeScope" style="width:125px" placeholder="范围"><el-option v-for="o in assigneeScopeOptions" :key="o.v" :label="o.t" :value="o.v"></el-option></el-select><el-input v-if="n.assigneeScope==='FORM_DEPT'" v-model="n.assigneeScopeValue" placeholder="部门控件key" style="width:120px"></el-input><el-input v-if="n.assigneeSubject==='FORM_MEMBER'" v-model="n.assigneeValue" placeholder="人员控件key" style="width:120px"></el-input><template v-if="n.assigneeSubject==='SUPERIOR'||n.assigneeSubject==='DEPT_HEAD'"><el-input-number v-model="n.assigneeLevel" :min="1" :max="8" :controls="false" size="small" style="width:64px"></el-input-number><el-checkbox v-model="n.assigneeChain">连续</el-checkbox></template><el-select v-model="n.approveMode" style="width:100px" placeholder="多人方式"><el-option v-for="o in approveModeOptions" :key="o.v" :label="o.t" :value="o.v"></el-option></el-select><el-select v-model="n.emptyStrategy" clearable style="width:112px" placeholder="找不到人"><el-option v-for="o in emptyStrategyOptions" :key="o.v" :label="o.t" :value="o.v"></el-option></el-select><el-input v-if="n.emptyStrategy==='TO_USER'" v-model="n.emptyFallback" placeholder="兜底账号" style="width:110px"></el-input><el-select v-model="n.approvalMode" style="width:100px" placeholder="审批类型"><el-option v-for="o in approvalModeOptions" :key="o.v" :label="o.t" :value="o.v"></el-option></el-select><span class="rule-hint">{{assigneeSubjectHint(n.assigneeSubject)}}</span></template><template v-if="n.nodeType==='CC'"><el-select v-model="n.ccRoleIds" multiple filterable placeholder="抄送角色" style="min-width:150px"><el-option v-for="r in roleConfigs" :key="r.id" :label="r.name" :value="String(r.id)"></el-option></el-select><el-select v-model="n.ccDeptIds" multiple filterable placeholder="抄送部门" style="min-width:150px"><el-option v-for="d in deptFlatOptions" :key="d.id" :label="d.name" :value="String(d.id)"></el-option></el-select><el-select v-model="n.ccAccounts" multiple filterable placeholder="抄送成员" style="min-width:150px"><el-option v-for="p in people" :key="p.account" :label="p.name" :value="p.account"></el-option></el-select><span class="rule-hint">目标留空=不抄送</span></template><span v-else class="rule-hint">{{n.nodeType==='START'?'流程起点':n.nodeType==='CC'?'仅抄送通知':n.nodeType==='END'?'流程结束':''}}</span><el-button link :disabled="idx===0" @click="moveNode(idx,-1)">↑</el-button><el-button link :disabled="idx===editingFlow.nodeRows.length-1" @click="moveNode(idx,1)">↓</el-button><el-button link type="danger" @click="editingFlow.nodeRows.splice(idx,1)">删除</el-button></div><el-button size="small" @click="addFlowNode">＋ 添加节点</el-button></div></el-form-item><el-form-item label="转移边（按优先级求值：命中条件走目标节点；全部不命中走无条件兜底边；目标留空=流程结束）"><div class="rule-editor"><div class="rule-row" v-for="(t,idx) in editingFlow.transitions" :key="idx"><el-select v-model="t.fromNodeName" style="width:150px" placeholder="源节点"><el-option v-for="n in editingFlow.nodeRows.filter(x=>x.name)" :key="n.name" :label="n.name" :value="n.name"></el-option></el-select><el-select v-model="t.toNodeName" clearable style="width:150px" placeholder="目标（空=结束）"><el-option v-for="n in editingFlow.nodeRows.filter(x=>x.name)" :key="n.name" :label="n.name" :value="n.name"></el-option></el-select><el-select v-model="t.variableName" clearable style="width:130px" placeholder="条件变量"><el-option v-for="v in conditionVariableOptions" :key="v.v" :label="v.t" :value="v.v"></el-option></el-select><el-select v-if="t.variableName" v-model="t.operator" style="width:125px"><el-option v-for="o in operatorOptions" :key="o.v" :label="o.t" :value="o.v"></el-option></el-select><el-input v-if="t.variableName" v-model="t.expectedValue" style="width:105px" placeholder="期望值"></el-input><el-button link type="danger" @click="editingFlow.transitions.splice(idx,1)">删除</el-button></div><el-button size="small" @click="editingFlow.transitions.push({fromNodeName:'',toNodeName:'',variableName:'',operator:'EQUAL',expectedValue:''})">＋ 添加转移边</el-button><span class="rule-hint">线性流程：每节点一条无条件边；分支：条件边 + 无条件兜底边</span></div></el-form-item></el-form></template><template #footer><el-button @click="flowVisible=false">取消</el-button><el-button type="primary" @click="saveFlow">保存流程</el-button></template></el-dialog>`);
 document.querySelector('#app').insertAdjacentHTML('beforeend',`<el-dialog v-model="roleVisible" :title="editingRole?.isNew?'新增角色':'配置角色权限'" width="680px" append-to-body><template v-if="editingRole"><el-form label-position="top"><div class="form2"><el-form-item label="角色名称"><el-input v-model="editingRole.name" :disabled="!editingRole.isNew"></el-input></el-form-item><el-form-item label="目录分类（仅用于架构树展示，不参与授权）"><el-tree-select v-model="editingRole.departmentId" :data="departmentsTree" node-key="id" check-strictly :props="{label:'name',children:'children'}" default-expand-all placeholder="从部门字典中选择" style="width:100%"></el-tree-select></el-form-item><el-form-item label="对应岗位"><el-select v-model="editingRole.post" filterable allow-create default-first-option style="width:100%"><el-option v-for="p in postOptions" :key="p" :label="p" :value="p"></el-option></el-select></el-form-item><el-form-item label="数据范围"><el-select v-model="editingRole.scope" style="width:100%"><el-option v-for="(code, label) in SCOPE_CODES" :key="code" :label="label" :value="code"></el-option></el-select></el-form-item><el-form-item v-if="editingRole.scope==='CUSTOM'" label="自定义部门集合（可多选，选中部门及其提交的单据对该角色可见）"><el-tree-select v-model="editingRole.scopeDepartmentIds" :data="departmentsTree" node-key="id" multiple check-strictly :props="{label:'name',children:'children'}" show-checkbox default-expand-all placeholder="选择可查看的部门" style="width:100%"></el-tree-select></el-form-item></div><el-form-item label="权限配置"><el-checkbox-group v-model="editingRole.permissions"><el-checkbox v-for="p in permissionDicts" :key="p.code" :label="p.code">{{p.name}}</el-checkbox></el-checkbox-group></el-form-item></el-form></template><template #footer><el-button @click="roleVisible=false">取消</el-button><el-button type="primary" @click="saveRole">保存角色</el-button></template></el-dialog>`);
 document.querySelector('#app').insertAdjacentHTML('beforeend',`<el-dialog v-model="rejectVisible" title="驳回审批" width="560px" append-to-body><el-form label-position="top"><el-form-item label="指定驳回层级"><el-select v-model="rejectForm.level" style="width:100%"><el-option v-for="n in rejectTargets" :label="n" :value="n"></el-option></el-select></el-form-item><el-form-item label="驳回原因"><el-input v-model="rejectForm.reason" type="textarea" :rows="3" placeholder="请写明驳回原因"></el-input></el-form-item><el-form-item label="需要补充材料"><el-input v-model="rejectForm.materials" placeholder="请输入需要补充的材料"></el-input></el-form-item></el-form><template #footer><el-button @click="rejectVisible=false">取消</el-button><el-button type="danger" @click="confirmReject">确认驳回</el-button></template></el-dialog><el-dialog v-model="supplementVisible" title="通过，但要求补充材料" width="590px" append-to-body><el-form label-position="top"><el-form-item label="补充模式"><el-radio-group v-model="supplementForm.mode"><el-radio-button label="付款前">付款前补充</el-radio-button><el-radio-button label="付款后">付款后补充</el-radio-button></el-radio-group></el-form-item><el-form-item label="指定补充对象"><el-select v-model="supplementForm.role" style="width:100%"><el-option v-for="r in ['提交人','直属部门负责人','核算会计']" :label="r" :value="r"></el-option></el-select></el-form-item><el-form-item label="需要补充材料"><el-input v-model="supplementForm.materials" type="textarea" :rows="3"></el-input></el-form-item><el-alert title="付款前补完后跳过当前审批人直接进入下一节点；付款后未补齐则流程不可闭环。" type="info" :closable="false"></el-alert></el-form><template #footer><el-button @click="supplementVisible=false">取消</el-button><el-button type="primary" @click="confirmSupplement">确认通过并补充</el-button></template></el-dialog><el-dialog v-model="signVisible" title="发起加签" width="520px" append-to-body><el-form label-position="top"><el-form-item label="加签人员"><el-select v-model="signForm.person" filterable style="width:100%"><el-option v-for="p in people" :label="p.name+' · '+p.department+' · '+p.post" :value="p.account"></el-option></el-select></el-form-item><el-form-item label="加签说明"><el-input v-model="signForm.reason" type="textarea" :rows="3"></el-input></el-form-item></el-form><template #footer><el-button @click="signVisible=false">取消</el-button><el-button type="primary" @click="confirmSign">发送加签</el-button></template></el-dialog>`);
 document.querySelector('#app').insertAdjacentHTML('beforeend',`<el-dialog v-model="deptVisible" :title="editingDepartment?.isNew?'新增部门':'编辑部门'" width="480px" append-to-body><el-form label-position="top"><el-form-item label="部门名称"><el-input v-model="editingDepartment.name" placeholder="请输入部门名称"></el-input></el-form-item><el-form-item label="上级部门"><el-tree-select v-model="editingDepartment.parentId" :data="departmentsTree" node-key="id" check-strictly clearable :props="{label:'name',children:'children'}" default-expand-all placeholder="不选则为根部门" style="width:100%"></el-tree-select></el-form-item><el-form-item label="同级排序号"><el-input-number v-model="editingDepartment.sortOrder" :min="0" :controls="false"></el-input-number></el-form-item></el-form><template #footer><el-button @click="deptVisible=false">取消</el-button><el-button type="primary" @click="saveDepartment">保存部门</el-button></template></el-dialog>`);
@@ -304,6 +304,13 @@ createApp({
         ...roleConfigs.map(r => r.department), ...people.map(p => p.department),
         ...(me.value && me.value.department ? [me.value.department] : [])
       ].filter(Boolean))].sort();
+    });
+    // 部门扁平选项（树 → [{id,name}]）：抄送目标等需要稳定部门 ID 的场景（按名字过滤的 computed 不带 ID）
+    const deptFlatOptions = computed(() => {
+      const out = [];
+      const walk = nodes => (nodes || []).forEach(n => { out.push({ id: n.id, name: n.name }); walk(n.children); });
+      walk(departmentsTree.value);
+      return out;
     });
 
     // 数据
@@ -564,6 +571,33 @@ createApp({
         default: return null;
       }
     }
+    // 抄送目标：ccTargets JSON（[{"type":"ROLE|DEPT|USER","value":"..."}]）↔ 三个多选框。
+    // ROLE/DEPT 存数字 ID（改名不影响抄送路由），USER 存账号（登录名天然稳定）
+    function parseCcTargets(json) {
+      let list = [];
+      try { list = JSON.parse(json || '[]'); } catch (e) { list = []; }
+      const ids = type => list.filter(x => x.type === type).map(x => String(x.value));
+      return { ccRoleIds: ids('ROLE'), ccDeptIds: ids('DEPT'), ccAccounts: ids('USER') };
+    }
+    function ccTargetsOf(n) {
+      if (n.nodeType !== 'CC') return null;
+      const list = [
+        ...(n.ccRoleIds || []).map(v => ({ type: 'ROLE', value: String(v) })),
+        ...(n.ccDeptIds || []).map(v => ({ type: 'DEPT', value: String(v) })),
+        ...(n.ccAccounts || []).map(v => ({ type: 'USER', value: String(v) }))
+      ];
+      return list.length ? JSON.stringify(list) : null;
+    }
+    /** 新增流程节点：完整字段预声明（Vue 3 响应式 + 避免 el-select 绑到 undefined）。 */
+    function addFlowNode() {
+      editingFlow.value.nodeRows.push({
+        name: '', nodeType: 'APPROVAL',
+        assigneeSubject: null, roleIds: [], memberAccounts: [],
+        assigneeScope: 'GLOBAL', assigneeScopeValue: '', assigneeLevel: 1, assigneeChain: false,
+        approveMode: 'OR_SIGN', emptyStrategy: '', emptyFallback: '', approvalMode: 'MANUAL',
+        ccRoleIds: [], ccDeptIds: [], ccAccounts: []
+      });
+    }
     function flowStatusById(id) {
       const f = (flowConfigs || []).find(x => String(x.id) === String(id));
       return f ? (f.status || '') : '';
@@ -767,7 +801,8 @@ createApp({
             category: fc.category || '日常',
             status: fc.status || 'PUBLISHED',
             version: fc.version || 0,
-            nodes: fc.nodeNames || fc.nodes || []
+            nodes: fc.nodeNames || fc.nodes || [],
+            branches: fc.branches || []
           });
         });
       } catch (e) { console.error('加载流程失败:', e); }
@@ -1120,6 +1155,12 @@ createApp({
       flowVisible.value = true;
       try {
         const detail = await apiCall('get', `/flow-configs/${flow.id}`);
+        // 字段即变量：条件变量目录按该流程绑定模板动态求（模板勾选字段 + 系统字段 + 保留键兜底）；失败保持兜底列表
+        try {
+          const catalog = await apiCall('get', `/flow-configs/${flow.id}/condition-variables`);
+          conditionVariableOptions.value = (catalog || []).map(
+            o => ({ v: o.value, t: o.label, source: o.source, valueType: o.valueType }));
+        } catch (e) { console.warn('条件变量目录加载失败，使用兜底列表', e); }
         // 结构化审批人协议：assigneeValue 为候选角色ID（逗号分隔），节点名仅展示
         editingFlow.value.nodeRows = (detail.nodes || []).map(n => ({
           name: n.name, nodeType: n.nodeType,
@@ -1134,7 +1175,8 @@ createApp({
           emptyFallback: n.emptyFallback || '',
           approvalMode: n.approvalMode || 'MANUAL',
           roleIds: (n.assigneeSubject === 'ROLE' && n.assigneeValue) ? n.assigneeValue.split(',').map(v => String(v).trim()).filter(Boolean) : [],
-          memberAccounts: (n.assigneeSubject === 'MEMBER' && n.assigneeValue) ? n.assigneeValue.split(',').map(v => String(v).trim()).filter(Boolean) : []
+          memberAccounts: (n.assigneeSubject === 'MEMBER' && n.assigneeValue) ? n.assigneeValue.split(',').map(v => String(v).trim()).filter(Boolean) : [],
+          ...parseCcTargets(n.ccTargets)
         }));
         editingFlow.value.transitions = (detail.transitions || []).map(t => ({
           fromNodeName: t.fromNodeName, toNodeName: t.toNodeName || '',
@@ -1150,6 +1192,8 @@ createApp({
     }
     function newFlow() {
       editingFlow.value = { type: '', category: 'DAILY', nodeRows: [{ name: '发起人', nodeType: 'START', assigneeSubject: null, approveMode: 'OR_SIGN', approvalMode: 'MANUAL' }], transitions: [], isNew: true };
+      // 新建流程尚未绑定模板：条件变量回退为「保留键 + 系统字段」兜底集
+      conditionVariableOptions.value = [...CONDITION_VARIABLE_FALLBACK];
       flowVisible.value = true;
     }
     async function publishFlow(flow) {
@@ -1219,19 +1263,20 @@ createApp({
       FORM_MEMBER: '表单人员控件选中的成员'
     };
     const assigneeSubjectHint = t => assigneeSubjectHintMap[t] || '';
-    // 条件变量白名单（与后端 WorkflowVariables.CONDITION_VARIABLES 一致）
-    // 条件变量：保留键 + 系统字段（模板字段直接输入 key —— 字段即变量）
-    const conditionVariableOptions = [
+    // 条件变量目录：打开流程编辑时按「流程绑定模板中勾选参与条件的字段」动态拉取（字段即变量）。
+    // 静态列表只是新建流程/接口失败时的兜底（保留键 + 系统字段，与后端目录的兜底部分一致）
+    const CONDITION_VARIABLE_FALLBACK = [
       { v: 'amount', t: '金额（保留键）' },
       { v: 'involvesFunds', t: '涉及资金（保留键）' },
       { v: 'requiresAdminReview', t: '需行政复核（保留键）' },
       { v: 'businessMode', t: '业务模式（保留键）' },
       { v: 'needPostMaterial', t: '后置补材料（保留键）' },
+      { v: 'sysInitiator', t: '发起人账号（系统）' },
       { v: 'sysInitiatorDeptId', t: '发起人部门ID（系统）' },
       { v: 'sysInitiatorDeptName', t: '发起人部门名（系统）' },
-      { v: 'sysInitiator', t: '发起人账号（系统）' },
       { v: 'sysInitiatorPost', t: '发起人岗位（系统）' }
     ];
+    const conditionVariableOptions = ref([...CONDITION_VARIABLE_FALLBACK]);
 
     // 条件规则操作符（与后端 ConditionOperatorEnum 一致）
     const operatorOptions = [
@@ -1247,9 +1292,13 @@ createApp({
       for (const n of ef.nodeRows) {
         if (!n.name) return ElementPlus.ElMessage.warning('节点名不能为空');
         if (n.nodeType === 'APPROVAL' || n.nodeType === 'HANDLER') {
-          if (!n.assigneeType) return ElementPlus.ElMessage.warning(`节点「${n.name}」需选择审批人类型`);
-          if (n.assigneeType === 'ROLE' && !(n.roleIds && n.roleIds.length))
+          if (!n.assigneeSubject) return ElementPlus.ElMessage.warning(`节点「${n.name}」需选择审批人类型`);
+          if (n.assigneeSubject === 'ROLE' && !(n.roleIds && n.roleIds.length))
             return ElementPlus.ElMessage.warning(`节点「${n.name}」的角色候选组需选择至少一个角色`);
+          if (n.assigneeSubject === 'MEMBER' && !(n.memberAccounts && n.memberAccounts.length))
+            return ElementPlus.ElMessage.warning(`节点「${n.name}」需选择至少一个指定成员`);
+          if (n.assigneeSubject === 'FORM_MEMBER' && !n.assigneeValue)
+            return ElementPlus.ElMessage.warning(`节点「${n.name}」需选择表单联系人字段`);
         }
       }
       for (const t of ef.transitions) {
@@ -1276,7 +1325,8 @@ createApp({
             approveMode: n.approveMode || 'OR_SIGN',
             emptyStrategy: n.emptyStrategy || null,
             emptyFallback: n.emptyStrategy === 'TO_USER' ? (n.emptyFallback || null) : null,
-            approvalMode: n.approvalMode || 'MANUAL'
+            approvalMode: n.approvalMode || 'MANUAL',
+            ccTargets: ccTargetsOf(n)
           })),
           transitions: ef.transitions.map(t => ({
             fromNodeName: t.fromNodeName,
@@ -1427,6 +1477,7 @@ createApp({
       pickEvidence, onEvidenceChange, evidenceInput,
       submitFiles, pickSubmitFile, onSubmitFileChange, rejectTargets, detailData, flowTimeline, homeTrend, homeBoard, homeTotal, homeRejected, openAttachment, loadLinkCandidates,
       mapType, mapDocType, flowNameById, flowStatusById, controlTypeOptions, addTemplateField, removeTemplateField,
+      deptFlatOptions, addFlowNode,
       handleLogout, userName
     };
   }
