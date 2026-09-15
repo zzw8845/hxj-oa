@@ -3,6 +3,7 @@ import com.hxj.common.ErrorCodeEnum;
 import com.hxj.entity.FlowConfig;
 import com.hxj.entity.FlowNodeConfig;
 import com.hxj.entity.FlowTransition;
+import com.hxj.enums.AssigneeScopeEnum;
 import com.hxj.enums.AssigneeTypeEnum;
 import com.hxj.enums.FlowNodeTypeEnum;
 import com.hxj.exception.BusinessException;
@@ -243,12 +244,13 @@ public class ConfigDrivenProcessDefinitionService {
                     multi.setElementVariable("selectedApprover");
                     task.setLoopCharacteristics(multi);
             }
-            case DEPT_ACCOUNTANT ->
-                    // 按发起人部门路由：提交时解析核算分工主办会计写入流程变量
-                    task.setAssignee("${" + WorkflowVariables.DEPT_ACCOUNTANT + "}");
             case ROLE -> {
-                if (node.getAssigneeValue() != null && !node.getAssigneeValue().isBlank()) {
-                    // 候选组 = 角色 ID（ID 外键化：角色改名不影响路由）
+                if (node.getAssigneeScope() == AssigneeScopeEnum.INITIATOR_DEPT) {
+                    // 按发起人部门过滤的角色成员（如核算会计、部门HR）：提交时解析主办账号，
+                    // 写入节点级变量动态指派——同一流程多个此类节点各自独立
+                    task.setAssignee("${" + WorkflowVariables.scopedAssigneeVariable(node.getId()) + "}");
+                } else if (node.getAssigneeValue() != null && !node.getAssigneeValue().isBlank()) {
+                    // 全局角色：静态候选组（候选组 = 角色 ID，角色改名不影响路由）
                     List<String> groupIds = new ArrayList<>();
                     for (String piece : node.getAssigneeValue().split(",")) {
                         if (!piece.isBlank()) {

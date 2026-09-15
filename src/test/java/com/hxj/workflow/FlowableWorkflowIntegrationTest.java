@@ -146,29 +146,35 @@ class FlowableWorkflowIntegrationTest {
     }
 
     @Test
-    void shouldRouteDeptAccountantNodeToResolvedVariableAndStayUnassignedWhenAbsent() {
+    void shouldRouteDeptScopedRoleNodeToResolvedVariableAndStayUnassignedWhenAbsent() {
         flowConfigRepository.deleteAll();
         FlowConfig cfg = new FlowConfig();
         cfg.setType("费用报销");
         cfg.setCategory(FlowCategoryEnum.DAILY);
         cfg.addNode(new FlowNodeConfig("发起人", FlowNodeTypeEnum.START));
         FlowNodeConfig accountant = new FlowNodeConfig("会计（按部门）", FlowNodeTypeEnum.APPROVAL);
-        accountant.setAssigneeType(com.hxj.enums.AssigneeTypeEnum.DEPT_ACCOUNTANT);
+        // 机制化表达：角色（核算会计=33）+ 范围（按发起人部门）——不再有专用审批人类型
+        accountant.setAssigneeType(com.hxj.enums.AssigneeTypeEnum.ROLE);
+        accountant.setAssigneeValue("33");
+        accountant.setAssigneeScope(com.hxj.enums.AssigneeScopeEnum.INITIATOR_DEPT);
         cfg.addNode(accountant);
         cfg.addTransition(transition(cfg.getNodes().get(0), accountant, null, null, null));
         flowConfigRepository.saveAndFlush(cfg);
 
         definitionService.deploy(cfg.getId());
 
-        // 有核算分工解析结果：动态指派给 ${deptAccountant}
+        // 变量名按节点 ID 生成：同一流程多个此类节点各自独立，互不覆盖
+        String variable = WorkflowVariables.scopedAssigneeVariable(accountant.getId());
+
+        // 有部门分工解析结果：动态指派给该节点级变量
         String withMapping = workflowService.startProcess(
-                cfg.getId(), 2001L, Map.of("deptAccountant", "wengtingting"));
+                cfg.getId(), 2001L, Map.of(variable, "wengtingting"));
         assertThat(singleTask(withMapping).getAssignee()).isEqualTo("wengtingting");
 
         runtimeService.deleteProcessInstance(withMapping, "cleanup");
 
         // 无分工映射：生产路径总是写入空串变量 → 任务保持未指派，待管理员人工指派
-        String withoutMapping = workflowService.startProcess(cfg.getId(), 2002L, Map.of("deptAccountant", ""));
+        String withoutMapping = workflowService.startProcess(cfg.getId(), 2002L, Map.of(variable, ""));
         String unassigned = singleTask(withoutMapping).getAssignee();
         assertThat(unassigned == null || unassigned.isBlank()).isTrue();
     }

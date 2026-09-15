@@ -1,5 +1,6 @@
 package com.hxj.workflow;
 
+import com.hxj.enums.AssigneeScopeEnum;
 import com.hxj.enums.AssigneeTypeEnum;
 import com.hxj.enums.ConditionOperatorEnum;
 import com.hxj.enums.FlowCategoryEnum;
@@ -23,11 +24,13 @@ public final class FlowConfigItems {
             @Schema(description = "发布状态") FlowStatusEnum status,
             @Schema(description = "发布版本号") int version,
             @Schema(description = "节点数量") int nodeCount,
-            @Schema(description = "节点名称列表（展示顺序）") List<String> nodeNames) {
+            @Schema(description = "节点名称列表（展示顺序）") List<String> nodeNames,
+            @Schema(description = "分支摘要（条件边，如「会计（按部门）: amount≥20000 → 财务经理」）") List<String> branches) {
 
         /** 紧凑构造器：集合组件防御性拷贝为不可变列表，null 归一化为不可变空列表。 */
         public Brief {
             nodeNames = nodeNames == null ? List.of() : List.copyOf(nodeNames);
+            branches = branches == null ? List.of() : List.copyOf(branches);
         }
     }
 
@@ -37,6 +40,7 @@ public final class FlowConfigItems {
             @Schema(description = "节点类型（枚举）") FlowNodeTypeEnum nodeType,
             @Schema(description = "审批人解析协议（枚举）") AssigneeTypeEnum assigneeType,
             @Schema(description = "审批人参数（仅 ROLE：候选角色ID逗号分隔）") String assigneeValue,
+            @Schema(description = "审批人范围（仅 ROLE：GLOBAL 全部成员 / INITIATOR_DEPT 按发起人部门）") AssigneeScopeEnum assigneeScope,
             @Schema(description = "候选角色名（展示用，由角色ID解析）") String assigneeRoleNames,
             @Schema(description = "抄送目标（JSON 数组，仅抄送节点）") String ccTargets) {
     }
@@ -45,7 +49,7 @@ public final class FlowConfigItems {
     public record Transition(
             @Schema(description = "源节点名称") String fromNodeName,
             @Schema(description = "目标节点名称；空表示转移至流程结束") String toNodeName,
-            @Schema(description = "条件变量（白名单见 WorkflowVariables）；空表示无条件边") String variableName,
+            @Schema(description = "条件变量（须为该流程绑定模板中标记“参与流程条件”的字段）；空表示无条件边") String variableName,
             @Schema(description = "比较操作符（枚举）") ConditionOperatorEnum operator,
             @Schema(description = "期望值") String expectedValue,
             @Schema(description = "优先级（同源多条条件边的求值顺序）") int sortOrder) {
@@ -86,12 +90,19 @@ public final class FlowConfigItems {
                 @Schema(description = "节点类型（枚举）") FlowNodeTypeEnum nodeType,
                 @Schema(description = "审批人解析协议（枚举）") AssigneeTypeEnum assigneeType,
                 @Schema(description = "审批人参数（仅 ROLE：候选角色ID逗号分隔）") String assigneeValue,
+                @Schema(description = "审批人范围（仅 ROLE：GLOBAL / INITIATOR_DEPT，空按 GLOBAL）") AssigneeScopeEnum assigneeScope,
                 @Schema(description = "抄送目标（JSON 数组，仅抄送节点）") String ccTargets) {
 
-            /** 兼容非抄送节点（无 ccTargets）。 */
+            /** 兼容无范围、无抄送（非 ROLE、非抄送节点）。 */
             public FlowNodePayload(String name, FlowNodeTypeEnum nodeType,
                                    AssigneeTypeEnum assigneeType, String assigneeValue) {
-                this(name, nodeType, assigneeType, assigneeValue, null);
+                this(name, nodeType, assigneeType, assigneeValue, null, null);
+            }
+
+            /** 兼容无范围但有抄送（抄送节点）。 */
+            public FlowNodePayload(String name, FlowNodeTypeEnum nodeType,
+                                   AssigneeTypeEnum assigneeType, String assigneeValue, String ccTargets) {
+                this(name, nodeType, assigneeType, assigneeValue, null, ccTargets);
             }
         }
 

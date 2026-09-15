@@ -1,5 +1,6 @@
 package com.hxj.entity;
 
+import com.hxj.enums.AssigneeScopeEnum;
 import com.hxj.enums.AssigneeTypeEnum;
 import com.hxj.enums.FlowNodeTypeEnum;
 import jakarta.persistence.Column;
@@ -53,10 +54,20 @@ public class FlowNodeConfig {
 
     /**
      * 审批人参数：仅 {@link AssigneeTypeEnum#ROLE} 使用——候选角色 ID 逗号分隔
-     * （其余类型的解析数据源在人员档案/部门负责人树/核算分工/提交请求中）。
+     * （其余类型的解析数据源在人员档案/部门负责人树/提交请求中）。
      */
     @Column(name = "assignee_value", length = 500)
     private String assigneeValue;
+
+    /**
+     * 审批人范围（仅 {@link AssigneeTypeEnum#ROLE} 生效）：{@link AssigneeScopeEnum#GLOBAL}
+     * 全部成员候选组 / {@link AssigneeScopeEnum#INITIATOR_DEPT} 仅服务发起人部门者（提交时解析）。
+     * 为空按 GLOBAL 处理（兼容存量节点）。
+     */
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "assignee_scope", length = 30)
+    private AssigneeScopeEnum assigneeScope;
 
     /** 抄送节点目标（JSON 数组 [{"type":"ROLE|DEPT|USER","value":"..."}]），仅 CC 节点使用。 */
     @Column(name = "cc_targets", columnDefinition = "TEXT")
@@ -85,6 +96,8 @@ public class FlowNodeConfig {
     public void setAssigneeType(AssigneeTypeEnum assigneeType) { this.assigneeType = assigneeType; }
     public String getAssigneeValue() { return assigneeValue; }
     public void setAssigneeValue(String assigneeValue) { this.assigneeValue = assigneeValue; }
+    public AssigneeScopeEnum getAssigneeScope() { return assigneeScope; }
+    public void setAssigneeScope(AssigneeScopeEnum assigneeScope) { this.assigneeScope = assigneeScope; }
     public String getCcTargets() { return ccTargets; }
     public void setCcTargets(String ccTargets) { this.ccTargets = ccTargets; }
     public int getSortOrder() { return sortOrder; }

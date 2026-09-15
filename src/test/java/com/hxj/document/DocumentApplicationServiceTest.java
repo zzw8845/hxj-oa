@@ -51,7 +51,7 @@ import com.hxj.exception.BusinessException;
         DocumentAccessPolicy.class,
         LocalAttachmentStorage.class,
         com.hxj.approval.ApprovalActionService.class,
-        com.hxj.workflow.DeptAccountantResolver.class,
+        com.hxj.workflow.DeptScopedRoleResolver.class,
         com.hxj.workflow.SupervisorChainResolver.class,
         FormTemplateManagementService.class,
         DocumentApplicationServiceTest.Config.class

@@ -13,4 +13,7 @@ public interface FormTemplateRepository extends JpaRepository<FormTemplate, Long
     Optional<FormTemplate> findByName(String name);
 
     List<FormTemplate> findByStatusOrderBySortOrderAsc(String status);
+
+    /** 绑定该流程配置的全部模板（条件变量目录按此求并集）。 */
+    List<FormTemplate> findByFlowConfigId(Long flowConfigId);
 }

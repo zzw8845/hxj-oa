@@ -55,6 +55,8 @@ public class FlowConfigManagementService {
     private final SysDepartmentRepository sysDepartmentRepository;
     private final OaDocumentRepository oaDocumentRepository;
     private final ConfigDrivenProcessDefinitionService definitionService;
+    private final ConditionVariableCatalog conditionVariableCatalog;
+
     public FlowConfigManagementService(
             FlowConfigRepository flowConfigRepository,
             FlowNodeConfigRepository nodeRepository,
@@ -63,7 +65,8 @@ public class FlowConfigManagementService {
             SysUserRepository sysUserRepository,
             SysDepartmentRepository sysDepartmentRepository,
             OaDocumentRepository oaDocumentRepository,
-            ConfigDrivenProcessDefinitionService definitionService) {
+            ConfigDrivenProcessDefinitionService definitionService,
+            ConditionVariableCatalog conditionVariableCatalog) {
         this.flowConfigRepository = flowConfigRepository;
         this.nodeRepository = nodeRepository;
         this.transitionRepository = transitionRepository;
@@ -72,6 +75,7 @@ public class FlowConfigManagementService {
         this.sysDepartmentRepository = sysDepartmentRepository;
         this.oaDocumentRepository = oaDocumentRepository;
         this.definitionService = definitionService;
+        this.conditionVariableCatalog = conditionVariableCatalog;
     }
 
     @Transactional(readOnly = true)
@@ -85,8 +89,27 @@ public class FlowConfigManagementService {
                         config.getStatus(),
                         config.getVersion(),
                         config.getNodes().size(),
-                        config.getNodes().stream().map(FlowNodeConfig::getName).toList()))
+                        config.getNodes().stream().map(FlowNodeConfig::getName).toList(),
+                        config.getTransitions().stream()
+                                .filter(FlowTransition::isConditional)
+                                .map(this::conditionHint)
+                                .toList()))
                 .toList();
+    }
+
+    /** 条件边摘要（列表页分支提示，如「会计（按部门）: amount≥20000 → 财务经理（大额）」）。 */
+    private String conditionHint(FlowTransition transition) {
+        String operator = switch (transition.getOperator()) {
+            case EQUAL -> "=";
+            case NOT_EQUAL -> "≠";
+            case GREATER_THAN -> ">";
+            case GREATER_THAN_OR_EQUAL -> "≥";
+            case LESS_THAN -> "<";
+            case LESS_THAN_OR_EQUAL -> "≤";
+        };
+        String target = transition.getToNode() == null ? "流程结束" : transition.getToNode().getName();
+        return transition.getFromNode().getName() + ": " + transition.getConditionVariable()
+                + operator + transition.getExpectedValue() + " → " + target;
     }
 
     /** 5.12 按业务单据类型返回完整节点与转移边（可视化流程图数据）。 */
@@ -103,7 +126,8 @@ public class FlowConfigManagementService {
     /** 新增流程配置：校验后落库为草稿（不部署——生效必须显式发布）。 */
     @Transactional
     public FlowConfigItems.Config create(FlowConfigItems.SaveFlowConfigRequest request) {
-        validate(request);
+        // 新建时尚未绑定模板：条件变量按保留键兜底校验，绑定模板后自动获得该模板声明的字段
+        validate(request, null);
         if (flowConfigRepository.findByType(request.type()).isPresent()) {
             throw new BusinessException(ErrorCodeEnum.FLOW_CONFIG_EXISTS, "同名流程配置已存在");
         }
@@ -136,7 +160,7 @@ public class FlowConfigManagementService {
      */
     @Transactional
     public FlowConfigItems.Config update(Long id, FlowConfigItems.SaveFlowConfigRequest request) {
-        validate(request);
+        validate(request, id);
         FlowConfig config = findById(id);
         if (!config.getType().equals(request.type())
                 && flowConfigRepository.findByType(request.type()).isPresent()) {
@@ -181,7 +205,11 @@ public class FlowConfigManagementService {
         for (FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload payload : request.nodes()) {
             FlowNodeConfig entity = new FlowNodeConfig(payload.name(), payload.nodeType());
             entity.setAssigneeType(payload.assigneeType());
-            entity.setAssigneeValue(payload.assigneeValue());
+            // 角色参数与范围仅对 ROLE 有语义，其余类型一律置空（机制层不接受业务参数）
+            entity.setAssigneeValue(payload.assigneeType() == AssigneeTypeEnum.ROLE
+                    ? payload.assigneeValue() : null);
+            entity.setAssigneeScope(payload.assigneeType() == AssigneeTypeEnum.ROLE
+                    ? payload.assigneeScope() : null);
             entity.setCcTargets(payload.ccTargets());
             config.addNode(entity);
             nodeByName.put(payload.name(), entity);
@@ -200,7 +228,7 @@ public class FlowConfigManagementService {
     }
 
     /** 保存关口完整校验：节点协议、转移边拓扑、图可达性。坏配置在此被拒，绝不流入运行时。 */
-    private void validate(FlowConfigItems.SaveFlowConfigRequest request) {
+    private void validate(FlowConfigItems.SaveFlowConfigRequest request, Long flowConfigId) {
         if (request == null || !StringUtils.hasText(request.type()) || request.category() == null) {
             throw new BusinessException(ErrorCodeEnum.FLOW_CONFIG_INFO_REQUIRED, "流程类型与分类不能为空");
         }
@@ -242,6 +270,9 @@ public class FlowConfigManagementService {
         }
 
         // —— 转移边校验：端点存在、条件合法、默认边唯一 ——
+        // 可用条件变量 = 该流程绑定模板中声明"参与流程条件"的字段 ∪ 保留键兜底（字段即变量）
+        Map<String, WorkflowVariables.ValueTypeEnum> availableVariables =
+                conditionVariableCatalog.available(flowConfigId);
         Map<String, List<FlowConfigItems.SaveFlowConfigRequest.FlowTransitionPayload>> outBySource =
                 new LinkedHashMap<>();
         for (FlowConfigItems.SaveFlowConfigRequest.FlowTransitionPayload edge : request.transitions()) {
@@ -261,7 +292,7 @@ public class FlowConfigManagementService {
                     throw new BusinessException(ErrorCodeEnum.FLOW_RULE_INVALID,
                             "条件转移不完整（需操作符与期望值）：" + edge.fromNodeName());
                 }
-                validateConditionValue(edge.variableName().trim(), edge.expectedValue());
+                validateConditionValue(edge.variableName().trim(), edge.expectedValue(), availableVariables);
             }
             outBySource.computeIfAbsent(edge.fromNodeName(), key -> new ArrayList<>()).add(edge);
         }
@@ -322,21 +353,23 @@ public class FlowConfigManagementService {
             }
             return;
         }
-        if (StringUtils.hasText(node.assigneeValue())) {
+        // 机制层与业务层分离：任何非 ROLE 类型都不得携带角色参数或范围参数
+        if (StringUtils.hasText(node.assigneeValue()) || node.assigneeScope() != null) {
             throw new BusinessException(ErrorCodeEnum.FLOW_NODE_INVALID,
                     "该审批人类型不接受角色参数：" + node.name());
         }
     }
 
-    /** 条件比较值与变量契约类型匹配：不匹配会在网关求值时抛异常导致流程永久卡死。 */
-    private void validateConditionValue(String variableName, String expectedValue) {
-        if (!WorkflowVariables.CONDITION_VARIABLES.contains(variableName)) {
+    /** 条件比较值与字段声明的类型匹配：不匹配会在网关求值时抛异常导致流程永久卡死。 */
+    private void validateConditionValue(String variableName, String expectedValue,
+                                        Map<String, WorkflowVariables.ValueTypeEnum> availableVariables) {
+        WorkflowVariables.ValueTypeEnum type = availableVariables.get(variableName);
+        if (type == null) {
             throw new BusinessException(ErrorCodeEnum.FLOW_RULE_INVALID,
                     "条件变量不可用：" + variableName
-                            + "（可用变量：" + String.join(" / ", WorkflowVariables.CONDITION_VARIABLES.stream()
-                            .sorted().toList()) + "）");
+                            + "（请在所绑定模板中勾选该字段“参与流程条件”；当前可用："
+                            + String.join(" / ", availableVariables.keySet()) + "）");
         }
-        WorkflowVariables.ValueTypeEnum type = WorkflowVariables.valueType(variableName);
         switch (type) {
             case NUMERIC -> {
                 try {
@@ -428,8 +461,9 @@ public class FlowConfigManagementService {
     }
 
     /**
-     * 抄送目标校验：合法 JSON 数组，每项 type ∈ {ROLE, DEPT, USER} 且 value 真实存在
-     * （与运行时 {@code OaCcNodeDelegate} 的解析语义一致：ROLE 按角色名、DEPT 按部门名、USER 按账号）。
+     * 抄送目标校验：合法 JSON 数组，每项 type ∈ {ROLE, DEPT, USER} 且引用真实存在
+     * （与运行时 {@code OaCcNodeDelegate} 语义一致：ROLE / DEPT 按<b>数字 ID</b>，USER 按账号）。
+     * 名称匹配已退役——改名不再导致抄送静默失配。
      */
     private void validateCcTargets(String ccTargets) {
         List<Map<String, String>> targets;
@@ -447,8 +481,9 @@ public class FlowConfigManagementService {
             }
             switch (type) {
                 case "ROLE" -> {
-                    if (!sysRoleRepository.findByName(value).isPresent()) {
-                        throw new BusinessException(ErrorCodeEnum.FLOW_NODE_INVALID, "抄送角色不存在：" + value);
+                    if (!isNumericId(value) || sysRoleRepository.findById(Long.valueOf(value)).isEmpty()) {
+                        throw new BusinessException(ErrorCodeEnum.FLOW_NODE_INVALID,
+                                "抄送角色不存在（应为角色ID）：" + value);
                     }
                 }
                 case "USER" -> {
@@ -457,8 +492,10 @@ public class FlowConfigManagementService {
                     }
                 }
                 case "DEPT" -> {
-                    if (!sysDepartmentRepository.findByName(value).isPresent()) {
-                        throw new BusinessException(ErrorCodeEnum.FLOW_NODE_INVALID, "抄送部门不存在：" + value);
+                    if (!isNumericId(value)
+                            || sysDepartmentRepository.findById(Long.valueOf(value)).isEmpty()) {
+                        throw new BusinessException(ErrorCodeEnum.FLOW_NODE_INVALID,
+                                "抄送部门不存在（应为部门ID）：" + value);
                     }
                 }
                 default -> throw new BusinessException(ErrorCodeEnum.FLOW_NODE_INVALID,
@@ -467,12 +504,17 @@ public class FlowConfigManagementService {
         }
     }
 
+    /** 数字 ID 判定（抄送目标的 ROLE / DEPT 引用契约）。 */
+    private static boolean isNumericId(String value) {
+        return value != null && value.matches("\\d+");
+    }
+
     private FlowConfigItems.Config toDetail(FlowConfig config) {
         List<FlowConfigItems.NodeConfig> nodes = config.getNodes().stream()
                 .map(node -> new FlowConfigItems.NodeConfig(
                         node.getName(), node.getNodeType(), node.getAssigneeType(),
-                        node.getAssigneeValue(), resolveRoleNames(node.getAssigneeValue()),
-                        node.getCcTargets()))
+                        node.getAssigneeValue(), node.getAssigneeScope(),
+                        resolveRoleNames(node.getAssigneeValue()), node.getCcTargets()))
                 .toList();
         List<FlowConfigItems.Transition> transitions = config.getTransitions().stream()
                 .sorted(java.util.Comparator.comparingInt(FlowTransition::getSortOrder))

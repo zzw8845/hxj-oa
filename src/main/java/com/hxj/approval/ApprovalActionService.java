@@ -415,9 +415,7 @@ public class ApprovalActionService {
         }
         List<Long> roleIds = workflowPort.candidateGroups(task.getId()).stream()
                 .map(Long::valueOf).toList();
-        for (com.hxj.entity.SysUser member : userRepository.findAllById(roleIds)) {
-            accounts.add(member.getAccount());
-        }
+        accounts.addAll(userRepository.findAccountsByRoleIds(roleIds));
         return accounts;
     }
 

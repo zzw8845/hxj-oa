@@ -5,6 +5,7 @@ import com.hxj.common.ErrorCodeEnum;
 import com.hxj.entity.*;
 import com.hxj.enums.BusinessTypeEnum;
 import com.hxj.common.PageResponse;
+import com.hxj.enums.AssigneeScopeEnum;
 import com.hxj.enums.AssigneeTypeEnum;
 import com.hxj.enums.CcSourceEnum;
 import com.hxj.enums.DocumentStatusEnum;
@@ -36,6 +37,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -56,7 +58,7 @@ public class DocumentApplicationService {
     private final WorkflowPort workflowPort;
     private final DocumentAccessPolicy accessPolicy;
     private final LocalAttachmentStorage attachmentStorage;
-    private final com.hxj.workflow.DeptAccountantResolver deptAccountantResolver;
+    private final com.hxj.workflow.DeptScopedRoleResolver deptScopedRoleResolver;
     private final com.hxj.workflow.SupervisorChainResolver supervisorChainResolver;
     private final BigDecimal riskThreshold;
 
@@ -72,7 +74,7 @@ public class DocumentApplicationService {
             WorkflowPort workflowPort,
             DocumentAccessPolicy accessPolicy,
             LocalAttachmentStorage attachmentStorage,
-            com.hxj.workflow.DeptAccountantResolver deptAccountantResolver,
+            com.hxj.workflow.DeptScopedRoleResolver deptScopedRoleResolver,
             com.hxj.workflow.SupervisorChainResolver supervisorChainResolver,
             @Value("${app.risk-threshold:80000}") BigDecimal riskThreshold) {
         this.documentRepository = documentRepository;
@@ -86,7 +88,7 @@ public class DocumentApplicationService {
         this.workflowPort = workflowPort;
         this.accessPolicy = accessPolicy;
         this.attachmentStorage = attachmentStorage;
-        this.deptAccountantResolver = deptAccountantResolver;
+        this.deptScopedRoleResolver = deptScopedRoleResolver;
         this.supervisorChainResolver = supervisorChainResolver;
         this.riskThreshold = riskThreshold;
     }
@@ -121,18 +123,27 @@ public class DocumentApplicationService {
                         "自选审批人不存在：" + account);
             }
         }
-        // 动态指派前置校验（钉钉模式）：主管链来源于人员档案直属主管或部门负责人树，
-        // 核算会计按部门分工映射——解析为空时提交即拒，把"卡单等管理员救"变成"提交时发现"
+        // 动态指派前置校验（钉钉同构）：所有动态寻人机制在提交时先解析，解析为空即拒绝提交——
+        // 把"卡单等管理员救"变成"提交时发现"；与保存关口的静态校验共同覆盖两类坏配置
         if (flowConfig.getNodes().stream().anyMatch(n -> n.getAssigneeType() == AssigneeTypeEnum.MANAGER
                 || n.getAssigneeType() == AssigneeTypeEnum.MANAGER_CHAIN)
                 && supervisorChainResolver.resolveChain(applicant).isEmpty()) {
             throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID,
                     "申请人未设置直属主管，且其部门及上级部门均未设置负责人，无法路由「直属主管」审批节点，请联系管理员在组织架构中补配");
         }
-        if (flowConfig.getNodes().stream().anyMatch(n -> n.getAssigneeType() == AssigneeTypeEnum.DEPT_ACCOUNTANT)
-                && deptAccountantResolver.resolve(applicant).isEmpty()) {
+        // 「角色 + 按发起人部门」节点（核算会计、部门HR 等）：逐节点解析，任一为空即拒绝
+        List<String> unresolvedScopedNodes = flowConfig.getNodes().stream()
+                .filter(node -> node.getAssigneeType() == AssigneeTypeEnum.ROLE
+                        && node.getAssigneeScope() == AssigneeScopeEnum.INITIATOR_DEPT)
+                .filter(node -> deptScopedRoleResolver
+                        .resolve(applicant, roleIds(node.getAssigneeValue())).isEmpty())
+                .map(FlowNodeConfig::getName)
+                .toList();
+        if (!unresolvedScopedNodes.isEmpty()) {
             throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID,
-                    "申请人所在部门未配置核算会计分工，无法路由「会计（按部门）」审批节点，请联系管理员补配核算分工");
+                    "申请人所在部门未配置下列节点的审批角色分工，无法路由："
+                            + String.join("、", unresolvedScopedNodes)
+                            + "，请联系管理员在部门服务分工或角色成员中补配");
         }
         BusinessTypeEnum businessType = BusinessTypeEnum.valueOf(template.getCategory());
 
@@ -168,7 +179,7 @@ public class DocumentApplicationService {
 
         String processInstanceId = workflowPort.startProcess(
                 flowConfig.getId(), document.getId(),
-                workflowVariables(values, applicant, request.approverAccounts()));
+                workflowVariables(values, applicant, request.approverAccounts(), flowConfig, fields));
         document.setProcessInstanceId(processInstanceId);
         document.setFlowConfigId(flowConfig.getId());
         return toSummary(document);
@@ -361,29 +372,68 @@ public class DocumentApplicationService {
         return Boolean.TRUE.equals(value) || "true".equalsIgnoreCase(String.valueOf(value));
     }
 
+    /**
+     * 构建流程变量（字段即变量 + 系统变量 + 节点级动态指派）：
+     * 模板声明"参与流程条件"的字段全量提升（类型按控件类型归一，缺失值给类型安全默认），
+     * 保证条件表达式在网关求值时不会遇到 null。
+     */
     private Map<String, Object> workflowVariables(
-            Map<String, Object> fieldValues, SysUser applicant, List<String> approverAccounts) {
-        // 主管链（钉钉模式）：人工指定的直属主管优先，未设则沿部门负责人树自近及远兜底——
+            Map<String, Object> fieldValues, SysUser applicant, List<String> approverAccounts,
+            FlowConfig flowConfig, List<FormField> fields) {
+        Map<String, Object> variables = new LinkedHashMap<>();
+        // 保留键兜底值：与保存关口的可用条件变量集合保持一致——「校验通过 ⟹ 运行时可求值」，
+        // 否则流程配了 amount 条件而模板无该字段时，网关求值会因变量缺失异常导致单据卡死
+        variables.put("amount", BigDecimal.ZERO);
+        variables.put("involvesFunds", Boolean.FALSE);
+        variables.put("requiresAdminReview", Boolean.FALSE);
+        variables.put("businessMode", "");
+        variables.put("needPostMaterial", Boolean.FALSE);
+        // 字段即变量：模板声明参与流程条件的字段按控件类型归一后覆盖兜底值
+        for (FormField field : fields) {
+            if (field.isProcessVariable()) {
+                variables.put(field.getFieldKey(),
+                        conditionValue(field, fieldValues.get(field.getFieldKey())));
+            }
+        }
+        // 主管链（钉钉同构）：人工指定的直属主管优先，未设则沿部门负责人树自近及远兜底——
         // 「直属主管」节点取链首 ${managerAccount}，「逐级主管」节点消费整条链串行审批（上限 10 级）
         List<String> managerChain = supervisorChainResolver.resolveChain(applicant);
-        String managerAccount = managerChain.isEmpty() ? "" : managerChain.get(0);
-        // 主办会计账号：「会计（按部门）」节点以 ${deptAccountant} 动态指派（核算分工表解析，无映射时为空串）
-        String deptAccountant = deptAccountantResolver.resolve(applicant);
-        return Map.ofEntries(
-                Map.entry(WorkflowVariables.AMOUNT, decimalValue(fieldValues, WorkflowVariables.AMOUNT) == null
-                        ? BigDecimal.ZERO : decimalValue(fieldValues, WorkflowVariables.AMOUNT)),
-                Map.entry(WorkflowVariables.INVOLVES_FUNDS, booleanValue(fieldValues, WorkflowVariables.INVOLVES_FUNDS)),
-                Map.entry(WorkflowVariables.REQUIRES_ADMIN_REVIEW,
-                        booleanValue(fieldValues, WorkflowVariables.REQUIRES_ADMIN_REVIEW)),
-                Map.entry(WorkflowVariables.BUSINESS_MODE,
-                        String.valueOf(fieldValues.getOrDefault(WorkflowVariables.BUSINESS_MODE, ""))),
-                // 发起人回环节点（签收/归还/上传归档附件等）以此为 assignee 表达式动态指派
-                Map.entry(WorkflowVariables.INITIATOR, applicant.getAccount()),
-                Map.entry(WorkflowVariables.MANAGER_ACCOUNT, managerAccount),
-                Map.entry(WorkflowVariables.MANAGER_CHAIN, managerChain),
-                // 「发起人自选」节点串行多实例的审批人集合（提交时申请人指定）
-                Map.entry(WorkflowVariables.APPROVER_CHAIN, List.copyOf(approverAccounts)),
-                Map.entry(WorkflowVariables.DEPT_ACCOUNTANT, deptAccountant));
+        variables.put(WorkflowVariables.INITIATOR, applicant.getAccount());
+        variables.put(WorkflowVariables.MANAGER_ACCOUNT, managerChain.isEmpty() ? "" : managerChain.get(0));
+        variables.put(WorkflowVariables.MANAGER_CHAIN, managerChain);
+        // 「发起人自选」节点串行多实例的审批人集合（提交时申请人指定）
+        variables.put(WorkflowVariables.APPROVER_CHAIN, List.copyOf(approverAccounts));
+        // 「角色 + 按发起人部门」节点：逐节点解析主办账号，写入节点级变量（同一流程多个此类节点各自独立）
+        for (FlowNodeConfig node : flowConfig.getNodes()) {
+            if (node.getAssigneeType() == AssigneeTypeEnum.ROLE
+                    && node.getAssigneeScope() == AssigneeScopeEnum.INITIATOR_DEPT) {
+                variables.put(WorkflowVariables.scopedAssigneeVariable(node.getId()),
+                        deptScopedRoleResolver.resolveFirst(applicant, roleIds(node.getAssigneeValue())));
+            }
+        }
+        return variables;
+    }
+
+    /** 字段值按控件类型归一为条件变量值：数值缺失给 0、布尔缺失给 false、文本缺失给空串。 */
+    private Object conditionValue(FormField field, Object raw) {
+        return switch (WorkflowVariables.valueTypeOfControlType(field.getControlType())) {
+            case NUMERIC -> raw == null || String.valueOf(raw).isBlank()
+                    ? BigDecimal.ZERO : new BigDecimal(String.valueOf(raw));
+            case BOOLEAN -> Boolean.TRUE.equals(raw) || "true".equalsIgnoreCase(String.valueOf(raw));
+            case STRING -> raw == null ? "" : String.valueOf(raw);
+        };
+    }
+
+    /** 角色 ID 串（逗号分隔）→ ID 列表。 */
+    private List<Long> roleIds(String assigneeValue) {
+        if (assigneeValue == null || assigneeValue.isBlank()) {
+            return List.of();
+        }
+        return java.util.Arrays.stream(assigneeValue.split(","))
+                .map(String::trim)
+                .filter(piece -> !piece.isEmpty())
+                .map(Long::valueOf)
+                .toList();
     }
 
     /** ccUserIds 来自请求 DTO 的不可变列表（紧凑构造器已保证非 null），可直接构造集合。 */

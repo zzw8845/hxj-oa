@@ -55,7 +55,7 @@ public class FlowTransition {
     @JoinColumn(name = "to_node_id", foreignKey = @ForeignKey(name = "fk_transition_to"))
     private FlowNodeConfig toNode;
 
-    /** 条件变量（白名单见 WorkflowVariables.CONDITION_VARIABLES）；空表示无条件边。 */
+    /** 条件变量（须为该流程绑定模板中标记"参与流程条件"的字段）；空表示无条件边。 */
     @Column(name = "condition_variable", length = 50)
     private String conditionVariable;
 

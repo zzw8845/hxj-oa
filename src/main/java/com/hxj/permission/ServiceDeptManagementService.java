@@ -62,13 +62,12 @@ public class ServiceDeptManagementService {
         return list(employeeId);
     }
 
-    /** 按部门列出全部服务成员账号（核算分工一览，供流程排障与配置核对）。 */
+    /** 按部门列出全部服务成员账号（部门分工一览，供流程排障与配置核对）。 */
     @Transactional(readOnly = true)
     public Map<Long, List<String>> accountsByDepartment(List<Long> departmentIds) {
         return departmentIds.stream().collect(Collectors.toMap(
                 Function.identity(),
-                deptId -> serviceDeptRepository.findServingAccountantAccounts(
-                        deptId, com.hxj.workflow.DeptAccountantResolver.DEPT_ROLE_NAME)));
+                serviceDeptRepository::findServingAccounts));
     }
 
     /** 服务部门视图：部门 ID + 名称。 */

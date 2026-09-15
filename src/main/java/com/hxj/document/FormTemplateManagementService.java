@@ -37,6 +37,13 @@ public class FormTemplateManagementService {
     public static final Set<String> RESERVED_KEYS = Set.of(
             "amount", "title", "involvesFunds", "requiresAdminReview", "businessMode", "needPostMaterial");
 
+    /**
+     * 默认参与流程条件的保留键（字段即变量）：未显式声明条件参与时按此推导。
+     * {@code title} 不在其中——标题仅供展示，不天然适合作为分支判据。
+     */
+    public static final Set<String> DEFAULT_PROCESS_VARIABLES = Set.of(
+            "amount", "involvesFunds", "requiresAdminReview", "businessMode", "needPostMaterial");
+
     /** 业务类型 → 单号前缀：前缀由业务类型唯一决定，不接受调用方自传。 */
     private static final Map<String, String> PREFIX_BY_BUSINESS_TYPE =
             Map.of("DAILY_PAYMENT", "BX", "BUSINESS_PAYMENT", "FK", "SEAL_APPLICATION", "YY");
@@ -102,7 +109,7 @@ public class FormTemplateManagementService {
                 fields.stream()
                         .map(f -> new FieldView(f.getFieldKey(), f.getLabel(), f.getControlType(),
                                 f.isRequired(), parseStringList(f.getOptions()), f.isReserved(),
-                                f.getSortOrder(), f.isEnabled()))
+                                f.isProcessVariable(), f.getSortOrder(), f.isEnabled()))
                         .toList());
     }
 
@@ -388,6 +395,10 @@ public class FormTemplateManagementService {
             field.setRequired(Boolean.TRUE.equals(payload.required()));
             // 提升字段由服务端白名单标记，客户端不感知；排序由数组顺序决定
             field.setReserved(RESERVED_KEYS.contains(payload.fieldKey()));
+            // 字段即变量：条件参与由模板显式声明；未声明时保留键按默认集推导（自定义字段默认不参与）
+            field.setProcessVariable(payload.processVariable() != null
+                    ? payload.processVariable()
+                    : DEFAULT_PROCESS_VARIABLES.contains(payload.fieldKey()));
             field.setSortOrder(++order);
             field.setEnabled(payload.enabled() == null || payload.enabled());
             if (payload.options() != null) {
@@ -556,7 +567,8 @@ public class FormTemplateManagementService {
 
     /** 字段视图（SELECT 选项已解析为数组）。 */
     public record FieldView(String fieldKey, String label, String controlType, boolean required,
-                            List<String> options, boolean reserved, int sortOrder, boolean enabled) {
+                            List<String> options, boolean reserved, boolean processVariable,
+                            int sortOrder, boolean enabled) {
     }
 
     /** 详情渲染的字段视图（定义 ∪ 值）。 */

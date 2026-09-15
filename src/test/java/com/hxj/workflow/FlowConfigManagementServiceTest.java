@@ -118,7 +118,7 @@ class FlowConfigManagementServiceTest {
                         roleNode("执行总经理审批", ceoRoleId),
                         new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload(
                                 "抄送财务", FlowNodeTypeEnum.CC, null, null,
-                                "[{\"type\":\"ROLE\",\"value\":\"财务经理\"}]")),
+                                "[{\"type\":\"ROLE\",\"value\":\"" + financeRoleId + "\"}]")),
                 List.of(
                         edge("发起人", "直属主管"),
                         condEdge("直属主管", "执行总经理审批",
@@ -272,11 +272,11 @@ class FlowConfigManagementServiceTest {
                 List.of(
                         node("发起人", FlowNodeTypeEnum.START),
                         typedNode("直属主管", AssigneeTypeEnum.MANAGER),
-                        typedNode("会计（按部门）", AssigneeTypeEnum.DEPT_ACCOUNTANT)),
+                        typedNode("逐级主管", AssigneeTypeEnum.MANAGER_CHAIN)),
                 List.of(
                         edge("发起人", "直属主管"),
-                        edge("直属主管", "会计（按部门）"),
-                        edge("会计（按部门）", null)));
+                        edge("直属主管", "逐级主管"),
+                        edge("逐级主管", null)));
         assertThatCode(() -> managementService.create(valid)).doesNotThrowAnyException();
     }
 
@@ -458,7 +458,7 @@ class FlowConfigManagementServiceTest {
                         roleNode("审批", managerRoleId),
                         new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload(
                                 "抄送", FlowNodeTypeEnum.CC, null, null,
-                                "[{\"type\":\"ROLE\",\"value\":\"不存在的角色\"}]")),
+                                "[{\"type\":\"ROLE\",\"value\":\"999999\"}]")),
                 List.of(
                         edge("发起人", "审批"),
                         edge("审批", "抄送")));
@@ -476,7 +476,7 @@ class FlowConfigManagementServiceTest {
                         roleNode("审批", managerRoleId),
                         new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload(
                                 "抄送", FlowNodeTypeEnum.CC, null, null,
-                                "[{\"type\":\"ROLE\",\"value\":\"财务经理\"}]")),
+                                "[{\"type\":\"ROLE\",\"value\":\"" + financeRoleId + "\"}]")),
                 List.of(
                         edge("发起人", "审批"),
                         edge("审批", "抄送"),
