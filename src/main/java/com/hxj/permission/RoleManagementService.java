@@ -64,27 +64,9 @@ public class RoleManagementService {
         String oldName = role.getName();
         boolean renamed = !oldName.equals(request.name());
         apply(role, request);
-        if (renamed) {
-            syncFlowNodeAssignee(oldName, request.name());
-        }
         return toResponse(role);
     }
 
-    /**
-     * 角色改名后同步流程节点的审批角色字符串：组合串（"A/B"）按段精确替换，
-     * 避免改名后流程节点绑定的旧角色名失效、审批任务无人可领。
-     */
-    private void syncFlowNodeAssignee(String oldName, String newName) {
-        List<com.hxj.entity.FlowNodeConfig> nodes =
-                flowNodeConfigRepository.findByAssigneeRoleContaining(oldName);
-        for (com.hxj.entity.FlowNodeConfig node : nodes) {
-            String updated = java.util.Arrays.stream(node.getAssigneeRole().split("[/、]"))
-                    .map(segment -> segment.trim().equals(oldName) ? newName : segment.trim())
-                    .collect(java.util.stream.Collectors.joining("/"));
-            node.setAssigneeRole(updated);
-        }
-        flowNodeConfigRepository.saveAll(nodes);
-    }
 
     @Transactional(readOnly = true)
     public List<RoleResponse> list() {
@@ -101,8 +83,11 @@ public class RoleManagementService {
         if (!role.getMembers().isEmpty()) {
             throw new BusinessException(ErrorCodeEnum.ROLE_HAS_MEMBERS, "角色下存在员工，无法删除");
         }
-        boolean flowUsed = flowNodeConfigRepository.findAllAssigneeRoles().stream()
-                .anyMatch(assignee -> usesRole(assignee, role.getName()));
+        boolean flowUsed = flowNodeConfigRepository.findByAssigneeType(com.hxj.enums.AssigneeTypeEnum.ROLE)
+                .stream()
+                .anyMatch(node -> node.getAssigneeValue() != null
+                        && java.util.Arrays.asList(node.getAssigneeValue().split(","))
+                        .contains(String.valueOf(roleId)));
         if (flowUsed) {
             throw new BusinessException(ErrorCodeEnum.ROLE_IN_FLOW_USE, "角色被流程节点引用，无法删除");
         }
@@ -111,16 +96,6 @@ public class RoleManagementService {
             throw new BusinessException(ErrorCodeEnum.ROLE_IN_CC_USE, "角色被抄送记录引用，无法删除");
         }
         roleRepository.delete(role);
-    }
-
-    /** 组合审批角色串（如 "会计主管&内控/执行总经理"）按 "/" 拆段后精确匹配。 */
-    private boolean usesRole(String assigneeRole, String roleName) {
-        for (String segment : assigneeRole.split("/")) {
-            if (segment.trim().equals(roleName)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /** 权限点字典（只读，供角色编辑下拉使用；权限点与代码逻辑强耦合，不开放写）。 */

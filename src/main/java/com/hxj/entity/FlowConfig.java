@@ -2,6 +2,7 @@ package com.hxj.entity;
 
 import com.hxj.enums.FlowCategoryEnum;
 import com.hxj.enums.FlowNodeTypeEnum;
+import com.hxj.enums.FlowStatusEnum;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -40,15 +41,25 @@ public class FlowConfig {
     @Column(nullable = false, length = 50)
     private FlowCategoryEnum category;
 
-    /** 有序节点链。 */
+    /** 发布状态：草稿（保存≠生效）与已发布（部署完成、可提交）两态。 */
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 20)
+    private FlowStatusEnum status = FlowStatusEnum.DRAFT;
+
+    /** 发布版本号：每次发布递增，供审计与问题回溯。 */
+    @Column(nullable = false)
+    private int version = 0;
+
+    /** 有序节点链（展示顺序；拓扑由转移边决定）。 */
     @OneToMany(mappedBy = "flowConfig", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder ASC")
     private List<FlowNodeConfig> nodes = new ArrayList<>();
 
-    /** 条件分支规则。 */
+    /** 转移边（图模型）：审批流的真实拓扑，见 {@link FlowTransition}。 */
     @OneToMany(mappedBy = "flowConfig", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder ASC")
-    private List<FlowConditionRule> conditionRules = new ArrayList<>();
+    private List<FlowTransition> transitions = new ArrayList<>();
 
     /** 创建时间。 */
     @Column(name = "created_at", insertable = false, updatable = false)
@@ -83,17 +94,21 @@ public class FlowConfig {
         node.setFlowConfig(null);
         resequenceNodes();
     }
-    public List<FlowConditionRule> getConditionRules() { return conditionRules; }
-    public void addConditionRule(FlowConditionRule rule) {
-        rule.setFlowConfig(this);
-        rule.setSortOrder(conditionRules.size());
-        conditionRules.add(rule);
+    public List<FlowTransition> getTransitions() { return transitions; }
+    public void addTransition(FlowTransition transition) {
+        transition.setFlowConfig(this);
+        transition.setSortOrder(transitions.size());
+        transitions.add(transition);
     }
-    public void removeConditionRule(FlowConditionRule rule) {
-        conditionRules.remove(rule);
-        rule.setFlowConfig(null);
-        resequenceConditionRules();
+    public void removeTransition(FlowTransition transition) {
+        transitions.remove(transition);
+        transition.setFlowConfig(null);
+        resequenceTransitions();
     }
+    public FlowStatusEnum getStatus() { return status; }
+    public void setStatus(FlowStatusEnum status) { this.status = status; }
+    public int getVersion() { return version; }
+    public void setVersion(int version) { this.version = version; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
 
@@ -103,9 +118,9 @@ public class FlowConfig {
         }
     }
 
-    private void resequenceConditionRules() {
-        for (int index = 0; index < conditionRules.size(); index++) {
-            conditionRules.get(index).setSortOrder(index);
+    private void resequenceTransitions() {
+        for (int index = 0; index < transitions.size(); index++) {
+            transitions.get(index).setSortOrder(index);
         }
     }
 }

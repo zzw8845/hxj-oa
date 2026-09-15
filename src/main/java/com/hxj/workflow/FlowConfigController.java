@@ -57,12 +57,19 @@ public class FlowConfigController {
         return ApiResponse.success(service.create(request));
     }
 
-    @Operation(summary = "修改流程配置", description = "修改流程配置节点链与条件分支（仅管理员），新提交单据按新流程流转")
+    @Operation(summary = "修改流程配置", description = "修改流程配置节点与转移边（仅管理员），保存后回退为草稿，需重新发布生效")
     @PutMapping("/api/admin/flow-configs/{id}")
     @PreAuthorize("hasAuthority('CONFIGURE_FLOW_PERMISSION')")
     public ApiResponse<FlowConfigItems.Config> update(
             @PathVariable Long id, @RequestBody FlowConfigItems.SaveFlowConfigRequest request) {
         return ApiResponse.success(service.update(id, request));
+    }
+
+    @Operation(summary = "发布流程", description = "部署 BPMN 并推进版本号（仅管理员）；仅已发布流程可被提交")
+    @PostMapping("/api/admin/flow-configs/{id}/publish")
+    @PreAuthorize("hasAuthority('CONFIGURE_FLOW_PERMISSION')")
+    public ApiResponse<FlowConfigItems.Config> publish(@PathVariable Long id) {
+        return ApiResponse.success(service.publish(id));
     }
 
     @Operation(summary = "删除流程配置", description = "删除流程配置（仅管理员；已被单据引用的禁止删除）")

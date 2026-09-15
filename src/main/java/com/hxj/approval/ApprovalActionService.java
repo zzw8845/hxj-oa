@@ -406,15 +406,17 @@ public class ApprovalActionService {
         }
     }
 
-    /** 解析任务的候选审批人账号：处理人优先，否则展开候选组（角色）成员。 */
+    /** 解析任务的候选审批人账号：处理人优先，否则展开候选组（角色ID）成员。 */
     private Set<String> resolveApproverAccounts(Task task) {
         Set<String> accounts = new java.util.HashSet<>();
         if (StringUtils.hasText(task.getAssignee())) {
             accounts.add(task.getAssignee());
             return accounts;
         }
-        for (String groupName : workflowPort.candidateGroups(task.getId())) {
-            accounts.addAll(userRepository.findAccountByRoleName(groupName));
+        List<Long> roleIds = workflowPort.candidateGroups(task.getId()).stream()
+                .map(Long::valueOf).toList();
+        for (com.hxj.entity.SysUser member : userRepository.findAllById(roleIds)) {
+            accounts.add(member.getAccount());
         }
         return accounts;
     }
@@ -487,7 +489,7 @@ public class ApprovalActionService {
         }
         List<Task> candidates = isSuperApprover(currentUser)
                 ? workflowPort.tasksForProcess(document.getProcessInstanceId())
-                : workflowPort.pendingTasksForUser(currentUser.account(), currentUser.roles());
+                : workflowPort.pendingTasksForUser(currentUser.account(), currentUser.roleIds());
         Task task = candidates.stream()
                 .filter(t -> document.getProcessInstanceId() != null
                         && document.getProcessInstanceId().equals(t.getProcessInstanceId()))

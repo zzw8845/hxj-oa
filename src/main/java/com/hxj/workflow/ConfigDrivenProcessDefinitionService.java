@@ -1,8 +1,9 @@
 package com.hxj.workflow;
 import com.hxj.common.ErrorCodeEnum;
-import com.hxj.entity.FlowConditionRule;
 import com.hxj.entity.FlowConfig;
 import com.hxj.entity.FlowNodeConfig;
+import com.hxj.entity.FlowTransition;
+import com.hxj.enums.AssigneeTypeEnum;
 import com.hxj.enums.FlowNodeTypeEnum;
 import com.hxj.exception.BusinessException;
 import com.hxj.repository.FlowConfigRepository;
@@ -26,9 +27,19 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.stream.Collectors;
 
-/** 将数据库中的有序流程配置编译并部署为 BPMN 2.0 定义。 */
+/**
+ * 将数据库中的流程图（节点 + 转移边）编译并部署为 BPMN 2.0 定义。
+ *
+ * <p>编译规则（图模型，替代历史"线性链 + 条件规则命中跳转"）：
+ * <ul>
+ *   <li>START 节点编译为 StartEvent，其余节点各建一个元素（CC → ServiceTask，其余 → UserTask）；</li>
+ *   <li>转移边编译为序列流：{@code toNode == null} 或指向 END 节点 → 连接 EndEvent；</li>
+ *   <li>某节点出边多于一条时，在它之后插入排他网关：条件边按优先级带表达式，
+ *       无条件边（每源至多一条，保存关口已校验）作为默认流兜底；</li>
+ *   <li>条件表达式为裸 JUEL，变量与比较值合法性已由保存关口按 {@link WorkflowVariables} 契约校验。</li>
+ * </ul>
+ */
 @Service
 public class ConfigDrivenProcessDefinitionService {
 
@@ -69,11 +80,14 @@ public class ConfigDrivenProcessDefinitionService {
         return definition == null ? null : definition.getId();
     }
 
-    /** 事务边界：保证懒加载流程节点配置时有可用 Session（自调用 deploy 时事务传播）。 */
+    /** 已发布流程返回其定义（发布动作负责部署）；草稿流程无定义——提交入口会拒绝。 */
     @Transactional(readOnly = true)
     public String ensureDeployed(Long configId) {
         String definitionId = latestDefinitionId(configId);
-        return definitionId == null ? deploy(configId) : definitionId;
+        if (definitionId != null) {
+            return definitionId;
+        }
+        return deploy(configId);
     }
 
     public String processKey(Long configId) {
@@ -98,56 +112,91 @@ public class ConfigDrivenProcessDefinitionService {
         end.setName("流程结束");
         process.addFlowElement(end);
 
-        List<FlowNodeConfig> executableNodes = config.getNodes().stream()
-                .filter(node -> node.getNodeType() != FlowNodeTypeEnum.START)
-                .filter(node -> node.getNodeType() != FlowNodeTypeEnum.CONDITION)
-                .filter(node -> node.getNodeType() != FlowNodeTypeEnum.END)
-                .toList();
-        // 按节点顺序存放元素：早期实现以节点名为 key，重名节点会被覆盖并静默丢失审批环节，改为按下标取用
-        List<FlowElement> elements = new ArrayList<>();
-        for (int index = 0; index < executableNodes.size(); index++) {
-            FlowNodeConfig node = executableNodes.get(index);
-            FlowElement element = createElement(node, "node_" + index);
-            elements.add(element);
+        // 节点元素表：START → start event；END 类型节点不建元素（出边直达 end）；
+        // 其余按展示顺序建 node_<sortOrder>（按下标取用，避免早期重名覆盖丢节点的问题）
+        List<FlowNodeConfig> nodes = config.getNodes();
+        Map<Long, FlowNodeConfig> startNode = nodes.stream()
+                .filter(node -> node.getNodeType() == FlowNodeTypeEnum.START)
+                .collect(LinkedHashMap::new, (map, node) -> map.put(node.getId(), node), Map::putAll);
+        if (startNode.isEmpty()) {
+            throw new BusinessException(ErrorCodeEnum.FLOW_NODE_INVALID, "流程缺少开始节点");
+        }
+        Map<Long, String> elementIdByNodeId = new LinkedHashMap<>();
+        elementIdByNodeId.put(startNode.keySet().iterator().next(), start.getId());
+        int nodeCounter = 0;
+        for (FlowNodeConfig node : nodes) {
+            if (node.getNodeType() == FlowNodeTypeEnum.START
+                    || node.getNodeType() == FlowNodeTypeEnum.END
+                    || node.getNodeType() == FlowNodeTypeEnum.CONDITION) {
+                continue;
+            }
+            // 活动 id 按可执行节点顺序编号（node_0 起）——驳回目标定位等按此约定引用
+            FlowElement element = createElement(node, "node_" + nodeCounter++);
+            elementIdByNodeId.put(node.getId(), element.getId());
             process.addFlowElement(element);
         }
 
-        Map<String, List<FlowConditionRule>> rulesByTarget = config.getConditionRules().stream()
-                .collect(Collectors.groupingBy(
-                        FlowConditionRule::getTargetNodeName,
-                        LinkedHashMap::new,
-                        Collectors.toList()));
-
-        String previousId = start.getId();
-        for (int index = 0; index < executableNodes.size(); index++) {
-            FlowNodeConfig node = executableNodes.get(index);
-            FlowElement element = elements.get(index);
-            List<FlowConditionRule> rules = rulesByTarget.getOrDefault(node.getName(), List.of());
-            if (rules.isEmpty()) {
-                addFlow(process, previousId, element.getId(), null, false);
-                previousId = element.getId();
+        // 转移边 → 序列流；多出边源节点插排他网关分发
+        List<FlowTransition> transitions = config.getTransitions();
+        Map<Long, List<FlowTransition>> outBySource = new LinkedHashMap<>();
+        for (FlowTransition transition : transitions) {
+            outBySource.computeIfAbsent(transition.getFromNode().getId(),
+                    key -> new ArrayList<>()).add(transition);
+        }
+        int gatewayCounter = 0;
+        int flowCounter = 0;
+        for (Map.Entry<Long, List<FlowTransition>> entry : outBySource.entrySet()) {
+            String sourceElementId = elementIdByNodeId.get(entry.getKey());
+            if (sourceElementId == null) {
                 continue;
             }
-
-            ExclusiveGateway decision = new ExclusiveGateway();
-            decision.setId("decision_" + index);
-            decision.setName("判断是否进入" + node.getName());
-            process.addFlowElement(decision);
-            addFlow(process, previousId, decision.getId(), null, false);
-
-            ExclusiveGateway merge = new ExclusiveGateway();
-            merge.setId("merge_" + index);
-            merge.setName("合并" + node.getName());
-            process.addFlowElement(merge);
-
-            addFlow(process, decision.getId(), element.getId(), conditionExpression(rules), false);
-            String defaultFlowId = addFlow(process, decision.getId(), merge.getId(), null, true);
-            decision.setDefaultFlow(defaultFlowId);
-            addFlow(process, element.getId(), merge.getId(), null, false);
-            previousId = merge.getId();
+            List<FlowTransition> outEdges = entry.getValue();
+            boolean multiOut = outEdges.size() > 1;
+            String distributeFrom = sourceElementId;
+            ExclusiveGateway gateway = null;
+            if (multiOut) {
+                gateway = new ExclusiveGateway();
+                gateway.setId("gateway_" + gatewayCounter++);
+                gateway.setName("分支判断");
+                process.addFlowElement(gateway);
+                SequenceFlow toGateway = new SequenceFlow(sourceElementId, gateway.getId());
+                toGateway.setId("flow_" + flowCounter++);
+                process.addFlowElement(toGateway);
+                distributeFrom = gateway.getId();
+            }
+            FlowTransition defaultEdge = outEdges.stream()
+                    .filter(edge -> !edge.isConditional())
+                    .findFirst().orElse(null);
+            for (FlowTransition edge : outEdges) {
+                String targetElementId = resolveTargetElement(edge, elementIdByNodeId, end.getId());
+                SequenceFlow flow = new SequenceFlow(distributeFrom, targetElementId);
+                flow.setId("flow_" + flowCounter++);
+                if (edge.isConditional()) {
+                    flow.setConditionExpression(conditionExpression(edge));
+                }
+                process.addFlowElement(flow);
+                if (multiOut && edge.equals(defaultEdge)) {
+                    // 无条件边作为网关默认流：全部条件不命中时走它
+                    gateway.setDefaultFlow(flow.getId());
+                }
+            }
         }
-        addFlow(process, previousId, end.getId(), null, false);
         return model;
+    }
+
+    /** 解析转移边目标元素：无目标或 END 节点 → end event，否则目标节点元素。 */
+    private String resolveTargetElement(
+            FlowTransition edge, Map<Long, String> elementIdByNodeId, String endElementId) {
+        FlowNodeConfig toNode = edge.getToNode();
+        if (toNode == null || toNode.getNodeType() == FlowNodeTypeEnum.END) {
+            return endElementId;
+        }
+        String elementId = elementIdByNodeId.get(toNode.getId());
+        if (elementId == null) {
+            throw new BusinessException(ErrorCodeEnum.FLOW_NODE_INVALID,
+                    "转移边目标节点无法编译：" + toNode.getName());
+        }
+        return elementId;
     }
 
     private FlowElement createElement(FlowNodeConfig node, String id) {
@@ -162,86 +211,64 @@ public class ConfigDrivenProcessDefinitionService {
         UserTask task = new UserTask();
         task.setId(id);
         task.setName(node.getName());
-        switch (NodeAssigneeRuleEnum.of(node.getName(), node.getAssigneeRole())) {
+        // 结构化指派协议（AssigneeTypeEnum）：节点名仅展示，路由行为由协议决定
+        AssigneeTypeEnum assigneeType = node.getAssigneeType();
+        if (assigneeType == null) {
+            return task;
+        }
+        switch (assigneeType) {
             case INITIATOR ->
                     // 发起人回环节点（签收/归还/上传归档附件等）：动态指派给单据申请人
-                    task.setAssignee("${initiator}");
+                    task.setAssignee("${" + WorkflowVariables.INITIATOR + "}");
             case MANAGER ->
-                    // 钉钉式汇报线节点：动态指派给申请人提交时确定的直属主管（提交时写入 managerAccount 流程变量）
-                    task.setAssignee("${managerAccount}");
-            case MULTI_MANAGER -> {
-                    // 连续多级主管（钉钉同款）：沿汇报线自下而上串行逐级审批。
-                    // 集合 = 提交时写入的 managerChain（直属主管→上级→…），元素变量 chainManager 供 assignee 表达式取值
+                    // 直属主管：主管链解析器产出链首（人工指定优先→部门负责人树兜底）
+                    task.setAssignee("${" + WorkflowVariables.MANAGER_ACCOUNT + "}");
+            case MANAGER_CHAIN -> {
+                    // 逐级主管：沿主管链自下而上串行逐级审批（提交时写入链集合）
                     task.setAssignee("${chainManager}");
                     org.flowable.bpmn.model.MultiInstanceLoopCharacteristics multi =
                             new org.flowable.bpmn.model.MultiInstanceLoopCharacteristics();
                     multi.setSequential(true);
-                    multi.setInputDataItem("managerChain");
+                    multi.setInputDataItem(WorkflowVariables.MANAGER_CHAIN);
                     multi.setElementVariable("chainManager");
                     task.setLoopCharacteristics(multi);
             }
             case SELF_SELECT -> {
-                    // 发起人自选（钉钉同款）：申请人提交时指定审批人，按选择顺序串行审批。
-                    // 集合 = 提交时写入的 approverChain，元素变量 selectedApprover
+                    // 发起人自选：申请人提交时指定审批人，按选择顺序串行审批
                     task.setAssignee("${selectedApprover}");
                     org.flowable.bpmn.model.MultiInstanceLoopCharacteristics multi =
                             new org.flowable.bpmn.model.MultiInstanceLoopCharacteristics();
                     multi.setSequential(true);
-                    multi.setInputDataItem("approverChain");
+                    multi.setInputDataItem(WorkflowVariables.APPROVER_CHAIN);
                     multi.setElementVariable("selectedApprover");
                     task.setLoopCharacteristics(multi);
             }
-            case DEPT_ROLE ->
-                    // 按发起人部门路由：提交时解析核算分工（服务部门=申请人部门且挂「核算会计」角色的成员），
-                    // 写入 deptAccountant 流程变量；无分工映射时为空串（任务待管理员指派）
-                    task.setAssignee("${deptAccountant}");
-            case STATIC_ROLE -> {
-                if (node.getAssigneeRole() != null && !node.getAssigneeRole().isBlank()) {
-                    task.setCandidateGroups(splitGroups(node.getAssigneeRole()));
+            case DEPT_ACCOUNTANT ->
+                    // 按发起人部门路由：提交时解析核算分工主办会计写入流程变量
+                    task.setAssignee("${" + WorkflowVariables.DEPT_ACCOUNTANT + "}");
+            case ROLE -> {
+                if (node.getAssigneeValue() != null && !node.getAssigneeValue().isBlank()) {
+                    // 候选组 = 角色 ID（ID 外键化：角色改名不影响路由）
+                    List<String> groupIds = new ArrayList<>();
+                    for (String piece : node.getAssigneeValue().split(",")) {
+                        if (!piece.isBlank()) {
+                            groupIds.add(piece.trim());
+                        }
+                    }
+                    task.setCandidateGroups(groupIds);
                 }
             }
         }
         return task;
     }
 
-    private List<String> splitGroups(String groups) {
-        // 注意：不能对角色名做 &→_ 之类的改写——候选组与 RBAC 角色名必须逐字一致
-        //（如「会计主管&内控」改写后部署出的候选组任何角色都无法命中，节点任务将无人可审）。
-        String[] pieces = groups.split("[/、]");
-        List<String> result = new ArrayList<>();
-        for (String piece : pieces) {
-            if (!piece.isBlank()) {
-                result.add(piece.trim());
-            }
-        }
-        return result.isEmpty() ? List.of(groups) : result;
+    private String conditionExpression(FlowTransition edge) {
+        return "${" + edge.getConditionVariable() + " "
+                + operatorSymbol(edge) + " " + expressionLiteral(edge.getExpectedValue()) + "}";
     }
 
-    private String addFlow(
-            Process process,
-            String source,
-            String target,
-            String condition,
-            boolean defaultPath) {
-        SequenceFlow flow = new SequenceFlow(source, target);
-        flow.setId("flow_" + process.getFlowElements().stream()
-                .filter(SequenceFlow.class::isInstance).count());
-        if (condition != null) {
-            flow.setConditionExpression(condition);
-        }
-        if (defaultPath) {
-            flow.setName("默认跳过");
-        }
-        process.addFlowElement(flow);
-        return flow.getId();
-    }
-
-    private String conditionExpression(List<FlowConditionRule> rules) {
-        return "${" + rules.stream().map(this::conditionClause).collect(Collectors.joining(" && ")) + "}";
-    }
-
-    private String conditionClause(FlowConditionRule rule) {
-        String operator = switch (rule.getOperator()) {
+    private String operatorSymbol(FlowTransition edge) {
+        return switch (edge.getOperator()) {
             case EQUAL -> "==";
             case NOT_EQUAL -> "!=";
             case GREATER_THAN -> ">";
@@ -249,7 +276,6 @@ public class ConfigDrivenProcessDefinitionService {
             case LESS_THAN -> "<";
             case LESS_THAN_OR_EQUAL -> "<=";
         };
-        return rule.getVariableName() + " " + operator + " " + expressionLiteral(rule.getExpectedValue());
     }
 
     private String expressionLiteral(String value) {

@@ -11,7 +11,7 @@ public interface WorkflowPort {
 
     void completeTask(String taskId, Map<String, Object> variables);
 
-    List<Task> pendingTasksForUser(String account, List<String> roleNames);
+    List<Task> pendingTasksForUser(String account, List<String> roleIds);
 
     /** 系统当前全部活动中的用户任务（供超级审批视图反查单据）。 */
     List<Task> allActiveTasks();

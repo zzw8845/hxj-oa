@@ -250,8 +250,10 @@ class DocumentAccessPolicyTest {
                 account,
                 account,
                 department,
+                departmentRepository.findByName(department).map(SysDepartment::getId).orElse(null),
                 "测试岗位",
                 roles,
+                List.of(),
                 List.of("VIEW_OWN_FORMS"),
                 dataScopes);
     }
@@ -290,6 +292,7 @@ class DocumentAccessPolicyTest {
         document.setDocCode(code);
         document.setBusinessType(businessType);
         document.setApplicant(applicant);
+        document.setDepartmentId(applicant.getDepartmentId());
         document.setDepartment(applicant.getDepartment());
         document.setProjectName("测试事项");
         entityManager.persist(document);

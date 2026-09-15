@@ -117,8 +117,16 @@ class ProcessPersistenceRepositoryTest {
         config.addNode(new FlowNodeConfig("直属主管", FlowNodeTypeEnum.APPROVAL));
         config.addNode(new FlowNodeConfig("执行总经理", FlowNodeTypeEnum.APPROVAL));
         config.addNode(new FlowNodeConfig("采购办理", FlowNodeTypeEnum.HANDLER));
-        config.addConditionRule(new FlowConditionRule(
-                "amount", ConditionOperatorEnum.GREATER_THAN_OR_EQUAL, "20000", "执行总经理"));
+        FlowNodeConfig startNode = config.getNodes().get(0);
+        FlowNodeConfig gmNode = config.getNodes().stream()
+                .filter(n -> n.getName().equals("执行总经理")).findFirst().orElseThrow();
+        com.hxj.entity.FlowTransition conditional = new com.hxj.entity.FlowTransition();
+        conditional.setFromNode(startNode);
+        conditional.setToNode(gmNode);
+        conditional.setConditionVariable("amount");
+        conditional.setOperator(ConditionOperatorEnum.GREATER_THAN_OR_EQUAL);
+        conditional.setExpectedValue("20000");
+        config.addTransition(conditional);
 
         flowConfigRepository.saveAndFlush(config);
         entityManager.clear();
@@ -128,11 +136,11 @@ class ProcessPersistenceRepositoryTest {
         assertThat(persisted.getNodes())
                 .extracting(FlowNodeConfig::getName)
                 .containsExactly("发起人", "直属主管", "执行总经理", "采购办理");
-        assertThat(persisted.getConditionRules()).singleElement().satisfies(rule -> {
-            assertThat(rule.getVariableName()).isEqualTo("amount");
-            assertThat(rule.getOperator()).isEqualTo(ConditionOperatorEnum.GREATER_THAN_OR_EQUAL);
-            assertThat(rule.getExpectedValue()).isEqualTo("20000");
-            assertThat(rule.getTargetNodeName()).isEqualTo("执行总经理");
+        assertThat(persisted.getTransitions()).singleElement().satisfies(transition -> {
+            assertThat(transition.getConditionVariable()).isEqualTo("amount");
+            assertThat(transition.getOperator()).isEqualTo(ConditionOperatorEnum.GREATER_THAN_OR_EQUAL);
+            assertThat(transition.getExpectedValue()).isEqualTo("20000");
+            assertThat(transition.getToNode().getName()).isEqualTo("执行总经理");
         });
     }
 

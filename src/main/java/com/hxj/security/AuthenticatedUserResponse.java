@@ -8,8 +8,10 @@ public record AuthenticatedUserResponse(
         String account,
         String name,
         String department,
+        Long departmentId,
         String post,
         List<String> roles,
+        List<String> roleIds,
         List<String> permissions,
         List<String> dataScopes) {
 
@@ -21,7 +23,16 @@ public record AuthenticatedUserResponse(
      */
     public AuthenticatedUserResponse {
         roles = roles == null ? List.of() : List.copyOf(roles);
+        roleIds = roleIds == null ? List.of() : List.copyOf(roleIds);
         permissions = permissions == null ? List.of() : List.copyOf(permissions);
         dataScopes = dataScopes == null ? List.of() : List.copyOf(dataScopes);
+    }
+
+    /** 兼容旧 8 参调用（无 departmentId/roleIds 的测试与老视图组装点）。 */
+    public AuthenticatedUserResponse(
+            Long userId, String account, String name, String department, String post,
+            List<String> roles, List<String> permissions, List<String> dataScopes) {
+        this(userId, account, name, department, null, post,
+                roles, List.of(), permissions, dataScopes);
     }
 }

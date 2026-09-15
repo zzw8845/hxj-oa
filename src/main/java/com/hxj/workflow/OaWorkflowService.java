@@ -53,10 +53,11 @@ public class OaWorkflowService implements WorkflowPort {
     }
 
     @Override
-    public List<Task> pendingTasksForUser(String account, List<String> roleNames) {
+    public List<Task> pendingTasksForUser(String account, List<String> roleIds) {
+        // 候选组以角色 ID 为外键（BPMN 部署时由 AssigneeTypeEnum.ROLE 写入），与角色改名解耦
         List<Task> result = new ArrayList<>(taskService.createTaskQuery().taskCandidateOrAssigned(account).list());
-        for (String role : roleNames == null ? List.<String>of() : roleNames) {
-            result.addAll(taskService.createTaskQuery().taskCandidateGroup(role).list());
+        for (String roleId : roleIds == null ? List.<String>of() : roleIds) {
+            result.addAll(taskService.createTaskQuery().taskCandidateGroup(roleId).list());
         }
         return result.stream().distinct().toList();
     }

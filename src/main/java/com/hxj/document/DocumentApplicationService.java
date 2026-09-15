@@ -5,9 +5,11 @@ import com.hxj.common.ErrorCodeEnum;
 import com.hxj.entity.*;
 import com.hxj.enums.BusinessTypeEnum;
 import com.hxj.common.PageResponse;
+import com.hxj.enums.AssigneeTypeEnum;
 import com.hxj.enums.CcSourceEnum;
 import com.hxj.enums.DocumentStatusEnum;
 import com.hxj.enums.FlowNodeTypeEnum;
+import com.hxj.enums.FlowStatusEnum;
 import com.hxj.exception.BusinessException;
 import com.hxj.repository.ApprovalRecordRepository;
 import com.hxj.repository.CcRecordRepository;
@@ -21,6 +23,7 @@ import com.hxj.security.DocumentAccessPolicy;
 import com.hxj.service.DocumentCodeGenerator;
 import com.hxj.entity.FormField;
 import com.hxj.entity.FormTemplate;import com.hxj.workflow.WorkflowPort;
+import com.hxj.workflow.WorkflowVariables;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.PageImpl;
@@ -100,10 +103,14 @@ public class DocumentApplicationService {
         }
         FlowConfig flowConfig = flowConfigRepository.findById(template.getFlowConfigId())
                 .orElseThrow(() -> new BusinessException(ErrorCodeEnum.FLOW_CONFIG_NOT_FOUND, "未配置对应审批流程"));
+        // 发布两态：只有已发布流程可提交（草稿修改不生效，防止改错配置污染新单据）
+        if (flowConfig.getStatus() != FlowStatusEnum.PUBLISHED) {
+            throw new BusinessException(ErrorCodeEnum.FLOW_CONFIG_NOT_FOUND,
+                    "流程「" + flowConfig.getType() + "」未发布，请联系管理员发布后重试");
+        }
         // 「发起人自选」节点需要申请人在提交时指定审批人（防提交后任务无主/空集自动跳过）
         boolean hasSelfSelect = flowConfig.getNodes().stream()
-                .anyMatch(n -> n.getNodeType() == FlowNodeTypeEnum.APPROVAL
-                        && "发起人自选".equals(n.getAssigneeRole()));
+                .anyMatch(n -> n.getAssigneeType() == AssigneeTypeEnum.SELF_SELECT);
         if (hasSelfSelect && request.approverAccounts().isEmpty()) {
             throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID,
                     "该流程含「发起人自选」节点，请指定审批人");
@@ -116,14 +123,13 @@ public class DocumentApplicationService {
         }
         // 动态指派前置校验（钉钉模式）：主管链来源于人员档案直属主管或部门负责人树，
         // 核算会计按部门分工映射——解析为空时提交即拒，把"卡单等管理员救"变成"提交时发现"
-        if (flowConfig.getNodes().stream().anyMatch(n -> n.getNodeType() == FlowNodeTypeEnum.APPROVAL
-                && ("直属主管".equals(n.getAssigneeRole()) || "逐级主管".equals(n.getAssigneeRole())))
+        if (flowConfig.getNodes().stream().anyMatch(n -> n.getAssigneeType() == AssigneeTypeEnum.MANAGER
+                || n.getAssigneeType() == AssigneeTypeEnum.MANAGER_CHAIN)
                 && supervisorChainResolver.resolveChain(applicant).isEmpty()) {
             throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID,
                     "申请人未设置直属主管，且其部门及上级部门均未设置负责人，无法路由「直属主管」审批节点，请联系管理员在组织架构中补配");
         }
-        if (flowConfig.getNodes().stream().anyMatch(n -> n.getNodeType() == FlowNodeTypeEnum.APPROVAL
-                && "会计（按部门）".equals(n.getAssigneeRole()))
+        if (flowConfig.getNodes().stream().anyMatch(n -> n.getAssigneeType() == AssigneeTypeEnum.DEPT_ACCOUNTANT)
                 && deptAccountantResolver.resolve(applicant).isEmpty()) {
             throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID,
                     "申请人所在部门未配置核算会计分工，无法路由「会计（按部门）」审批节点，请联系管理员补配核算分工");
@@ -135,6 +141,7 @@ public class DocumentApplicationService {
         document.setDocCode(codeGenerator.generate(template.getDocPrefix()));
         document.setProjectName(template.getName());
         document.setApplicant(applicant);
+        document.setDepartmentId(applicant.getDepartmentId());
         document.setDepartment(applicant.getDepartment());
         BigDecimal amount = decimalValue(values, "amount");
         document.setAmount(businessType == BusinessTypeEnum.SEAL_APPLICATION ? null : amount);
@@ -202,7 +209,7 @@ public class DocumentApplicationService {
                 // 任务持有本身即访问依据——不再叠加数据范围过滤，否则候选组审批人
                 // 会陷入"收得到待办、待审列表却看不见"的死锁
                 Set<String> processInstanceIds = workflowPort
-                        .pendingTasksForUser(currentUser.account(), currentUser.roles()).stream()
+                        .pendingTasksForUser(currentUser.account(), currentUser.roleIds()).stream()
                         .map(task -> task.getProcessInstanceId())
                         .collect(Collectors.toSet());
                 if (processInstanceIds.isEmpty()) {
@@ -363,18 +370,20 @@ public class DocumentApplicationService {
         // 主办会计账号：「会计（按部门）」节点以 ${deptAccountant} 动态指派（核算分工表解析，无映射时为空串）
         String deptAccountant = deptAccountantResolver.resolve(applicant);
         return Map.ofEntries(
-                Map.entry("amount", decimalValue(fieldValues, "amount") == null
-                        ? BigDecimal.ZERO : decimalValue(fieldValues, "amount")),
-                Map.entry("involvesFunds", booleanValue(fieldValues, "involvesFunds")),
-                Map.entry("requiresAdminReview", booleanValue(fieldValues, "requiresAdminReview")),
-                Map.entry("businessMode", String.valueOf(fieldValues.getOrDefault("businessMode", ""))),
+                Map.entry(WorkflowVariables.AMOUNT, decimalValue(fieldValues, WorkflowVariables.AMOUNT) == null
+                        ? BigDecimal.ZERO : decimalValue(fieldValues, WorkflowVariables.AMOUNT)),
+                Map.entry(WorkflowVariables.INVOLVES_FUNDS, booleanValue(fieldValues, WorkflowVariables.INVOLVES_FUNDS)),
+                Map.entry(WorkflowVariables.REQUIRES_ADMIN_REVIEW,
+                        booleanValue(fieldValues, WorkflowVariables.REQUIRES_ADMIN_REVIEW)),
+                Map.entry(WorkflowVariables.BUSINESS_MODE,
+                        String.valueOf(fieldValues.getOrDefault(WorkflowVariables.BUSINESS_MODE, ""))),
                 // 发起人回环节点（签收/归还/上传归档附件等）以此为 assignee 表达式动态指派
-                Map.entry("initiator", applicant.getAccount()),
-                Map.entry("managerAccount", managerAccount),
-                Map.entry("managerChain", managerChain),
+                Map.entry(WorkflowVariables.INITIATOR, applicant.getAccount()),
+                Map.entry(WorkflowVariables.MANAGER_ACCOUNT, managerAccount),
+                Map.entry(WorkflowVariables.MANAGER_CHAIN, managerChain),
                 // 「发起人自选」节点串行多实例的审批人集合（提交时申请人指定）
-                Map.entry("approverChain", List.copyOf(approverAccounts)),
-                Map.entry("deptAccountant", deptAccountant));
+                Map.entry(WorkflowVariables.APPROVER_CHAIN, List.copyOf(approverAccounts)),
+                Map.entry(WorkflowVariables.DEPT_ACCOUNTANT, deptAccountant));
     }
 
     /** ccUserIds 来自请求 DTO 的不可变列表（紧凑构造器已保证非 null），可直接构造集合。 */

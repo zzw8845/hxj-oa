@@ -252,7 +252,8 @@ class PermissionManagementServiceTest {
         flowConfig.setType("测试流程");
         flowConfig.setCategory(FlowCategoryEnum.DAILY);
         FlowNodeConfig node = new FlowNodeConfig("直属主管", FlowNodeTypeEnum.APPROVAL);
-        node.setAssigneeRole("二级部门负责人/" + role.getName());
+        node.setAssigneeType(com.hxj.enums.AssigneeTypeEnum.ROLE);
+        node.setAssigneeValue(role.getId() + ",88888");
         flowConfig.addNode(node);
         flowConfigRepository.saveAndFlush(flowConfig);
         assertThatThrownBy(() -> roleService.delete(role.getId()))
@@ -294,13 +295,14 @@ class PermissionManagementServiceTest {
     }
 
     @Test
-    void shouldSyncFlowNodeAndRolePostOnRename() {
-        // 流程节点绑定的角色组合串随角色改名按段同步
+    void shouldKeepFlowNodeBindingStableOnRename() {
+        // 图模型：候选组以角色 ID 为外键——角色改名不影响流程节点绑定，无需同步补丁
         FlowConfig flowConfig = new FlowConfig();
         flowConfig.setType("改名同步流程");
         flowConfig.setCategory(FlowCategoryEnum.DAILY);
         FlowNodeConfig node = new FlowNodeConfig("直属主管", FlowNodeTypeEnum.APPROVAL);
-        node.setAssigneeRole(role.getName() + "/其他角色");
+        node.setAssigneeType(com.hxj.enums.AssigneeTypeEnum.ROLE);
+        node.setAssigneeValue(String.valueOf(role.getId()));
         flowConfig.addNode(node);
         flowConfigRepository.saveAndFlush(flowConfig);
 
@@ -310,7 +312,7 @@ class PermissionManagementServiceTest {
         assertThat(roleRepository.findById(role.getId()).orElseThrow().getName()).isEqualTo("改名后角色");
         FlowNodeConfig updated = flowConfigRepository.findById(flowConfig.getId()).orElseThrow()
                 .getNodes().stream().filter(n -> n.getName().equals("直属主管")).findFirst().orElseThrow();
-        assertThat(updated.getAssigneeRole()).isEqualTo("改名后角色/其他角色");
+        assertThat(updated.getAssigneeValue()).isEqualTo(String.valueOf(role.getId()));
 
         // 岗位改名同步角色岗位快照
         role.setPost("专员");

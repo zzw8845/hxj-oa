@@ -2,7 +2,6 @@ package com.hxj.workflow;
 
 import com.hxj.enums.ConditionOperatorEnum;
 import com.hxj.enums.FlowCategoryEnum;
-import com.hxj.entity.FlowConditionRule;
 import com.hxj.entity.FlowConfig;
 import com.hxj.entity.FlowNodeConfig;
 import com.hxj.enums.FlowNodeTypeEnum;
@@ -50,6 +49,9 @@ class FlowableWorkflowIntegrationTest {
 
     private FlowConfig config;
 
+    private static final String MANAGER_GROUP_ID = "501";
+    private static final String CEO_GROUP_ID = "502";
+
     @BeforeEach
     void setUp() {
         flowConfigRepository.deleteAll();
@@ -58,15 +60,37 @@ class FlowableWorkflowIntegrationTest {
         config.setCategory(FlowCategoryEnum.DAILY);
         config.addNode(new FlowNodeConfig("发起人", FlowNodeTypeEnum.START));
         FlowNodeConfig manager = new FlowNodeConfig("直属主管", FlowNodeTypeEnum.APPROVAL);
-        manager.setAssigneeRole("二级部门负责人");
+        manager.setAssigneeType(com.hxj.enums.AssigneeTypeEnum.ROLE);
+        manager.setAssigneeValue(MANAGER_GROUP_ID);
         config.addNode(manager);
         FlowNodeConfig gm = new FlowNodeConfig("执行总经理（≥2万元）", FlowNodeTypeEnum.APPROVAL);
-        gm.setAssigneeRole("执行总经理");
+        gm.setAssigneeType(com.hxj.enums.AssigneeTypeEnum.ROLE);
+        gm.setAssigneeValue(CEO_GROUP_ID);
         config.addNode(gm);
         config.addNode(new FlowNodeConfig("抄送财务", FlowNodeTypeEnum.CC));
-        config.addConditionRule(new FlowConditionRule(
-                "amount", ConditionOperatorEnum.GREATER_THAN_OR_EQUAL, "20000", "执行总经理（≥2万元）"));
+        // 图模型：发起人→主管；主管→(金额≥2万)→执行总经理，默认→抄送；执行总经理→抄送
+        FlowNodeConfig startNode = config.getNodes().get(0);
+        FlowNodeConfig managerNode = config.getNodes().get(1);
+        FlowNodeConfig gmNode = config.getNodes().get(2);
+        FlowNodeConfig ccNode = config.getNodes().get(3);
+        config.addTransition(transition(startNode, managerNode, null, null, null));
+        config.addTransition(transition(managerNode, gmNode,
+                "amount", ConditionOperatorEnum.GREATER_THAN_OR_EQUAL, "20000"));
+        config.addTransition(transition(managerNode, ccNode, null, null, null));
+        config.addTransition(transition(gmNode, ccNode, null, null, null));
         flowConfigRepository.saveAndFlush(config);
+    }
+
+    private com.hxj.entity.FlowTransition transition(
+            FlowNodeConfig from, FlowNodeConfig to,
+            String variable, ConditionOperatorEnum operator, String expectedValue) {
+        com.hxj.entity.FlowTransition transition = new com.hxj.entity.FlowTransition();
+        transition.setFromNode(from);
+        transition.setToNode(to);
+        transition.setConditionVariable(variable);
+        transition.setOperator(operator);
+        transition.setExpectedValue(expectedValue);
+        return transition;
     }
 
     @Test
@@ -81,7 +105,7 @@ class FlowableWorkflowIntegrationTest {
         assertThat(managerTask.getName()).isEqualTo("直属主管");
         assertThat(taskService.getIdentityLinksForTask(managerTask.getId()))
                 .anyMatch(link -> "candidate".equals(link.getType())
-                        && "二级部门负责人".equals(link.getGroupId()));
+                        && MANAGER_GROUP_ID.equals(link.getGroupId()));
         workflowService.completeTask(managerTask.getId(), Map.of());
 
         Task gmTask = singleTask(processInstanceId);
@@ -129,8 +153,9 @@ class FlowableWorkflowIntegrationTest {
         cfg.setCategory(FlowCategoryEnum.DAILY);
         cfg.addNode(new FlowNodeConfig("发起人", FlowNodeTypeEnum.START));
         FlowNodeConfig accountant = new FlowNodeConfig("会计（按部门）", FlowNodeTypeEnum.APPROVAL);
-        accountant.setAssigneeRole("会计（按部门）");
+        accountant.setAssigneeType(com.hxj.enums.AssigneeTypeEnum.DEPT_ACCOUNTANT);
         cfg.addNode(accountant);
+        cfg.addTransition(transition(cfg.getNodes().get(0), accountant, null, null, null));
         flowConfigRepository.saveAndFlush(cfg);
 
         definitionService.deploy(cfg.getId());

@@ -67,7 +67,11 @@ public class OaDocument {
     @Column(length = 50)
     private CompanyEnum company;
 
-    /** 所属部门。 */
+    /** 所属部门（ID 外键：可见性路由按 ID 匹配，与部门改名解耦）。 */
+    @Column(name = "department_id")
+    private Long departmentId;
+
+    /** 所属部门名称快照（仅历史展示；授权逻辑一律走 departmentId）。 */
     @Column(length = 100)
     private String department;
 
@@ -182,6 +186,8 @@ public class OaDocument {
     public String getApplicantName() { return applicant == null ? null : applicant.getName(); }
     public CompanyEnum getCompany() { return company; }
     public void setCompany(CompanyEnum company) { this.company = company; }
+    public Long getDepartmentId() { return departmentId; }
+    public void setDepartmentId(Long departmentId) { this.departmentId = departmentId; }
     public String getDepartment() { return department; }
     public void setDepartment(String department) { this.department = department; }
     public BigDecimal getAmount() { return amount; }

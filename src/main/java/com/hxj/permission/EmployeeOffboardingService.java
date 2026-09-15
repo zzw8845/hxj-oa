@@ -54,9 +54,11 @@ public class EmployeeOffboardingService {
     public List<PendingTask> pendingTasks(Long userId) {
         SysUser user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCodeEnum.USER_NOT_FOUND, "员工不存在"));
-        List<String> roleNames = user.getRoles().stream().map(SysRole::getName).toList();
+        // 候选组以角色 ID 为外键（图模型 ID 化），待办查询必须传 ID 而非角色名
+        List<String> roleIds = user.getRoles().stream()
+                .map(role -> String.valueOf(role.getId())).toList();
         List<PendingTask> items = new ArrayList<>();
-        for (Task task : workflowPort.pendingTasksForUser(user.getAccount(), roleNames)) {
+        for (Task task : workflowPort.pendingTasksForUser(user.getAccount(), roleIds)) {
             documentRepository.findByProcessInstanceId(task.getProcessInstanceId())
                     .ifPresent(document -> items.add(new PendingTask(
                             task.getId(), document.getId(), document.getDocCode(),
@@ -87,7 +89,8 @@ public class EmployeeOffboardingService {
         SysUser operator = userRepository.findByAccount(operatorAccount)
                 .orElseThrow(() -> new BusinessException(ErrorCodeEnum.USER_NOT_FOUND, "当前用户不存在"));
         List<Task> tasks = workflowPort.pendingTasksForUser(
-                leaver.getAccount(), leaver.getRoles().stream().map(SysRole::getName).toList());
+                leaver.getAccount(), leaver.getRoles().stream()
+                        .map(role -> String.valueOf(role.getId())).toList());
         for (Task task : tasks) {
             workflowPort.setAssignee(task.getId(), transferTo.getAccount());
             documentRepository.findByProcessInstanceId(task.getProcessInstanceId())
@@ -113,7 +116,8 @@ public class EmployeeOffboardingService {
         SysUser operator = userRepository.findByAccount(operatorAccount)
                 .orElseThrow(() -> new BusinessException(ErrorCodeEnum.USER_NOT_FOUND, "当前用户不存在"));
         List<Task> tasks = workflowPort.pendingTasksForUser(
-                leaver.getAccount(), leaver.getRoles().stream().map(SysRole::getName).toList());
+                leaver.getAccount(), leaver.getRoles().stream()
+                        .map(role -> String.valueOf(role.getId())).toList());
         for (Task task : tasks) {
             documentRepository.findByProcessInstanceId(task.getProcessInstanceId())
                     .ifPresent(document -> {

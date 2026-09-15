@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.hxj.entity.SysDataScope;
 import com.hxj.entity.SysPermission;
 import com.hxj.entity.SysRole;
+import com.hxj.entity.SysDepartment;
 import com.hxj.entity.SysUser;
 import com.hxj.enums.UserStatusEnum;
 import com.hxj.repository.OaDocumentRepository;
@@ -129,7 +130,25 @@ class ApiRoundTripContractTest {
                 com.hxj.support.DictionaryTestSupport.ensurePost(postRepository, "系统管理员"));
         admin.setStatus(UserStatusEnum.ACTIVE);
         admin.addRole(savedRole);
-        token = jwtService.issueAccessToken(userRepository.save(admin));
+        SysUser savedAdmin = userRepository.save(admin);
+        // 动态指派前置校验需要申请人有主管链：给管理员设一个直属主管（主管本人即部门负责人）
+        SysUser supervisor = new SysUser();
+        supervisor.setName("王主管");
+        supervisor.setJobNo("HXJ000");
+        supervisor.setAccount("supervisor1");
+        supervisor.setPassword("not-used");
+        com.hxj.support.DictionaryTestSupport.applyDictionary(supervisor,
+                com.hxj.support.DictionaryTestSupport.ensureDepartment(departmentRepository, "总经办"),
+                com.hxj.support.DictionaryTestSupport.ensurePost(postRepository, "系统管理员"));
+        supervisor.setStatus(UserStatusEnum.ACTIVE);
+        userRepository.save(supervisor);
+        SysDepartment ownDept = com.hxj.support.DictionaryTestSupport
+                .ensureDepartment(departmentRepository, "总经办");
+        ownDept.setLeaderUserId(supervisor.getId());
+        departmentRepository.save(ownDept);
+        savedAdmin.setManagerId(supervisor.getId());
+        userRepository.save(savedAdmin);
+        token = jwtService.issueAccessToken(savedAdmin);
     }
 
     @Test
@@ -181,7 +200,7 @@ class ApiRoundTripContractTest {
         body.set("type", config.get("type"));
         body.set("category", config.get("category"));
         body.set("nodes", config.get("nodes"));
-        body.set("conditionRules", config.get("conditionRules"));
+        body.set("transitions", config.get("transitions"));
 
         String response = putJson("/api/admin/flow-configs/" + configId, body);
 
@@ -269,16 +288,20 @@ class ApiRoundTripContractTest {
         ObjectNode start = nodes.addObject();
         start.put("name", "发起人");
         start.put("nodeType", "START");
-        start.put("assigneeRole", "");
         ObjectNode approval = nodes.addObject();
         approval.put("name", "直属主管");
         approval.put("nodeType", "APPROVAL");
-        approval.put("assigneeRole", "二级部门负责人");
-        body.putArray("conditionRules");
+        approval.put("assigneeType", "MANAGER");
+        ArrayNode transitions = body.putArray("transitions");
+        transitions.addObject().put("fromNodeName", "发起人").put("toNodeName", "直属主管");
+        transitions.addObject().put("fromNodeName", "直属主管");
 
         String response = postJson("/api/admin/flow-configs", body);
         assertSuccess("创建流程配置 " + type, response);
-        return mapper.readTree(response).path("data").path("id").asLong();
+        long configId = mapper.readTree(response).path("data").path("id").asLong();
+        // 图模型发布两态：流程必须显式发布后模板才能提交
+        assertSuccess("发布流程 " + type, postJson("/api/admin/flow-configs/" + configId + "/publish", mapper.createObjectNode()));
+        return configId;
     }
 
     private JsonNode firstElementOf(String path) throws Exception {

@@ -61,7 +61,7 @@ public class ApprovalTemplateManagementService {
 
         public record FlowPayload(
                 List<FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload> nodes,
-                List<FlowConfigItems.SaveFlowConfigRequest.FlowConditionRulePayload> conditionRules) {}
+                List<FlowConfigItems.SaveFlowConfigRequest.FlowTransitionPayload> transitions) {}
     }
 
     /** 聚合视图：模板（含字段清单）+ 流程节点链 + 条件规则，管理端一屏全览。 */
@@ -75,7 +75,7 @@ public class ApprovalTemplateManagementService {
         // 同一事务内：流程（含 BPMN 部署）→ 模板（含字段清单）→ 自动事项入口；
         // 任一环节失败整体回滚，不存在"流程建了模板没建"的半拉子状态
         FlowConfigItems.Config flow = flowConfigService.create(new FlowConfigItems.SaveFlowConfigRequest(
-                request.name(), category, request.flow().nodes(), request.flow().conditionRules()));
+                request.name(), category, request.flow().nodes(), request.flow().transitions()));
         return templateService.create(new SaveFormTemplateRequest(
                 request.businessType(), request.name(), flow.id(),
                 request.attachmentRequirements(), request.fields()));
@@ -90,7 +90,7 @@ public class ApprovalTemplateManagementService {
             throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID, "模板未绑定流程，请走创建接口");
         }
         flowConfigService.update(template.getFlowConfigId(), new FlowConfigItems.SaveFlowConfigRequest(
-                request.name(), category, request.flow().nodes(), request.flow().conditionRules()));
+                request.name(), category, request.flow().nodes(), request.flow().transitions()));
         return templateService.update(templateId, new SaveFormTemplateRequest(
                 request.businessType(), request.name(), template.getFlowConfigId(),
                 request.attachmentRequirements(), request.fields()));

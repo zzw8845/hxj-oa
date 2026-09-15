@@ -1,5 +1,6 @@
 package com.hxj.entity;
 
+import com.hxj.enums.AssigneeTypeEnum;
 import com.hxj.enums.FlowNodeTypeEnum;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -15,7 +16,11 @@ import jakarta.persistence.Table;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/** 流程配置中的一个有序节点。 */
+/**
+ * 流程图中的一个节点。{@code name} 仅作展示；
+ * 路由行为由 {@link #nodeType} 与结构化指派协议 {@link #assigneeType} + {@link #assigneeValue} 决定
+ * （替代历史"中文节点名/角色名字符串特判"协议，见 {@link AssigneeTypeEnum}）。
+ */
 @Entity
 @Table(name = "flow_node_config")
 public class FlowNodeConfig {
@@ -30,24 +35,34 @@ public class FlowNodeConfig {
     @JoinColumn(name = "flow_config_id", nullable = false)
     private FlowConfig flowConfig;
 
-    /** 节点名称。 */
+    /** 节点名称（纯展示，不参与路由）。 */
     @Column(nullable = false, length = 100)
     private String name;
 
-    /** 节点类型（START/APPROVAL/CONDITION/HANDLER/CC/END）。 */
+    /** 节点类型（START/APPROVAL/HANDLER/CC/END）。 */
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "node_type", nullable = false, length = 30)
     private FlowNodeTypeEnum nodeType;
 
-    /** 审批角色（指定由哪个角色处理）。 */
-    @Column(name = "assignee_role", length = 100)
-    private String assigneeRole;
+    /** 审批人解析协议（六种，见枚举说明）。 */
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "assignee_type", length = 30)
+    private AssigneeTypeEnum assigneeType;
+
+    /**
+     * 审批人参数：仅 {@link AssigneeTypeEnum#ROLE} 使用——候选角色 ID 逗号分隔
+     * （其余类型的解析数据源在人员档案/部门负责人树/核算分工/提交请求中）。
+     */
+    @Column(name = "assignee_value", length = 500)
+    private String assigneeValue;
+
     /** 抄送节点目标（JSON 数组 [{"type":"ROLE|DEPT|USER","value":"..."}]），仅 CC 节点使用。 */
     @Column(name = "cc_targets", columnDefinition = "TEXT")
     private String ccTargets;
 
-    /** 节点顺序。 */
+    /** 同流程内的展示顺序（审批链在界面上的呈现顺序，拓扑由转移边决定）。 */
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 
@@ -66,8 +81,10 @@ public class FlowNodeConfig {
     public void setName(String name) { this.name = name; }
     public FlowNodeTypeEnum getNodeType() { return nodeType; }
     public void setNodeType(FlowNodeTypeEnum nodeType) { this.nodeType = nodeType; }
-    public String getAssigneeRole() { return assigneeRole; }
-    public void setAssigneeRole(String assigneeRole) { this.assigneeRole = assigneeRole; }
+    public AssigneeTypeEnum getAssigneeType() { return assigneeType; }
+    public void setAssigneeType(AssigneeTypeEnum assigneeType) { this.assigneeType = assigneeType; }
+    public String getAssigneeValue() { return assigneeValue; }
+    public void setAssigneeValue(String assigneeValue) { this.assigneeValue = assigneeValue; }
     public String getCcTargets() { return ccTargets; }
     public void setCcTargets(String ccTargets) { this.ccTargets = ccTargets; }
     public int getSortOrder() { return sortOrder; }

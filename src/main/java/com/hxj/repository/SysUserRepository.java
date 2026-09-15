@@ -28,10 +28,6 @@ public interface SysUserRepository extends JpaRepository<SysUser, Long> {
 
     List<SysUser> findDistinctByRolesId(Long roleId);
 
-    /** 挂指定角色的用户账号集合（审批人去重判定用）。 */
-    @Query("select u.account from SysUser u join u.roles r where r.name = ?1")
-    List<String> findAccountByRoleName(String roleName);
-
     List<SysUser> findByStatus(UserStatusEnum status);
 
     List<SysUser> findByManagerId(Long managerId);

@@ -69,13 +69,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private AuthenticatedUserResponse toPrincipal(Map<String, Object> claims) {
         Object userIdValue = claims.get("userId");
         Long userId = userIdValue instanceof Number number ? number.longValue() : null;
+        Object departmentIdValue = claims.get("departmentId");
+        Long departmentId = departmentIdValue instanceof Number number ? number.longValue() : null;
         return new AuthenticatedUserResponse(
                 userId,
                 stringClaim(claims, "account"),
                 stringClaim(claims, "name"),
                 stringClaim(claims, "department"),
+                departmentId,
                 stringClaim(claims, "post"),
                 stringListClaim(claims, "roles"),
+                stringListClaim(claims, "roleIds"),
                 stringListClaim(claims, "permissions"),
                 stringListClaim(claims, "dataScopes"));
     }

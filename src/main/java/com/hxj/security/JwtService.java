@@ -52,6 +52,8 @@ public class JwtService {
                 .claim("department", user.getDepartment())
                 .claim("post", user.getPost())
                 .claim("roles", roleNames(user))
+                .claim("roleIds", roleIds(user))
+                .claim("departmentId", user.getDepartmentId())
                 .claim("permissions", permissionCodes(user))
                 .claim("dataScopes", dataScopeCodes(user))
                 .issuedAt(Date.from(issuedAt))
@@ -117,6 +119,14 @@ public class JwtService {
     public List<String> roleNames(SysUser user) {
         return user.getRoles().stream()
                 .map(SysRole::getName)
+                .sorted()
+                .toList();
+    }
+
+    /** 角色 ID 列表（字符串形式）——Flowable 候选组以角色 ID 为外键，与角色改名解耦。 */
+    public List<String> roleIds(SysUser user) {
+        return user.getRoles().stream()
+                .map(role -> String.valueOf(role.getId()))
                 .sorted()
                 .toList();
     }

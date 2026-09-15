@@ -20,12 +20,13 @@ import java.util.stream.Collectors;
 /**
  * 将当前用户的数据范围转换为单据查询约束，未知范围默认拒绝（仅剩本人单据基线）。
  *
- * <p>数据范围模型为 5 种通用类型（V12 起收敛，替换旧 19 个业务耦合 code）：
+ * <p>数据范围模型为 5 种通用类型（V12 起收敛，替换旧 19 个业务耦合 code）；
+ * 部门匹配一律按<b>部门 ID</b>（单据挂 department_id 外键），与部门改名解耦：
  * <ul>
  *   <li>{@code ALL}：全部单据；</li>
  *   <li>{@code OWN}：仅本人单据；</li>
- *   <li>{@code DEPT}：本部门（与用户部门名称精确匹配）；</li>
- *   <li>{@code DEPT_AND_CHILD}：本部门及以下（经部门闭包表求子树）；</li>
+ *   <li>{@code DEPT}：本部门（与用户主部门 ID 精确匹配）；</li>
+ *   <li>{@code DEPT_AND_CHILD}：本部门及以下（经部门闭包表求子树 ID）；</li>
  *   <li>{@code CUSTOM}：自定义部门集合（角色配置，经 sys_role_scope_department）。</li>
  * </ul>
  * 「本人提交的单据」是所有用户的基线权利，与数据范围类型取并集。
@@ -74,14 +75,14 @@ public class DocumentAccessPolicy {
 
         // 基线：本人提交的单据始终可见
         Specification<OaDocument> result = applicant(currentUser.userId());
-        if (scopes.contains(DEPT)) {
-            result = or(result, departmentNameIn(Set.of(currentUser.department())));
+        if (scopes.contains(DEPT) && currentUser.departmentId() != null) {
+            result = or(result, departmentIdIn(Set.of(currentUser.departmentId())));
         }
-        if (scopes.contains(DEPT_AND_CHILD)) {
-            result = or(result, departmentNameIn(subtreeDepartmentNames(currentUser.department())));
+        if (scopes.contains(DEPT_AND_CHILD) && currentUser.departmentId() != null) {
+            result = or(result, departmentIdIn(subtreeDepartmentIds(currentUser.departmentId())));
         }
         if (scopes.contains(CUSTOM)) {
-            result = or(result, departmentNameIn(customDepartmentNames(currentUser.roles())));
+            result = or(result, departmentIdIn(customDepartmentIds(currentUser.roles())));
         }
         return result;
     }
@@ -111,7 +112,7 @@ public class DocumentAccessPolicy {
         participatedIds.addAll(approvalRecordRepository.findDocumentIdsByApproverId(currentUser.userId()));
         Specification<OaDocument> spec = documentIdIn(participatedIds);
         Set<String> activeInstanceIds = workflowPort
-                .pendingTasksForUser(currentUser.account(), currentUser.roles()).stream()
+                .pendingTasksForUser(currentUser.account(), currentUser.roleIds()).stream()
                 .map(Task::getProcessInstanceId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
@@ -127,31 +128,20 @@ public class DocumentAccessPolicy {
                 : (root, query, builder) -> root.get("id").in(ids);
     }
 
-    /** 本部门及以下的部门名称集合（闭包表求子树；部门字典缺失时退化为仅本部门）。 */
-    private Set<String> subtreeDepartmentNames(String departmentName) {
-        if (departmentName == null) {
-            return Set.of();
-        }
-        return departmentRepository.findByName(departmentName)
-                .map(department -> {
-                    LinkedHashSet<String> names = new LinkedHashSet<>();
-                    for (Long id : departmentRepository.findSubtreeIds(department.getId())) {
-                        departmentRepository.findById(id).map(SysDepartment::getName).ifPresent(names::add);
-                    }
-                    return names;
-                })
-                .orElseGet(() -> new LinkedHashSet<>(Set.of(departmentName)));
+    /** 本部门及以下的部门 ID 集合（闭包表求子树）。 */
+    private Set<Long> subtreeDepartmentIds(Long departmentId) {
+        return new LinkedHashSet<>(departmentRepository.findSubtreeIds(departmentId));
     }
 
-    /** 角色配置的自定义部门名称集合（仅统计数据范围为 CUSTOM 的角色）。 */
-    private Set<String> customDepartmentNames(List<String> roleNames) {
+    /** 角色配置的自定义部门 ID 集合（仅统计数据范围为 CUSTOM 的角色）。 */
+    private Set<Long> customDepartmentIds(List<String> roleNames) {
         if (roleNames == null || roleNames.isEmpty()) {
             return Set.of();
         }
         return roleRepository.findByNameIn(new LinkedHashSet<>(roleNames)).stream()
                 .filter(role -> role.getDataScope() != null && CUSTOM.equals(role.getDataScope().getCode()))
                 .flatMap(role -> role.getScopeDepartments().stream())
-                .map(SysDepartment::getName)
+                .map(SysDepartment::getId)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
     }
 
@@ -159,10 +149,10 @@ public class DocumentAccessPolicy {
         return (root, query, builder) -> builder.equal(root.get("applicant").get("id"), userId);
     }
 
-    private Specification<OaDocument> departmentNameIn(Set<String> departmentNames) {
-        return departmentNames.isEmpty()
+    private Specification<OaDocument> departmentIdIn(Set<Long> departmentIds) {
+        return departmentIds.isEmpty()
                 ? denyAll()
-                : (root, query, builder) -> root.get("department").in(departmentNames);
+                : (root, query, builder) -> root.get("departmentId").in(departmentIds);
     }
 
     private Specification<OaDocument> denyAll() {

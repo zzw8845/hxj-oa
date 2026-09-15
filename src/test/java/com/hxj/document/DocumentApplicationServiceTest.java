@@ -92,9 +92,10 @@ class DocumentApplicationServiceTest {
         FlowConfig config = new FlowConfig();
         config.setType("合作方退款");
         config.setCategory(FlowCategoryEnum.BUSINESS);
+        config.setStatus(FlowStatusEnum.PUBLISHED);
         FlowNodeConfig start = new FlowNodeConfig("发起人", FlowNodeTypeEnum.START);
         FlowNodeConfig managerNode = new FlowNodeConfig("直属主管", FlowNodeTypeEnum.APPROVAL);
-        managerNode.setAssigneeRole("直属主管");
+        managerNode.setAssigneeType(AssigneeTypeEnum.MANAGER);
         config.addNode(start);
         config.addNode(managerNode);
         flowConfigRepository.save(config);
@@ -102,9 +103,10 @@ class DocumentApplicationServiceTest {
         FlowConfig sealConfig = new FlowConfig();
         sealConfig.setType("非标合同审批及用印");
         sealConfig.setCategory(FlowCategoryEnum.SEAL);
+        sealConfig.setStatus(FlowStatusEnum.PUBLISHED);
         FlowNodeConfig sealStart = new FlowNodeConfig("发起人", FlowNodeTypeEnum.START);
         FlowNodeConfig sealManagerNode = new FlowNodeConfig("直属主管", FlowNodeTypeEnum.APPROVAL);
-        sealManagerNode.setAssigneeRole("直属主管");
+        sealManagerNode.setAssigneeType(AssigneeTypeEnum.MANAGER);
         sealConfig.addNode(sealStart);
         sealConfig.addNode(sealManagerNode);
         sealConfig.addNode(new FlowNodeConfig("内控专员用印", FlowNodeTypeEnum.HANDLER));

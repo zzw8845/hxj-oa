@@ -70,6 +70,7 @@ class ApprovalActionServiceIntegrationTest {
     private AuthenticatedUserResponse outsider;
     private AuthenticatedUserResponse admin;
     private FlowConfig config;
+    private SysRole managerRole;
     private long sequence = 0;
 
     @BeforeEach
@@ -85,7 +86,7 @@ class ApprovalActionServiceIntegrationTest {
 
         SysDataScope deptScope = dataScopeRepository.save(
                 new SysDataScope("OWN_DEPARTMENT_DOCUMENTS", "本部门单据"));
-        SysRole managerRole = new SysRole();
+        managerRole = new SysRole();
         managerRole.setName("二级部门负责人");
         managerRole.setDataScope(deptScope);
         roleRepository.saveAndFlush(managerRole);
@@ -115,12 +116,19 @@ class ApprovalActionServiceIntegrationTest {
         config.setCategory(FlowCategoryEnum.DAILY);
         config.addNode(new FlowNodeConfig("发起人", FlowNodeTypeEnum.START));
         FlowNodeConfig managerNode = new FlowNodeConfig("直属主管", FlowNodeTypeEnum.APPROVAL);
-        managerNode.setAssigneeRole("二级部门负责人");
+        managerNode.setAssigneeType(com.hxj.enums.AssigneeTypeEnum.ROLE);
+        managerNode.setAssigneeValue(String.valueOf(managerRole.getId()));
         config.addNode(managerNode);
         FlowNodeConfig gmNode = new FlowNodeConfig("执行总经理审批", FlowNodeTypeEnum.APPROVAL);
-        gmNode.setAssigneeRole("执行总经理");
+        gmNode.setAssigneeType(com.hxj.enums.AssigneeTypeEnum.ROLE);
+        gmNode.setAssigneeValue(String.valueOf(gmRole.getId()));
         config.addNode(gmNode);
         config.addNode(new FlowNodeConfig("抄送财务", FlowNodeTypeEnum.CC));
+        // 图模型转移边：线性链（发起人→主管→执行总经理→抄送财务→结束）
+        config.addTransition(edge(config.getNodes().get(0), config.getNodes().get(1)));
+        config.addTransition(edge(config.getNodes().get(1), config.getNodes().get(2)));
+        config.addTransition(edge(config.getNodes().get(2), config.getNodes().get(3)));
+        config.addTransition(edge(config.getNodes().get(3), null));
         flowConfigRepository.saveAndFlush(config);
     }
 
@@ -247,7 +255,7 @@ class ApprovalActionServiceIntegrationTest {
                 document.getId(), "金额核对无误");
         assertThat(commented.status()).isEqualTo(DocumentStatusEnum.APPROVING);
         // 归还后原审批人可继续处理
-        assertThat(workflowService.pendingTasksForUser("manager1", List.of("二级部门负责人")))
+        assertThat(workflowService.pendingTasksForUser("manager1", List.of(String.valueOf(managerRole.getId()))))
                 .anyMatch(task -> document.getProcessInstanceId().equals(task.getProcessInstanceId()));
     }
 
@@ -414,8 +422,11 @@ class ApprovalActionServiceIntegrationTest {
         sealConfig.setCategory(FlowCategoryEnum.SEAL);
         sealConfig.addNode(new FlowNodeConfig("发起人", FlowNodeTypeEnum.START));
         FlowNodeConfig sealNode = new FlowNodeConfig("内控专员用印", FlowNodeTypeEnum.APPROVAL);
-        sealNode.setAssigneeRole("二级部门负责人");
+        sealNode.setAssigneeType(com.hxj.enums.AssigneeTypeEnum.ROLE);
+        sealNode.setAssigneeValue(String.valueOf(managerRole.getId()));
         sealConfig.addNode(sealNode);
+        sealConfig.addTransition(edge(sealConfig.getNodes().get(0), sealNode));
+        sealConfig.addTransition(edge(sealNode, null));
         flowConfigRepository.saveAndFlush(sealConfig);
 
         FlowNodeConfig firstNode = sealConfig.getNodes().stream()
@@ -464,9 +475,22 @@ class ApprovalActionServiceIntegrationTest {
         return user;
     }
 
+    /** 图模型转移边辅助（无条件默认边）。 */
+    private com.hxj.entity.FlowTransition edge(FlowNodeConfig from, FlowNodeConfig to) {
+        com.hxj.entity.FlowTransition transition = new com.hxj.entity.FlowTransition();
+        transition.setFromNode(from);
+        transition.setToNode(to);
+        return transition;
+    }
+
     private AuthenticatedUserResponse auth(SysUser user, List<String> roles) {
+        // 角色 ID 按角色名查库解析（user 在测试方法中可能已脱离会话，直接遍历其 lazy 角色集合会抛异常）
+        List<String> roleIds = roleRepository.findByNameIn(new java.util.LinkedHashSet<>(roles)).stream()
+                .map(role -> String.valueOf(role.getId())).toList();
         return new AuthenticatedUserResponse(user.getId(), user.getAccount(), user.getName(),
-                user.getDepartment(), user.getPost(), roles, List.of(), List.of("OWN"));
+                user.getDepartment(), user.getDepartmentId(), user.getPost(), roles,
+                roleIds,
+                List.of(), List.of("OWN"));
     }
 
     @Test
@@ -477,8 +501,10 @@ class ApprovalActionServiceIntegrationTest {
         managerFlow.setCategory(FlowCategoryEnum.DAILY);
         managerFlow.addNode(new FlowNodeConfig("发起人", FlowNodeTypeEnum.START));
         FlowNodeConfig managerNode = new FlowNodeConfig("直属主管审批", FlowNodeTypeEnum.APPROVAL);
-        managerNode.setAssigneeRole("直属主管");
+        managerNode.setAssigneeType(com.hxj.enums.AssigneeTypeEnum.MANAGER);
         managerFlow.addNode(managerNode);
+        managerFlow.addTransition(edge(managerFlow.getNodes().get(0), managerNode));
+        managerFlow.addTransition(edge(managerNode, null));
         flowConfigRepository.saveAndFlush(managerFlow);
 
         sequence++;

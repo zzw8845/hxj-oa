@@ -63,7 +63,7 @@ public class DashboardService {
         long rejected = documentRepository.count(visible
                 .and((root, cq, builder) -> builder.equal(root.get("status"), DocumentStatusEnum.REJECTED)));
         long pendingMyApproval = workflowPort
-                .pendingTasksForUser(currentUser.account(), currentUser.roles()).size();
+                .pendingTasksForUser(currentUser.account(), currentUser.roleIds()).size();
 
         YearMonth month = YearMonth.from(LocalDate.now(zone));
         long monthlyCompleted = completedIn(month, visible);
@@ -99,7 +99,7 @@ public class DashboardService {
     public List<DashboardViews.Todo> todoList() {
         AuthenticatedUserResponse currentUser = CurrentUser.require();
         List<OaDocument> pending = workflowPort
-                .pendingTasksForUser(currentUser.account(), currentUser.roles()).stream()
+                .pendingTasksForUser(currentUser.account(), currentUser.roleIds()).stream()
                 .map(task -> documentRepository.findByProcessInstanceId(task.getProcessInstanceId()))
                 .filter(java.util.Optional::isPresent)
                 .map(java.util.Optional::get)
