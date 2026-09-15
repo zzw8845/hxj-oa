@@ -1,11 +1,14 @@
 package com.hxj.workflow;
 
+import com.hxj.enums.ApproveModeEnum;
 import com.hxj.enums.AssigneeScopeEnum;
-import com.hxj.enums.AssigneeTypeEnum;
+import com.hxj.enums.AssigneeSubjectEnum;
 import com.hxj.enums.ConditionOperatorEnum;
+import com.hxj.enums.EmptyAssigneeStrategyEnum;
 import com.hxj.enums.FlowCategoryEnum;
 import com.hxj.enums.FlowNodeTypeEnum;
 import com.hxj.enums.FlowStatusEnum;
+import com.hxj.enums.NodeApprovalModeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
@@ -34,14 +37,21 @@ public final class FlowConfigItems {
         }
     }
 
-    /** 节点条目（展示 + 配置）。 */
+    /** 节点条目（六维审批人配置 + 展示辅助）。 */
     public record NodeConfig(
             @Schema(description = "节点名称（纯展示，不参与路由）") String name,
             @Schema(description = "节点类型（枚举）") FlowNodeTypeEnum nodeType,
-            @Schema(description = "审批人解析协议（枚举）") AssigneeTypeEnum assigneeType,
-            @Schema(description = "审批人参数（仅 ROLE：候选角色ID逗号分隔）") String assigneeValue,
-            @Schema(description = "审批人范围（仅 ROLE：GLOBAL 全部成员 / INITIATOR_DEPT 按发起人部门）") AssigneeScopeEnum assigneeScope,
-            @Schema(description = "候选角色名（展示用，由角色ID解析）") String assigneeRoleNames,
+            @Schema(description = "审批主体（枚举）") AssigneeSubjectEnum assigneeSubject,
+            @Schema(description = "主体参数（账号/角色ID/字段键，逗号分隔）") String assigneeValue,
+            @Schema(description = "主体参数展示文本（角色名/成员名，由 ID 解析）") String assigneeValueText,
+            @Schema(description = "组织范围（枚举）") AssigneeScopeEnum assigneeScope,
+            @Schema(description = "表单部门控件字段键（范围=FORM_DEPT 时）") String assigneeScopeValue,
+            @Schema(description = "主管层级（1-8）") Integer assigneeLevel,
+            @Schema(description = "连续多级（逐级审到第 N 级）") boolean assigneeChain,
+            @Schema(description = "多人方式（或签/会签/依次）") ApproveModeEnum approveMode,
+            @Schema(description = "空策略（找不到审批人时）") EmptyAssigneeStrategyEnum emptyStrategy,
+            @Schema(description = "空策略兜底账号（TO_USER 时）") String emptyFallback,
+            @Schema(description = "审批类型（人工/自动通过/自动拒绝）") NodeApprovalModeEnum approvalMode,
             @Schema(description = "抄送目标（JSON 数组，仅抄送节点）") String ccTargets) {
     }
 
@@ -49,7 +59,7 @@ public final class FlowConfigItems {
     public record Transition(
             @Schema(description = "源节点名称") String fromNodeName,
             @Schema(description = "目标节点名称；空表示转移至流程结束") String toNodeName,
-            @Schema(description = "条件变量（须为该流程绑定模板中标记“参与流程条件”的字段）；空表示无条件边") String variableName,
+            @Schema(description = "条件变量（须为该流程可用变量：模板字段或系统字段）；空表示无条件边") String variableName,
             @Schema(description = "比较操作符（枚举）") ConditionOperatorEnum operator,
             @Schema(description = "期望值") String expectedValue,
             @Schema(description = "优先级（同源多条条件边的求值顺序）") int sortOrder) {
@@ -85,24 +95,43 @@ public final class FlowConfigItems {
             transitions = transitions == null ? List.of() : List.copyOf(transitions);
         }
 
+        /** 节点载荷：六维审批人配置，除节点名与类型外全部可选（按主体解释）。 */
         public record FlowNodePayload(
                 @Schema(description = "节点名称（全流程唯一）") String name,
                 @Schema(description = "节点类型（枚举）") FlowNodeTypeEnum nodeType,
-                @Schema(description = "审批人解析协议（枚举）") AssigneeTypeEnum assigneeType,
-                @Schema(description = "审批人参数（仅 ROLE：候选角色ID逗号分隔）") String assigneeValue,
-                @Schema(description = "审批人范围（仅 ROLE：GLOBAL / INITIATOR_DEPT，空按 GLOBAL）") AssigneeScopeEnum assigneeScope,
+                @Schema(description = "审批主体（枚举）") AssigneeSubjectEnum assigneeSubject,
+                @Schema(description = "主体参数（账号/角色ID/字段键，逗号分隔）") String assigneeValue,
+                @Schema(description = "组织范围（枚举）") AssigneeScopeEnum assigneeScope,
+                @Schema(description = "表单部门控件字段键（范围=FORM_DEPT 时）") String assigneeScopeValue,
+                @Schema(description = "主管层级（1-8，仅 SUPERIOR / DEPT_HEAD）") Integer assigneeLevel,
+                @Schema(description = "连续多级（逐级审到第 N 级，仅主管类）") Boolean assigneeChain,
+                @Schema(description = "多人方式（或签/会签/依次，默认或签）") ApproveModeEnum approveMode,
+                @Schema(description = "空策略（找不到审批人时；空=提交即拒）") EmptyAssigneeStrategyEnum emptyStrategy,
+                @Schema(description = "空策略兜底账号（TO_USER 时必填）") String emptyFallback,
+                @Schema(description = "审批类型（人工/自动通过/自动拒绝，默认人工）") NodeApprovalModeEnum approvalMode,
                 @Schema(description = "抄送目标（JSON 数组，仅抄送节点）") String ccTargets) {
 
-            /** 兼容无范围、无抄送（非 ROLE、非抄送节点）。 */
+            /** 兼容最小载荷（仅主体，如指定成员/发起人）。 */
             public FlowNodePayload(String name, FlowNodeTypeEnum nodeType,
-                                   AssigneeTypeEnum assigneeType, String assigneeValue) {
-                this(name, nodeType, assigneeType, assigneeValue, null, null);
+                                   AssigneeSubjectEnum assigneeSubject, String assigneeValue) {
+                this(name, nodeType, assigneeSubject, assigneeValue, null, null, null, null,
+                        null, null, null, null, null);
             }
 
-            /** 兼容无范围但有抄送（抄送节点）。 */
+            /** 兼容无主体但有抄送目标（抄送节点）。 */
             public FlowNodePayload(String name, FlowNodeTypeEnum nodeType,
-                                   AssigneeTypeEnum assigneeType, String assigneeValue, String ccTargets) {
-                this(name, nodeType, assigneeType, assigneeValue, null, ccTargets);
+                                   AssigneeSubjectEnum assigneeSubject, String assigneeValue,
+                                   String ccTargets) {
+                this(name, nodeType, assigneeSubject, assigneeValue, null, null, null, null,
+                        null, null, null, null, ccTargets);
+            }
+
+            /** 兼容角色主体 + 范围（钉钉"角色 + 管理范围"）。 */
+            public FlowNodePayload(String name, FlowNodeTypeEnum nodeType,
+                                   AssigneeSubjectEnum assigneeSubject, String assigneeValue,
+                                   AssigneeScopeEnum assigneeScope, Boolean assigneeChain) {
+                this(name, nodeType, assigneeSubject, assigneeValue, assigneeScope, null, null,
+                        assigneeChain, null, null, null, null, null);
             }
         }
 

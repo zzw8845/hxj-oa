@@ -18,7 +18,11 @@ public enum ConditionOperatorEnum {
     /** 小于。 */
     LESS_THAN(5,"小于"),
     /** 小于等于。 */
-    LESS_THAN_OR_EQUAL(6,"小于等于");
+    LESS_THAN_OR_EQUAL(6,"小于等于"),
+    /** 属于（集合判断，期望值为逗号分隔的多个值；编译为等值或链）。 */
+    IN(7,"属于"),
+    /** 不属于（集合判断；编译为不等值与链）。 */
+    NOT_IN(8,"不属于");
 
 
     private final Integer code;

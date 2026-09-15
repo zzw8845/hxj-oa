@@ -170,9 +170,16 @@ CREATE TABLE `flow_node_config` (
   `node_type` varchar(30) NOT NULL COMMENT '节点类型',
   `sort_order` int NOT NULL COMMENT '节点顺序',
   `cc_targets` text,
-  `assignee_type` varchar(30) DEFAULT NULL,
-  `assignee_value` varchar(500) DEFAULT NULL,
-  `assignee_scope` varchar(30) DEFAULT NULL COMMENT '审批人范围（仅ROLE：GLOBAL全部成员/INITIATOR_DEPT按发起人部门）',
+  `assignee_subject` varchar(30) DEFAULT NULL COMMENT '审批主体（MEMBER/INITIATOR/INITIATOR_SELECT/ROLE/SUPERIOR/DEPT_HEAD/FORM_MEMBER）',
+  `assignee_value` varchar(500) DEFAULT NULL COMMENT '主体参数（账号/角色ID/字段键，逗号分隔）',
+  `assignee_scope` varchar(30) DEFAULT NULL COMMENT '组织范围（GLOBAL/INITIATOR_DEPT/FORM_DEPT）',
+  `assignee_scope_value` varchar(100) DEFAULT NULL COMMENT '表单部门控件字段键（范围=FORM_DEPT）',
+  `assignee_level` int DEFAULT NULL COMMENT '主管层级1-8（SUPERIOR/DEPT_HEAD）',
+  `assignee_chain` tinyint(1) NOT NULL DEFAULT '0' COMMENT '连续多级（逐级审到第N级）',
+  `approve_mode` varchar(20) NOT NULL DEFAULT 'OR_SIGN' COMMENT '多人方式（OR_SIGN/AND_SIGN/SEQUENTIAL）',
+  `empty_strategy` varchar(20) DEFAULT NULL COMMENT '空策略（AUTO_PASS/AUTO_REJECT/TO_ADMIN/TO_USER）',
+  `empty_fallback` varchar(100) DEFAULT NULL COMMENT '空策略兜底账号（TO_USER）',
+  `approval_mode` varchar(20) NOT NULL DEFAULT 'MANUAL' COMMENT '审批类型（MANUAL/AUTO_PASS/AUTO_REJECT）',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_flow_node_order` (`flow_config_id`,`sort_order`),
   CONSTRAINT `fk_flow_node_config` FOREIGN KEY (`flow_config_id`) REFERENCES `flow_config` (`id`) ON DELETE CASCADE
@@ -1018,7 +1025,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `flow_node_config` WRITE;
 /*!40000 ALTER TABLE `flow_node_config` DISABLE KEYS */;
-INSERT INTO `flow_node_config` (`id`, `flow_config_id`, `name`, `node_type`, `sort_order`, `cc_targets`, `assignee_type`, `assignee_value`, `assignee_scope`) VALUES (1,1,'发起人','START',0,NULL,NULL,NULL,NULL),(2,1,'直属主管','APPROVAL',1,NULL,'MANAGER',NULL,NULL),(3,1,'会计（按部门）','APPROVAL',2,NULL,'ROLE','33','INITIATOR_DEPT'),(4,1,'财务经理（大额）','APPROVAL',3,NULL,'ROLE','38',NULL),(5,1,'出纳','APPROVAL',4,NULL,'ROLE','29',NULL),(6,1,'抄送相关负责人','CC',5,'[{"type":"ROLE","value":"26"}]',NULL,NULL,NULL),(7,1,'结束','END',6,NULL,NULL,NULL,NULL);
+INSERT INTO `flow_node_config` (`id`, `flow_config_id`, `name`, `node_type`, `sort_order`, `cc_targets`, `assignee_subject`, `assignee_value`, `assignee_scope`, `assignee_scope_value`, `assignee_level`, `assignee_chain`, `approve_mode`, `empty_strategy`, `empty_fallback`, `approval_mode`) VALUES (1,1,'发起人','START',0,NULL,NULL,NULL,NULL,NULL,NULL,0,'OR_SIGN',NULL,NULL,'MANUAL'),(2,1,'直属主管','APPROVAL',1,NULL,'SUPERIOR',NULL,NULL,NULL,1,0,'OR_SIGN','AUTO_PASS',NULL,'MANUAL'),(3,1,'会计（按部门）','APPROVAL',2,NULL,'ROLE','33','INITIATOR_DEPT',NULL,NULL,0,'OR_SIGN',NULL,NULL,'MANUAL'),(4,1,'财务经理（大额）','APPROVAL',3,NULL,'ROLE','38',NULL,NULL,NULL,0,'OR_SIGN',NULL,NULL,'MANUAL'),(5,1,'出纳','APPROVAL',4,NULL,'ROLE','29',NULL,NULL,NULL,0,'OR_SIGN',NULL,NULL,'MANUAL'),(6,1,'抄送相关负责人','CC',5,'[{"type":"ROLE","value":"26"}]',NULL,NULL,NULL,NULL,NULL,0,'OR_SIGN',NULL,NULL,'MANUAL'),(7,1,'结束','END',6,NULL,NULL,NULL,NULL,NULL,NULL,0,'OR_SIGN',NULL,NULL,'MANUAL');
 /*!40000 ALTER TABLE `flow_node_config` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

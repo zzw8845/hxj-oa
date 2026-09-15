@@ -1,6 +1,6 @@
 package com.hxj.workflow;
 
-import com.hxj.enums.AssigneeTypeEnum;
+import com.hxj.enums.AssigneeSubjectEnum;
 import com.hxj.enums.ConditionOperatorEnum;
 import com.hxj.enums.FlowCategoryEnum;
 import com.hxj.enums.FlowNodeTypeEnum;
@@ -90,13 +90,15 @@ class FlowConfigManagementServiceTest {
 
     private FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload roleNode(String name, Long roleId) {
         return new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload(
-                name, FlowNodeTypeEnum.APPROVAL, AssigneeTypeEnum.ROLE, String.valueOf(roleId), null);
+                name, FlowNodeTypeEnum.APPROVAL, AssigneeSubjectEnum.ROLE, String.valueOf(roleId));
     }
 
-    private FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload typedNode(
-            String name, AssigneeTypeEnum assigneeType) {
+    /** 主管类节点（主体 + 层级 + 连续多级）：对应钉钉"直属主管/部门主管/连续多级主管"。 */
+    private FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload superiorNode(
+            String name, AssigneeSubjectEnum subject, Integer level, Boolean chain) {
         return new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload(
-                name, FlowNodeTypeEnum.APPROVAL, assigneeType, null, null);
+                name, FlowNodeTypeEnum.APPROVAL, subject, null, null, null,
+                level, chain, null, null, null, null, null);
     }
 
     private FlowConfigItems.SaveFlowConfigRequest.FlowTransitionPayload edge(String from, String to) {
@@ -207,8 +209,8 @@ class FlowConfigManagementServiceTest {
         assertThat(detail.nodes()).extracting(FlowConfigItems.NodeConfig::nodeType)
                 .containsExactly(FlowNodeTypeEnum.START, FlowNodeTypeEnum.APPROVAL,
                         FlowNodeTypeEnum.APPROVAL, FlowNodeTypeEnum.CC);
-        // 候选角色名由角色ID解析展示
-        assertThat(detail.nodes().get(1).assigneeRoleNames()).isEqualTo("二级部门负责人");
+        // 主体参数展示文本由角色 ID 解析
+        assertThat(detail.nodes().get(1).assigneeValueText()).isEqualTo("二级部门负责人");
         assertThat(detail.transitions()).hasSize(5);
         assertThat(detail.transitions().stream().anyMatch(t -> t.variableName() == null))
                 .as("默认边（无条件）应存在").isTrue();
@@ -235,7 +237,7 @@ class FlowConfigManagementServiceTest {
                 List.of(edge("发起人", "审批节点")));
         assertThatThrownBy(() -> managementService.create(invalid))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("审批人解析方式");
+                .hasMessageContaining("审批主体");
     }
 
     @Test
@@ -257,12 +259,11 @@ class FlowConfigManagementServiceTest {
                 "费用报销", FlowCategoryEnum.DAILY,
                 List.of(
                         node("发起人", FlowNodeTypeEnum.START),
-                        new FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload(
-                                "直属主管", FlowNodeTypeEnum.APPROVAL, AssigneeTypeEnum.MANAGER, "123", null)),
+                        superiorNode("直属主管", AssigneeSubjectEnum.SUPERIOR, 99, null)),
                 List.of(edge("发起人", "直属主管")));
         assertThatThrownBy(() -> managementService.create(invalid))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("不接受角色参数");
+                .hasMessageContaining("主管层级需在 1-8");
     }
 
     @Test
@@ -271,8 +272,8 @@ class FlowConfigManagementServiceTest {
                 "费用报销", FlowCategoryEnum.DAILY,
                 List.of(
                         node("发起人", FlowNodeTypeEnum.START),
-                        typedNode("直属主管", AssigneeTypeEnum.MANAGER),
-                        typedNode("逐级主管", AssigneeTypeEnum.MANAGER_CHAIN)),
+                        superiorNode("直属主管", AssigneeSubjectEnum.SUPERIOR, 1, null),
+                        superiorNode("逐级主管", AssigneeSubjectEnum.DEPT_HEAD, 2, true)),
                 List.of(
                         edge("发起人", "直属主管"),
                         edge("直属主管", "逐级主管"),

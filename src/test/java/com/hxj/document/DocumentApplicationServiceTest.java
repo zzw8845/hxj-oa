@@ -51,8 +51,7 @@ import com.hxj.exception.BusinessException;
         DocumentAccessPolicy.class,
         LocalAttachmentStorage.class,
         com.hxj.approval.ApprovalActionService.class,
-        com.hxj.workflow.DeptScopedRoleResolver.class,
-        com.hxj.workflow.SupervisorChainResolver.class,
+        com.hxj.workflow.AssigneeResolver.class,
         FormTemplateManagementService.class,
         DocumentApplicationServiceTest.Config.class
 })
@@ -95,7 +94,7 @@ class DocumentApplicationServiceTest {
         config.setStatus(FlowStatusEnum.PUBLISHED);
         FlowNodeConfig start = new FlowNodeConfig("发起人", FlowNodeTypeEnum.START);
         FlowNodeConfig managerNode = new FlowNodeConfig("直属主管", FlowNodeTypeEnum.APPROVAL);
-        managerNode.setAssigneeType(AssigneeTypeEnum.MANAGER);
+        managerNode.setAssigneeSubject(com.hxj.enums.AssigneeSubjectEnum.DEPT_HEAD);
         config.addNode(start);
         config.addNode(managerNode);
         flowConfigRepository.save(config);
@@ -106,7 +105,7 @@ class DocumentApplicationServiceTest {
         sealConfig.setStatus(FlowStatusEnum.PUBLISHED);
         FlowNodeConfig sealStart = new FlowNodeConfig("发起人", FlowNodeTypeEnum.START);
         FlowNodeConfig sealManagerNode = new FlowNodeConfig("直属主管", FlowNodeTypeEnum.APPROVAL);
-        sealManagerNode.setAssigneeType(AssigneeTypeEnum.MANAGER);
+        sealManagerNode.setAssigneeSubject(com.hxj.enums.AssigneeSubjectEnum.DEPT_HEAD);
         sealConfig.addNode(sealStart);
         sealConfig.addNode(sealManagerNode);
         sealConfig.addNode(new FlowNodeConfig("内控专员用印", FlowNodeTypeEnum.HANDLER));
@@ -318,21 +317,22 @@ class DocumentApplicationServiceTest {
     void shouldResolveManagerAccountFromDepartmentLeaderWhenNoManagerSet() {
         TestSecurityContext.mock(principal);
         service.submit(paymentRequest(null, List.of()));
-        // applicant 无 manager_id → 直属主管节点应指派给业务部负责人 dept-leader
-        assertThat(workflow.startedVariables.get("managerAccount")).isEqualTo("dept-leader");
+        // 部门主管节点按节点级候选变量派发：值应为业务部负责人 dept-leader
+        assertThat(workflow.startedVariables.values().stream().map(String::valueOf).toList())
+                .anyMatch(value -> value.contains("dept-leader"));
     }
 
     @Test
     void shouldRejectSubmitWhenSupervisorUnresolvable() {
         TestSecurityContext.mock(principal);
-        // 清除业务部负责人：申请人无直属主管 + 部门及上级均无负责人 → 提交即拒（不再卡单等管理员救）
+        // 清除业务部负责人：部门主管节点解析为空且未配空策略 → 提交即拒（不再卡单等管理员救）
         departmentRepository.findByName("业务部").ifPresent(department -> {
             department.setLeaderUserId(null);
             departmentRepository.save(department);
         });
         assertThatThrownBy(() -> service.submit(paymentRequest(null, List.of())))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("无法路由");
+                .hasMessageContaining("无法解析下列审批节点的审批人");
     }
 
     private SysUser saveUser(String account, String department) {

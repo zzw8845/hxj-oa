@@ -252,7 +252,7 @@ class PermissionManagementServiceTest {
         flowConfig.setType("测试流程");
         flowConfig.setCategory(FlowCategoryEnum.DAILY);
         FlowNodeConfig node = new FlowNodeConfig("直属主管", FlowNodeTypeEnum.APPROVAL);
-        node.setAssigneeType(com.hxj.enums.AssigneeTypeEnum.ROLE);
+        node.setAssigneeSubject(com.hxj.enums.AssigneeSubjectEnum.ROLE);
         node.setAssigneeValue(role.getId() + ",88888");
         flowConfig.addNode(node);
         flowConfigRepository.saveAndFlush(flowConfig);
@@ -301,7 +301,7 @@ class PermissionManagementServiceTest {
         flowConfig.setType("改名同步流程");
         flowConfig.setCategory(FlowCategoryEnum.DAILY);
         FlowNodeConfig node = new FlowNodeConfig("直属主管", FlowNodeTypeEnum.APPROVAL);
-        node.setAssigneeType(com.hxj.enums.AssigneeTypeEnum.ROLE);
+        node.setAssigneeSubject(com.hxj.enums.AssigneeSubjectEnum.ROLE);
         node.setAssigneeValue(String.valueOf(role.getId()));
         flowConfig.addNode(node);
         flowConfigRepository.saveAndFlush(flowConfig);

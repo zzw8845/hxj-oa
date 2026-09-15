@@ -7,9 +7,14 @@ import com.hxj.entity.FlowConfig;
 import com.hxj.entity.FlowNodeConfig;
 import com.hxj.entity.FlowTransition;
 import com.hxj.entity.SysRole;
-import com.hxj.enums.AssigneeTypeEnum;
+import com.hxj.enums.ApproveModeEnum;
+import com.hxj.enums.AssigneeScopeEnum;
+import com.hxj.enums.AssigneeSubjectEnum;
+import com.hxj.enums.ConditionOperatorEnum;
+import com.hxj.enums.EmptyAssigneeStrategyEnum;
 import com.hxj.enums.FlowNodeTypeEnum;
 import com.hxj.enums.FlowStatusEnum;
+import com.hxj.enums.NodeApprovalModeEnum;
 import com.hxj.exception.BusinessException;
 import com.hxj.repository.FlowConfigRepository;
 import com.hxj.repository.FlowNodeConfigRepository;
@@ -106,6 +111,8 @@ public class FlowConfigManagementService {
             case GREATER_THAN_OR_EQUAL -> "≥";
             case LESS_THAN -> "<";
             case LESS_THAN_OR_EQUAL -> "≤";
+            case IN -> "属于";
+            case NOT_IN -> "不属于";
         };
         String target = transition.getToNode() == null ? "流程结束" : transition.getToNode().getName();
         return transition.getFromNode().getName() + ": " + transition.getConditionVariable()
@@ -204,12 +211,18 @@ public class FlowConfigManagementService {
         Map<String, FlowNodeConfig> nodeByName = new LinkedHashMap<>();
         for (FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload payload : request.nodes()) {
             FlowNodeConfig entity = new FlowNodeConfig(payload.name(), payload.nodeType());
-            entity.setAssigneeType(payload.assigneeType());
-            // 角色参数与范围仅对 ROLE 有语义，其余类型一律置空（机制层不接受业务参数）
-            entity.setAssigneeValue(payload.assigneeType() == AssigneeTypeEnum.ROLE
-                    ? payload.assigneeValue() : null);
-            entity.setAssigneeScope(payload.assigneeType() == AssigneeTypeEnum.ROLE
-                    ? payload.assigneeScope() : null);
+            entity.setAssigneeSubject(payload.assigneeSubject());
+            entity.setAssigneeValue(trimToNull(payload.assigneeValue()));
+            entity.setAssigneeScope(payload.assigneeScope());
+            entity.setAssigneeScopeValue(trimToNull(payload.assigneeScopeValue()));
+            entity.setAssigneeLevel(payload.assigneeLevel());
+            entity.setAssigneeChain(Boolean.TRUE.equals(payload.assigneeChain()));
+            entity.setApproveMode(payload.approveMode() == null
+                    ? ApproveModeEnum.OR_SIGN : payload.approveMode());
+            entity.setEmptyStrategy(payload.emptyStrategy());
+            entity.setEmptyFallback(trimToNull(payload.emptyFallback()));
+            entity.setApprovalMode(payload.approvalMode() == null
+                    ? NodeApprovalModeEnum.MANUAL : payload.approvalMode());
             entity.setCcTargets(payload.ccTargets());
             config.addNode(entity);
             nodeByName.put(payload.name(), entity);
@@ -253,13 +266,16 @@ public class FlowConfigManagementService {
             if (!seenNodeNames.add(node.name())) {
                 throw new BusinessException(ErrorCodeEnum.FLOW_NODE_DUPLICATE, "流程节点名称不能重复：" + node.name());
             }
-            if ((node.nodeType() == FlowNodeTypeEnum.APPROVAL
+            // 人工审批节点必须指定审批主体；自动通过/自动拒绝节点由服务任务处理，无需主体
+            boolean manualApproval = (node.nodeType() == FlowNodeTypeEnum.APPROVAL
                     || node.nodeType() == FlowNodeTypeEnum.HANDLER)
-                    && node.assigneeType() == null) {
+                    && (node.approvalMode() == null
+                    || node.approvalMode() == NodeApprovalModeEnum.MANUAL);
+            if (manualApproval && node.assigneeSubject() == null) {
                 throw new BusinessException(ErrorCodeEnum.FLOW_ASSIGNEE_REQUIRED,
-                        "审批节点需指定审批人解析方式：" + node.name());
+                        "审批节点需指定审批主体：" + node.name());
             }
-            if (node.assigneeType() != null) {
+            if (node.assigneeSubject() != null) {
                 validateAssignee(node);
             }
             // 抄送目标在保存关口做完整校验：坏配置若流入运行时，会在流程走到抄送节点时
@@ -292,7 +308,8 @@ public class FlowConfigManagementService {
                     throw new BusinessException(ErrorCodeEnum.FLOW_RULE_INVALID,
                             "条件转移不完整（需操作符与期望值）：" + edge.fromNodeName());
                 }
-                validateConditionValue(edge.variableName().trim(), edge.expectedValue(), availableVariables);
+                validateConditionValue(edge.variableName().trim(), edge.operator(),
+                        edge.expectedValue(), availableVariables);
             }
             outBySource.computeIfAbsent(edge.fromNodeName(), key -> new ArrayList<>()).add(edge);
         }
@@ -333,54 +350,140 @@ public class FlowConfigManagementService {
         validateReachability(request, startName, endNodeNames);
     }
 
-    /** 审批人协议校验：ROLE 引用的角色 ID 必须真实存在，其余类型不接受参数。 */
+    /**
+     * 审批人六维配置校验：主体必填、主体参数按主体解释、范围/层级/空策略各自合法。
+     * 保存关口是唯一入口——校验通过即保证编译与运行期不会求值失败。
+     */
     private void validateAssignee(FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload node) {
-        if (node.assigneeType() == AssigneeTypeEnum.ROLE) {
-            if (!StringUtils.hasText(node.assigneeValue())) {
-                throw new BusinessException(ErrorCodeEnum.FLOW_ASSIGNEE_REQUIRED,
-                        "角色候选组节点需提供角色ID：" + node.name());
-            }
-            for (String piece : node.assigneeValue().split(",")) {
-                String roleId = piece.trim();
-                if (!StringUtils.hasText(roleId) || !roleId.matches("\\d+")) {
-                    throw new BusinessException(ErrorCodeEnum.FLOW_NODE_INVALID,
-                            "角色ID格式错误（应为数字ID逗号分隔）：" + node.assigneeValue());
-                }
-                if (!sysRoleRepository.findById(Long.valueOf(roleId)).isPresent()) {
-                    throw new BusinessException(ErrorCodeEnum.FLOW_NODE_INVALID,
-                            "审批人引用的角色不存在（ID=" + roleId + "）：" + node.name());
-                }
-            }
-            return;
+        AssigneeSubjectEnum subject = node.assigneeSubject();
+        if (subject == null) {
+            throw new BusinessException(ErrorCodeEnum.FLOW_ASSIGNEE_REQUIRED,
+                    "审批节点需指定审批主体：" + node.name());
         }
-        // 机制层与业务层分离：任何非 ROLE 类型都不得携带角色参数或范围参数
-        if (StringUtils.hasText(node.assigneeValue()) || node.assigneeScope() != null) {
+        switch (subject) {
+            case MEMBER -> {
+                if (!StringUtils.hasText(node.assigneeValue())) {
+                    throw new BusinessException(ErrorCodeEnum.FLOW_ASSIGNEE_REQUIRED,
+                            "指定成员节点需提供账号：" + node.name());
+                }
+                for (String account : split(node.assigneeValue())) {
+                    if (sysUserRepository.findByAccount(account).isEmpty()) {
+                        throw new BusinessException(ErrorCodeEnum.FLOW_NODE_INVALID,
+                                "审批人账号不存在：" + account + "（节点 " + node.name() + "）");
+                    }
+                }
+            }
+            case ROLE -> {
+                if (!StringUtils.hasText(node.assigneeValue())) {
+                    throw new BusinessException(ErrorCodeEnum.FLOW_ASSIGNEE_REQUIRED,
+                            "角色节点需提供角色ID：" + node.name());
+                }
+                for (String roleId : split(node.assigneeValue())) {
+                    if (!roleId.matches("\\d+")
+                            || sysRoleRepository.findById(Long.valueOf(roleId)).isEmpty()) {
+                        throw new BusinessException(ErrorCodeEnum.FLOW_NODE_INVALID,
+                                "审批人引用的角色不存在（ID=" + roleId + "）：" + node.name());
+                    }
+                }
+            }
+            case FORM_MEMBER -> requireFieldKey(node, "表单联系人节点需指定人员控件字段");
+            case SUPERIOR, DEPT_HEAD -> validateLevel(node);
+            case INITIATOR, INITIATOR_SELECT -> {
+                // 无主体参数：自选节点可选配置范围，由前端约束
+            }
+        }
+        // 组织范围：仅角色与部门主管支持，FORM_DEPT 需给出部门控件字段键
+        if (node.assigneeScope() != null) {
+            if (subject != AssigneeSubjectEnum.ROLE && subject != AssigneeSubjectEnum.DEPT_HEAD) {
+                throw new BusinessException(ErrorCodeEnum.FLOW_NODE_INVALID,
+                        "该审批主体不支持组织范围：" + node.name());
+            }
+            if (node.assigneeScope() == AssigneeScopeEnum.FORM_DEPT) {
+                requireFieldKey(node, "按表单部门范围需指定部门控件字段");
+            }
+        }
+        // 空策略：转交指定成员必须给出真实存在的账号
+        if (node.emptyStrategy() == EmptyAssigneeStrategyEnum.TO_USER
+                && !StringUtils.hasText(node.emptyFallback())) {
             throw new BusinessException(ErrorCodeEnum.FLOW_NODE_INVALID,
-                    "该审批人类型不接受角色参数：" + node.name());
+                    "空策略为「转交指定成员」时必须提供兜底账号：" + node.name());
+        }
+        if (StringUtils.hasText(node.emptyFallback())
+                && sysUserRepository.findByAccount(node.emptyFallback().trim()).isEmpty()) {
+            throw new BusinessException(ErrorCodeEnum.FLOW_NODE_INVALID,
+                    "空策略兜底账号不存在：" + node.emptyFallback());
         }
     }
 
-    /** 条件比较值与字段声明的类型匹配：不匹配会在网关求值时抛异常导致流程永久卡死。 */
-    private void validateConditionValue(String variableName, String expectedValue,
+    /** 主管层级校验：钉钉最高 8 级。 */
+    private void validateLevel(FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload node) {
+        Integer level = node.assigneeLevel();
+        if (level != null && (level < 1 || level > 8)) {
+            throw new BusinessException(ErrorCodeEnum.FLOW_NODE_INVALID,
+                    "主管层级需在 1-8 之间：" + node.name());
+        }
+    }
+
+    /** 表单字段键校验（表单联系人 / 部门控件范围）：保存流程时可早于模板绑定，故只校验非空。 */
+    private void requireFieldKey(FlowConfigItems.SaveFlowConfigRequest.FlowNodePayload node, String message) {
+        String fieldKey = node.assigneeSubject() == AssigneeSubjectEnum.FORM_MEMBER
+                ? node.assigneeValue() : node.assigneeScopeValue();
+        if (!StringUtils.hasText(fieldKey)) {
+            throw new BusinessException(ErrorCodeEnum.FLOW_NODE_INVALID, message + "：" + node.name());
+        }
+    }
+
+    private static List<String> split(String value) {
+        List<String> pieces = new ArrayList<>();
+        if (value == null) {
+            return pieces;
+        }
+        for (String piece : value.split(",")) {
+            if (!piece.isBlank()) {
+                pieces.add(piece.trim());
+            }
+        }
+        return pieces;
+    }
+
+    /**
+     * 条件比较值校验：变量须在可用目录内，比较值须与变量类型匹配，集合判断逐值校验。
+     * 不匹配会在网关求值时抛异常导致流程永久卡死，故必须挡在保存关口。
+     */
+    private void validateConditionValue(String variableName, ConditionOperatorEnum operator,
+                                        String expectedValue,
                                         Map<String, WorkflowVariables.ValueTypeEnum> availableVariables) {
         WorkflowVariables.ValueTypeEnum type = availableVariables.get(variableName);
         if (type == null) {
             throw new BusinessException(ErrorCodeEnum.FLOW_RULE_INVALID,
                     "条件变量不可用：" + variableName
-                            + "（请在所绑定模板中勾选该字段“参与流程条件”；当前可用："
+                            + "（可用变量：模板中勾选“参与流程条件”的字段、系统字段、保留键；当前可用："
                             + String.join(" / ", availableVariables.keySet()) + "）");
         }
+        boolean collection = operator == ConditionOperatorEnum.IN || operator == ConditionOperatorEnum.NOT_IN;
+        List<String> values = collection ? split(expectedValue) : List.of(expectedValue);
+        if (values.isEmpty()) {
+            throw new BusinessException(ErrorCodeEnum.FLOW_RULE_INVALID,
+                    variableName + " 的集合条件至少需要一个比较值");
+        }
+        for (String value : values) {
+            validateSingleValue(variableName, type, value);
+        }
+    }
+
+    /** 单个比较值的类型匹配校验。 */
+    private void validateSingleValue(String variableName, WorkflowVariables.ValueTypeEnum type, String value) {
         switch (type) {
             case NUMERIC -> {
                 try {
-                    new BigDecimal(expectedValue);
+                    new BigDecimal(value);
                 } catch (NumberFormatException e) {
                     throw new BusinessException(ErrorCodeEnum.FLOW_RULE_INVALID,
-                            variableName + " 条件的比较值必须是数字：" + expectedValue);
+                            variableName + " 条件的比较值必须是数字：" + value);
                 }
             }
             case BOOLEAN -> {
-                if (!"true".equalsIgnoreCase(expectedValue) && !"false".equalsIgnoreCase(expectedValue)) {
+                if (!"true".equalsIgnoreCase(value) && !"false".equalsIgnoreCase(value)) {
                     throw new BusinessException(ErrorCodeEnum.FLOW_RULE_INVALID,
                             variableName + " 条件的比较值只能是 true / false");
                 }
@@ -512,9 +615,13 @@ public class FlowConfigManagementService {
     private FlowConfigItems.Config toDetail(FlowConfig config) {
         List<FlowConfigItems.NodeConfig> nodes = config.getNodes().stream()
                 .map(node -> new FlowConfigItems.NodeConfig(
-                        node.getName(), node.getNodeType(), node.getAssigneeType(),
-                        node.getAssigneeValue(), node.getAssigneeScope(),
-                        resolveRoleNames(node.getAssigneeValue()), node.getCcTargets()))
+                        node.getName(), node.getNodeType(),
+                        node.getAssigneeSubject(), node.getAssigneeValue(),
+                        resolveAssigneeText(node),
+                        node.getAssigneeScope(), node.getAssigneeScopeValue(),
+                        node.getAssigneeLevel(), node.isAssigneeChain(),
+                        node.getApproveMode(), node.getEmptyStrategy(), node.getEmptyFallback(),
+                        node.getApprovalMode(), node.getCcTargets()))
                 .toList();
         List<FlowConfigItems.Transition> transitions = config.getTransitions().stream()
                 .sorted(java.util.Comparator.comparingInt(FlowTransition::getSortOrder))
@@ -529,21 +636,36 @@ public class FlowConfigManagementService {
                 config.getStatus(), config.getVersion(), nodes, transitions);
     }
 
-    /** 候选角色 ID → 角色名展示（ROLE 节点用；解析不到的 ID 原样保留以便发现问题）。 */
-    private String resolveRoleNames(String assigneeValue) {
-        if (!StringUtils.hasText(assigneeValue)) {
+    /** 主体参数展示文本：角色 ID → 角色名；成员账号 → 姓名；其余原样（解析不到时保留原值便于发现问题）。 */
+    private String resolveAssigneeText(FlowNodeConfig node) {
+        String value = node.getAssigneeValue();
+        if (!StringUtils.hasText(value)) {
             return null;
         }
-        List<String> names = new ArrayList<>();
-        for (String piece : assigneeValue.split(",")) {
-            String trimmed = piece.trim();
-            if (!StringUtils.hasText(trimmed)) {
-                continue;
+        if (node.getAssigneeSubject() == AssigneeSubjectEnum.ROLE) {
+            List<String> names = new ArrayList<>();
+            for (String piece : split(value)) {
+                names.add(piece.matches("\\d+")
+                        ? sysRoleRepository.findById(Long.valueOf(piece))
+                                .map(SysRole::getName).orElse(piece)
+                        : piece);
             }
-            names.add(sysRoleRepository.findById(Long.valueOf(trimmed))
-                    .map(SysRole::getName).orElse(trimmed));
+            return String.join("、", names);
         }
-        return String.join("、", names);
+        if (node.getAssigneeSubject() == AssigneeSubjectEnum.MEMBER) {
+            List<String> names = new ArrayList<>();
+            for (String piece : split(value)) {
+                names.add(sysUserRepository.findByAccount(piece)
+                        .map(user -> user.getName()).orElse(piece));
+            }
+            return String.join("、", names);
+        }
+        return value;
+    }
+
+    /** 空白归一化为 null（避免空串落库后与"未配置"混淆）。 */
+    private static String trimToNull(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
     }
 
     private FlowConfig findByType(String type) {

@@ -291,7 +291,8 @@ class ApiRoundTripContractTest {
         ObjectNode approval = nodes.addObject();
         approval.put("name", "直属主管");
         approval.put("nodeType", "APPROVAL");
-        approval.put("assigneeType", "MANAGER");
+        approval.put("assigneeSubject", "SUPERIOR");
+        approval.put("assigneeLevel", 1);
         ArrayNode transitions = body.putArray("transitions");
         transitions.addObject().put("fromNodeName", "发起人").put("toNodeName", "直属主管");
         transitions.addObject().put("fromNodeName", "直属主管");

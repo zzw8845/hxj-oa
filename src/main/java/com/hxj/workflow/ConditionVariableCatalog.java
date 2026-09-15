@@ -47,6 +47,9 @@ public class ConditionVariableCatalog {
                 }
             }
         }
+        // 系统字段（钉钉同款）：发起人/发起人部门/岗位——可直接用于"按发起人部门分流"型条件
+        WorkflowVariables.SYSTEM_VARIABLES.forEach(key -> variables.putIfAbsent(
+                key, WorkflowVariables.systemVariableType(key)));
         WorkflowVariables.RESERVED_KEY_VARIABLES.forEach(key -> variables.putIfAbsent(
                 key, WorkflowVariables.reservedKeyType(key)));
         return variables;

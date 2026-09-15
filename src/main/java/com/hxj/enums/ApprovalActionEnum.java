@@ -19,8 +19,10 @@ public enum ApprovalActionEnum {
     VOID(5,"作废"),
     /** 转交：离职交接/管理员调整，将待办任务转给其他审批人。 */
     TRANSFER(6,"转交"),
-    /** 自动通过：发起人或重复审批人的节点按去重规则系统自动通过。 */
-    AUTO_PASS(7,"自动通过");
+    /** 自动通过：发起人或重复审批人的节点按去重规则系统自动通过，或节点审批类型配置为自动通过。 */
+    AUTO_PASS(7,"自动通过"),
+    /** 自动拒绝：审批人解析为空且空策略为自动拒绝时，系统按策略驳回并终止流程。 */
+    AUTO_REJECT(8,"自动拒绝");
 
     private final Integer code;
     private final String text;

@@ -50,4 +50,9 @@ public interface SysUserRepository extends JpaRepository<SysUser, Long> {
             + "where r.id in :roleIds and u.departmentId = :departmentId order by u.account")
     List<String> findAccountsByRoleIdsAndDepartmentId(@Param("roleIds") Collection<Long> roleIds,
                                                       @Param("departmentId") Long departmentId);
+
+    /** 拥有指定权限点的成员账号（按账号升序）——空策略"转交管理员"的落地对象来源。 */
+    @Query("select distinct u.account from SysUser u join u.roles r join r.permissions p "
+            + "where p.code = :permissionCode order by u.account")
+    List<String> findAccountsByPermission(@Param("permissionCode") String permissionCode);
 }

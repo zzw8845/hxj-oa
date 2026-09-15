@@ -116,11 +116,11 @@ class ApprovalActionServiceIntegrationTest {
         config.setCategory(FlowCategoryEnum.DAILY);
         config.addNode(new FlowNodeConfig("发起人", FlowNodeTypeEnum.START));
         FlowNodeConfig managerNode = new FlowNodeConfig("直属主管", FlowNodeTypeEnum.APPROVAL);
-        managerNode.setAssigneeType(com.hxj.enums.AssigneeTypeEnum.ROLE);
+        managerNode.setAssigneeSubject(com.hxj.enums.AssigneeSubjectEnum.ROLE);
         managerNode.setAssigneeValue(String.valueOf(managerRole.getId()));
         config.addNode(managerNode);
         FlowNodeConfig gmNode = new FlowNodeConfig("执行总经理审批", FlowNodeTypeEnum.APPROVAL);
-        gmNode.setAssigneeType(com.hxj.enums.AssigneeTypeEnum.ROLE);
+        gmNode.setAssigneeSubject(com.hxj.enums.AssigneeSubjectEnum.ROLE);
         gmNode.setAssigneeValue(String.valueOf(gmRole.getId()));
         config.addNode(gmNode);
         config.addNode(new FlowNodeConfig("抄送财务", FlowNodeTypeEnum.CC));
@@ -422,7 +422,7 @@ class ApprovalActionServiceIntegrationTest {
         sealConfig.setCategory(FlowCategoryEnum.SEAL);
         sealConfig.addNode(new FlowNodeConfig("发起人", FlowNodeTypeEnum.START));
         FlowNodeConfig sealNode = new FlowNodeConfig("内控专员用印", FlowNodeTypeEnum.APPROVAL);
-        sealNode.setAssigneeType(com.hxj.enums.AssigneeTypeEnum.ROLE);
+        sealNode.setAssigneeSubject(com.hxj.enums.AssigneeSubjectEnum.ROLE);
         sealNode.setAssigneeValue(String.valueOf(managerRole.getId()));
         sealConfig.addNode(sealNode);
         sealConfig.addTransition(edge(sealConfig.getNodes().get(0), sealNode));
@@ -495,13 +495,13 @@ class ApprovalActionServiceIntegrationTest {
 
     @Test
     void shouldAssignManagerLineNodeToApplicantsManager() {
-        // 直属主管节点流程（钉钉式汇报线：assigneeRole=直属主管 → ${managerAccount} 动态指派）
+        // 部门主管节点流程（钉钉同构：主体=DEPT_HEAD → 提交时解析候选人写入节点级变量）
         FlowConfig managerFlow = new FlowConfig();
         managerFlow.setType("直属主管审批流程");
         managerFlow.setCategory(FlowCategoryEnum.DAILY);
         managerFlow.addNode(new FlowNodeConfig("发起人", FlowNodeTypeEnum.START));
         FlowNodeConfig managerNode = new FlowNodeConfig("直属主管审批", FlowNodeTypeEnum.APPROVAL);
-        managerNode.setAssigneeType(com.hxj.enums.AssigneeTypeEnum.MANAGER);
+        managerNode.setAssigneeSubject(com.hxj.enums.AssigneeSubjectEnum.DEPT_HEAD);
         managerFlow.addNode(managerNode);
         managerFlow.addTransition(edge(managerFlow.getNodes().get(0), managerNode));
         managerFlow.addTransition(edge(managerNode, null));
@@ -521,8 +521,10 @@ class ApprovalActionServiceIntegrationTest {
         document.setStatus(DocumentStatusEnum.APPROVING);
         document.setCurrentNode("直属主管审批");
         document = documentRepository.saveAndFlush(document);
+        // 节点级候选变量由提交链路解析写入（部门主管链 → gm1）
         String pid = workflowService.startProcess(managerFlow.getId(), document.getId(),
-                java.util.Map.of("initiator", "manager1", "managerAccount", "gm1"));
+                java.util.Map.of(com.hxj.workflow.WorkflowVariables
+                        .candidatesVariable(managerNode.getId()), List.of("gm1")));
         document.setProcessInstanceId(pid);
         documentRepository.saveAndFlush(document);
 

@@ -5,8 +5,9 @@ import com.hxj.common.ErrorCodeEnum;
 import com.hxj.entity.*;
 import com.hxj.enums.BusinessTypeEnum;
 import com.hxj.common.PageResponse;
-import com.hxj.enums.AssigneeScopeEnum;
-import com.hxj.enums.AssigneeTypeEnum;
+import com.hxj.enums.AssigneeSubjectEnum;
+import com.hxj.enums.EmptyAssigneeStrategyEnum;
+import com.hxj.enums.NodeApprovalModeEnum;
 import com.hxj.enums.CcSourceEnum;
 import com.hxj.enums.DocumentStatusEnum;
 import com.hxj.enums.FlowNodeTypeEnum;
@@ -58,8 +59,7 @@ public class DocumentApplicationService {
     private final WorkflowPort workflowPort;
     private final DocumentAccessPolicy accessPolicy;
     private final LocalAttachmentStorage attachmentStorage;
-    private final com.hxj.workflow.DeptScopedRoleResolver deptScopedRoleResolver;
-    private final com.hxj.workflow.SupervisorChainResolver supervisorChainResolver;
+    private final com.hxj.workflow.AssigneeResolver assigneeResolver;
     private final BigDecimal riskThreshold;
 
     public DocumentApplicationService(
@@ -74,8 +74,7 @@ public class DocumentApplicationService {
             WorkflowPort workflowPort,
             DocumentAccessPolicy accessPolicy,
             LocalAttachmentStorage attachmentStorage,
-            com.hxj.workflow.DeptScopedRoleResolver deptScopedRoleResolver,
-            com.hxj.workflow.SupervisorChainResolver supervisorChainResolver,
+            com.hxj.workflow.AssigneeResolver assigneeResolver,
             @Value("${app.risk-threshold:80000}") BigDecimal riskThreshold) {
         this.documentRepository = documentRepository;
         this.attachmentRepository = attachmentRepository;
@@ -88,8 +87,7 @@ public class DocumentApplicationService {
         this.workflowPort = workflowPort;
         this.accessPolicy = accessPolicy;
         this.attachmentStorage = attachmentStorage;
-        this.deptScopedRoleResolver = deptScopedRoleResolver;
-        this.supervisorChainResolver = supervisorChainResolver;
+        this.assigneeResolver = assigneeResolver;
         this.riskThreshold = riskThreshold;
     }
 
@@ -112,7 +110,7 @@ public class DocumentApplicationService {
         }
         // 「发起人自选」节点需要申请人在提交时指定审批人（防提交后任务无主/空集自动跳过）
         boolean hasSelfSelect = flowConfig.getNodes().stream()
-                .anyMatch(n -> n.getAssigneeType() == AssigneeTypeEnum.SELF_SELECT);
+                .anyMatch(n -> n.getAssigneeSubject() == AssigneeSubjectEnum.INITIATOR_SELECT);
         if (hasSelfSelect && request.approverAccounts().isEmpty()) {
             throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID,
                     "该流程含「发起人自选」节点，请指定审批人");
@@ -123,28 +121,11 @@ public class DocumentApplicationService {
                         "自选审批人不存在：" + account);
             }
         }
-        // 动态指派前置校验（钉钉同构）：所有动态寻人机制在提交时先解析，解析为空即拒绝提交——
-        // 把"卡单等管理员救"变成"提交时发现"；与保存关口的静态校验共同覆盖两类坏配置
-        if (flowConfig.getNodes().stream().anyMatch(n -> n.getAssigneeType() == AssigneeTypeEnum.MANAGER
-                || n.getAssigneeType() == AssigneeTypeEnum.MANAGER_CHAIN)
-                && supervisorChainResolver.resolveChain(applicant).isEmpty()) {
-            throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID,
-                    "申请人未设置直属主管，且其部门及上级部门均未设置负责人，无法路由「直属主管」审批节点，请联系管理员在组织架构中补配");
-        }
-        // 「角色 + 按发起人部门」节点（核算会计、部门HR 等）：逐节点解析，任一为空即拒绝
-        List<String> unresolvedScopedNodes = flowConfig.getNodes().stream()
-                .filter(node -> node.getAssigneeType() == AssigneeTypeEnum.ROLE
-                        && node.getAssigneeScope() == AssigneeScopeEnum.INITIATOR_DEPT)
-                .filter(node -> deptScopedRoleResolver
-                        .resolve(applicant, roleIds(node.getAssigneeValue())).isEmpty())
-                .map(FlowNodeConfig::getName)
-                .toList();
-        if (!unresolvedScopedNodes.isEmpty()) {
-            throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID,
-                    "申请人所在部门未配置下列节点的审批角色分工，无法路由："
-                            + String.join("、", unresolvedScopedNodes)
-                            + "，请联系管理员在部门服务分工或角色成员中补配");
-        }
+        // 审批人统一解析（六维正交模型）：解析 + 空策略落地；解析为空且未配空策略 → 提交即拒，
+        // 把"卡单等管理员救"变成"提交时发现"
+        com.hxj.workflow.AssigneeResolver.Context assigneeContext =
+                new com.hxj.workflow.AssigneeResolver.Context(applicant, values, request.approverAccounts());
+        AssigneeResolution resolution = resolveAssignees(flowConfig, assigneeContext);
         BusinessTypeEnum businessType = BusinessTypeEnum.valueOf(template.getCategory());
 
         OaDocument document = new OaDocument();
@@ -177,9 +158,19 @@ public class DocumentApplicationService {
         documentRepository.saveAndFlush(document);
         createSelfSelectedCc(document, request.ccUserIds());
 
+        // 空策略自动通过的节点：引擎 skipExpression 不产生审批动作，审计留痕在业务侧补齐
+        for (String nodeName : resolution.autoPassNodes()) {
+            com.hxj.entity.ApprovalRecord autoPass = new com.hxj.entity.ApprovalRecord();
+            autoPass.setDocument(document);
+            autoPass.setNodeName(nodeName);
+            autoPass.setApprover(applicant);
+            autoPass.setAction(com.hxj.enums.ApprovalActionEnum.AUTO_PASS);
+            autoPass.setComment("该节点未解析到审批人，按空策略自动通过并跳过");
+            approvalRepository.save(autoPass);
+        }
         String processInstanceId = workflowPort.startProcess(
                 flowConfig.getId(), document.getId(),
-                workflowVariables(values, applicant, request.approverAccounts(), flowConfig, fields));
+                workflowVariables(values, applicant, fields, resolution.variables()));
         document.setProcessInstanceId(processInstanceId);
         document.setFlowConfigId(flowConfig.getId());
         return toSummary(document);
@@ -373,16 +364,15 @@ public class DocumentApplicationService {
     }
 
     /**
-     * 构建流程变量（字段即变量 + 系统变量 + 节点级动态指派）：
-     * 模板声明"参与流程条件"的字段全量提升（类型按控件类型归一，缺失值给类型安全默认），
-     * 保证条件表达式在网关求值时不会遇到 null。
+     * 构建流程变量：保留键兜底值 + 模板声明字段（字段即变量）+ 系统字段 + 审批人解析产物。
+     *
+     * <p>保留键兜底与保存关口的可用变量集合保持一致——「校验通过 ⟹ 运行时可求值」，
+     * 否则流程配了 amount 条件而模板无该字段时，网关求值会因变量缺失异常导致单据卡死。
      */
     private Map<String, Object> workflowVariables(
-            Map<String, Object> fieldValues, SysUser applicant, List<String> approverAccounts,
-            FlowConfig flowConfig, List<FormField> fields) {
+            Map<String, Object> fieldValues, SysUser applicant, List<FormField> fields,
+            Map<String, Object> assigneeVariables) {
         Map<String, Object> variables = new LinkedHashMap<>();
-        // 保留键兜底值：与保存关口的可用条件变量集合保持一致——「校验通过 ⟹ 运行时可求值」，
-        // 否则流程配了 amount 条件而模板无该字段时，网关求值会因变量缺失异常导致单据卡死
         variables.put("amount", BigDecimal.ZERO);
         variables.put("involvesFunds", Boolean.FALSE);
         variables.put("requiresAdminReview", Boolean.FALSE);
@@ -395,23 +385,115 @@ public class DocumentApplicationService {
                         conditionValue(field, fieldValues.get(field.getFieldKey())));
             }
         }
-        // 主管链（钉钉同构）：人工指定的直属主管优先，未设则沿部门负责人树自近及远兜底——
-        // 「直属主管」节点取链首 ${managerAccount}，「逐级主管」节点消费整条链串行审批（上限 10 级）
-        List<String> managerChain = supervisorChainResolver.resolveChain(applicant);
-        variables.put(WorkflowVariables.INITIATOR, applicant.getAccount());
-        variables.put(WorkflowVariables.MANAGER_ACCOUNT, managerChain.isEmpty() ? "" : managerChain.get(0));
-        variables.put(WorkflowVariables.MANAGER_CHAIN, managerChain);
-        // 「发起人自选」节点串行多实例的审批人集合（提交时申请人指定）
-        variables.put(WorkflowVariables.APPROVER_CHAIN, List.copyOf(approverAccounts));
-        // 「角色 + 按发起人部门」节点：逐节点解析主办账号，写入节点级变量（同一流程多个此类节点各自独立）
-        for (FlowNodeConfig node : flowConfig.getNodes()) {
-            if (node.getAssigneeType() == AssigneeTypeEnum.ROLE
-                    && node.getAssigneeScope() == AssigneeScopeEnum.INITIATOR_DEPT) {
-                variables.put(WorkflowVariables.scopedAssigneeVariable(node.getId()),
-                        deptScopedRoleResolver.resolveFirst(applicant, roleIds(node.getAssigneeValue())));
-            }
-        }
+        // 系统字段（钉钉同款）：发起人/发起人部门/岗位可直接作为条件判据，无需模板声明
+        variables.put(WorkflowVariables.SYS_INITIATOR, applicant.getAccount());
+        variables.put(WorkflowVariables.SYS_INITIATOR_DEPT_ID,
+                applicant.getDepartmentId() == null ? -1L : applicant.getDepartmentId());
+        variables.put(WorkflowVariables.SYS_INITIATOR_DEPT_NAME,
+                applicant.getDepartment() == null ? "" : applicant.getDepartment());
+        variables.put(WorkflowVariables.SYS_INITIATOR_POST,
+                applicant.getPost() == null ? "" : applicant.getPost());
+        // 审批人解析产物（节点级变量，同一流程多个同类节点各自独立）
+        variables.putAll(assigneeVariables);
+        // 空策略"自动通过"依赖 Flowable 原生 skipExpression，需显式开启开关
+        variables.put(com.hxj.workflow.AssigneeResolver.SKIP_EXPRESSION_ENABLED_VARIABLE, Boolean.TRUE);
         return variables;
+    }
+
+    /**
+     * 审批人统一解析（六维正交模型）+ 空策略落地。
+     *
+     * <p>逐个人工审批节点解析候选人：
+     * <ul>
+     *   <li>解析到人 → 写入节点候选变量（或签全局角色由 BPMN 侧用静态候选组，变量无害）；</li>
+     *   <li>解析为空 + 已配空策略 → 自动通过（跳过变量）/ 自动拒绝（拒绝变量）/
+     *       转模板管理员 / 转指定人（兜底人写回候选变量）；</li>
+     *   <li>解析为空 + 未配空策略 → 汇总后提交即拒，错误在提交时暴露而非卡单等管理员救。</li>
+     * </ul>
+     */
+    private AssigneeResolution resolveAssignees(
+            FlowConfig flowConfig, com.hxj.workflow.AssigneeResolver.Context context) {
+        Map<String, Object> variables = new LinkedHashMap<>();
+        List<String> unresolvedNodes = new ArrayList<>();
+        List<String> autoPassNodes = new ArrayList<>();
+        for (FlowNodeConfig node : flowConfig.getNodes()) {
+            if (node.getNodeType() != FlowNodeTypeEnum.APPROVAL
+                    && node.getNodeType() != FlowNodeTypeEnum.HANDLER) {
+                continue;
+            }
+            if (node.getAssigneeSubject() == null) {
+                continue;
+            }
+            if (node.getApprovalMode() != null
+                    && node.getApprovalMode() != NodeApprovalModeEnum.MANUAL) {
+                continue; // 节点级自动通过/自动拒绝由 BPMN 服务任务处理，无需解析
+            }
+            // BPMN 的跳过/拒绝表达式总会求值：先兜底为 false，保证变量始终存在（否则引擎报未知属性）
+            if (node.getEmptyStrategy() == EmptyAssigneeStrategyEnum.AUTO_PASS) {
+                variables.put(WorkflowVariables.skipVariable(node.getId()), Boolean.FALSE);
+            }
+            if (node.getEmptyStrategy() == EmptyAssigneeStrategyEnum.AUTO_REJECT) {
+                variables.put(WorkflowVariables.autoRejectVariable(node.getId()), Boolean.FALSE);
+            }
+            List<String> candidates = assigneeResolver.resolve(node, context);
+            if (candidates.isEmpty()) {
+                EmptyAssigneeStrategyEnum strategy = node.getEmptyStrategy();
+                if (strategy == null) {
+                    unresolvedNodes.add(node.getName());
+                    continue;
+                }
+                switch (strategy) {
+                    case AUTO_PASS -> {
+                        variables.put(WorkflowVariables.skipVariable(node.getId()), Boolean.TRUE);
+                        // 候选集合变量必须存在（BPMN 多实例的集合表达式会求值它）：空集合 + 跳过标记
+                        variables.put(WorkflowVariables.candidatesVariable(node.getId()), List.of());
+                        autoPassNodes.add(node.getName());
+                    }
+                    case AUTO_REJECT -> {
+                        variables.put(WorkflowVariables.autoRejectVariable(node.getId()), Boolean.TRUE);
+                        variables.put(WorkflowVariables.candidatesVariable(node.getId()), List.of());
+                    }
+                    case TO_ADMIN -> candidates = adminAccounts();
+                    case TO_USER -> candidates = candidateAccounts(node.getEmptyFallback());
+                }
+                // 跳过/拒绝类策略本就没有候选人（由 BPMN 网关/skipExpression 承接），不参与"必须解析到人"判定
+                if (strategy == EmptyAssigneeStrategyEnum.AUTO_PASS
+                        || strategy == EmptyAssigneeStrategyEnum.AUTO_REJECT) {
+                    continue;
+                }
+                if (candidates.isEmpty()) {
+                    // 兜底对象本身不存在：仍拒绝提交，避免空列表多实例静默跳过造成"假审批"
+                    unresolvedNodes.add(node.getName());
+                    continue;
+                }
+            }
+            variables.put(WorkflowVariables.candidatesVariable(node.getId()), candidates);
+        }
+        if (!unresolvedNodes.isEmpty()) {
+            throw new BusinessException(ErrorCodeEnum.FORM_FIELD_INVALID,
+                    "无法解析下列审批节点的审批人：" + String.join("、", unresolvedNodes)
+                            + "，请在组织架构/角色成员中补配，或在流程配置中为该节点设置空策略");
+        }
+        return new AssigneeResolution(variables, autoPassNodes);
+    }
+
+    /** 审批人解析结果：节点候选变量 + 空策略自动通过的节点（供业务侧补审计留痕）。 */
+    private record AssigneeResolution(Map<String, Object> variables, List<String> autoPassNodes) {
+    }
+
+    /** 模板管理员 = 拥有全节点审批权限的账号（钉钉"转交管理员"的落地对象）。 */
+    private List<String> adminAccounts() {
+        return userRepository.findAccountsByPermission(
+                com.hxj.approval.ApprovalActionService.APPROVE_ALL_NODES);
+    }
+
+    /** 空策略 TO_USER 的兜底账号（值不存在时返回空列表 → 交由上层拒绝提交）。 */
+    private List<String> candidateAccounts(String account) {
+        if (account == null || account.isBlank()) {
+            return List.of();
+        }
+        return userRepository.findByAccount(account.trim()).map(user -> List.of(user.getAccount()))
+                .orElse(List.of());
     }
 
     /** 字段值按控件类型归一为条件变量值：数值缺失给 0、布尔缺失给 false、文本缺失给空串。 */

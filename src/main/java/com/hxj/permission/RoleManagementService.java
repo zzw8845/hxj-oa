@@ -83,7 +83,7 @@ public class RoleManagementService {
         if (!role.getMembers().isEmpty()) {
             throw new BusinessException(ErrorCodeEnum.ROLE_HAS_MEMBERS, "角色下存在员工，无法删除");
         }
-        boolean flowUsed = flowNodeConfigRepository.findByAssigneeType(com.hxj.enums.AssigneeTypeEnum.ROLE)
+        boolean flowUsed = flowNodeConfigRepository.findByAssigneeSubject(com.hxj.enums.AssigneeSubjectEnum.ROLE)
                 .stream()
                 .anyMatch(node -> node.getAssigneeValue() != null
                         && java.util.Arrays.asList(node.getAssigneeValue().split(","))

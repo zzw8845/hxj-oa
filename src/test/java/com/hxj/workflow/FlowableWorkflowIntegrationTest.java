@@ -60,11 +60,11 @@ class FlowableWorkflowIntegrationTest {
         config.setCategory(FlowCategoryEnum.DAILY);
         config.addNode(new FlowNodeConfig("发起人", FlowNodeTypeEnum.START));
         FlowNodeConfig manager = new FlowNodeConfig("直属主管", FlowNodeTypeEnum.APPROVAL);
-        manager.setAssigneeType(com.hxj.enums.AssigneeTypeEnum.ROLE);
+        manager.setAssigneeSubject(com.hxj.enums.AssigneeSubjectEnum.ROLE);
         manager.setAssigneeValue(MANAGER_GROUP_ID);
         config.addNode(manager);
         FlowNodeConfig gm = new FlowNodeConfig("执行总经理（≥2万元）", FlowNodeTypeEnum.APPROVAL);
-        gm.setAssigneeType(com.hxj.enums.AssigneeTypeEnum.ROLE);
+        gm.setAssigneeSubject(com.hxj.enums.AssigneeSubjectEnum.ROLE);
         gm.setAssigneeValue(CEO_GROUP_ID);
         config.addNode(gm);
         config.addNode(new FlowNodeConfig("抄送财务", FlowNodeTypeEnum.CC));
@@ -146,36 +146,48 @@ class FlowableWorkflowIntegrationTest {
     }
 
     @Test
-    void shouldRouteDeptScopedRoleNodeToResolvedVariableAndStayUnassignedWhenAbsent() {
+    void shouldRouteDeptScopedRoleNodeToResolvedCandidates() {
+        FlowConfig cfg = deptScopedRoleFlow(null);
+        definitionService.deploy(cfg.getId());
+
+        // 候选人在提交时解析写入节点级变量：多实例消费（或签=任一通过即过）
+        String candidatesVar = WorkflowVariables.candidatesVariable(cfg.getNodes().get(1).getId());
+        String withMapping = workflowService.startProcess(
+                cfg.getId(), 2001L, Map.of(candidatesVar, List.of("wengtingting")));
+        assertThat(singleTask(withMapping).getAssignee()).isEqualTo("wengtingting");
+
+        runtimeService.deleteProcessInstance(withMapping, "cleanup");
+    }
+
+    @Test
+    void shouldSkipNodeWhenEmptyStrategyIsAutoPass() {
+        // 空策略=自动通过：提交关口写入跳过变量，引擎按 skipExpression 跳过该节点（钉钉同款）
+        FlowConfig cfg = deptScopedRoleFlow(com.hxj.enums.EmptyAssigneeStrategyEnum.AUTO_PASS);
+        definitionService.deploy(cfg.getId());
+
+        String candidatesVar = WorkflowVariables.candidatesVariable(cfg.getNodes().get(1).getId());
+        String skipped = workflowService.startProcess(cfg.getId(), 2002L, Map.of(
+                candidatesVar, List.of(),
+                WorkflowVariables.skipVariable(cfg.getNodes().get(1).getId()), Boolean.TRUE,
+                com.hxj.workflow.AssigneeResolver.SKIP_EXPRESSION_ENABLED_VARIABLE, Boolean.TRUE));
+
+        assertThat(taskService.createTaskQuery().processInstanceId(skipped).count()).isZero();
+    }
+
+    /** 角色 + 发起人部门范围节点（钉钉"角色管理范围"，即"会计按部门"）。 */
+    private FlowConfig deptScopedRoleFlow(com.hxj.enums.EmptyAssigneeStrategyEnum emptyStrategy) {
         flowConfigRepository.deleteAll();
         FlowConfig cfg = new FlowConfig();
         cfg.setType("费用报销");
         cfg.setCategory(FlowCategoryEnum.DAILY);
         cfg.addNode(new FlowNodeConfig("发起人", FlowNodeTypeEnum.START));
         FlowNodeConfig accountant = new FlowNodeConfig("会计（按部门）", FlowNodeTypeEnum.APPROVAL);
-        // 机制化表达：角色（核算会计=33）+ 范围（按发起人部门）——不再有专用审批人类型
-        accountant.setAssigneeType(com.hxj.enums.AssigneeTypeEnum.ROLE);
+        accountant.setAssigneeSubject(com.hxj.enums.AssigneeSubjectEnum.ROLE);
         accountant.setAssigneeValue("33");
         accountant.setAssigneeScope(com.hxj.enums.AssigneeScopeEnum.INITIATOR_DEPT);
+        accountant.setEmptyStrategy(emptyStrategy);
         cfg.addNode(accountant);
         cfg.addTransition(transition(cfg.getNodes().get(0), accountant, null, null, null));
-        flowConfigRepository.saveAndFlush(cfg);
-
-        definitionService.deploy(cfg.getId());
-
-        // 变量名按节点 ID 生成：同一流程多个此类节点各自独立，互不覆盖
-        String variable = WorkflowVariables.scopedAssigneeVariable(accountant.getId());
-
-        // 有部门分工解析结果：动态指派给该节点级变量
-        String withMapping = workflowService.startProcess(
-                cfg.getId(), 2001L, Map.of(variable, "wengtingting"));
-        assertThat(singleTask(withMapping).getAssignee()).isEqualTo("wengtingting");
-
-        runtimeService.deleteProcessInstance(withMapping, "cleanup");
-
-        // 无分工映射：生产路径总是写入空串变量 → 任务保持未指派，待管理员人工指派
-        String withoutMapping = workflowService.startProcess(cfg.getId(), 2002L, Map.of(variable, ""));
-        String unassigned = singleTask(withoutMapping).getAssignee();
-        assertThat(unassigned == null || unassigned.isBlank()).isTrue();
+        return flowConfigRepository.saveAndFlush(cfg);
     }
 }

@@ -1,7 +1,7 @@
 package com.hxj.repository;
 
 import com.hxj.entity.FlowNodeConfig;
-import com.hxj.enums.AssigneeTypeEnum;
+import com.hxj.enums.AssigneeSubjectEnum;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -21,6 +21,6 @@ public interface FlowNodeConfigRepository extends JpaRepository<FlowNodeConfig, 
     @Query("delete from FlowNodeConfig n where n.flowConfig.id = :configId")
     void deleteByConfigId(@Param("configId") Long configId);
 
-    /** 指派协议为角色候选组的节点（角色删除守卫按 assignee_value 中的角色 ID 精确匹配）。 */
-    List<FlowNodeConfig> findByAssigneeType(AssigneeTypeEnum assigneeType);
+    /** 审批主体为角色成员的节点（角色删除守卫按 assignee_value 中的角色 ID 精确匹配）。 */
+    List<FlowNodeConfig> findByAssigneeSubject(AssigneeSubjectEnum assigneeSubject);
 }
